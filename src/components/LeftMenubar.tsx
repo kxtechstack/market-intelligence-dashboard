@@ -1,12 +1,13 @@
-import { Clock, TrendingUp, Search, Radar, MessageSquare, ShieldAlert, Compass, Bookmark, Settings, HelpCircle, Layers } from "lucide-react";
+import { Clock, TrendingUp, Search, Radar, MessageSquare, ShieldAlert, Compass, Bookmark, Settings, HelpCircle, Layers, LogOut } from "lucide-react";
 import { SIDEBAR_ITEMS, BOTTOM_SIDEBAR_ITEMS } from "../data";
 
 interface LeftMenubarProps {
   activeTab: string;
   onTabChange: (id: string) => void;
+  onLogout: () => void;
 }
 
-export default function LeftMenubar({ activeTab, onTabChange }: LeftMenubarProps) {
+export default function LeftMenubar({ activeTab, onTabChange, onLogout }: LeftMenubarProps) {
   // Map string icon names to actual Lucide component instances
   const renderIcon = (iconName: string, isActive: boolean) => {
     const iconClass = `w-[15px] h-[15px] transition-colors ${
@@ -114,6 +115,19 @@ export default function LeftMenubar({ activeTab, onTabChange }: LeftMenubarProps
             </button>
           );
         })}
+        
+        <div className="w-full h-px bg-zinc-200 my-1"></div>
+
+        <button
+          onClick={onLogout}
+          className="group/item relative w-8.5 h-8.5 flex items-center justify-center transition-all rounded-[4px] hover:bg-zinc-100 text-zinc-500"
+        >
+          <LogOut className="w-[15px] h-[15px]" />
+          
+          <div className="absolute left-[44px] top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 translate-x-1 group-hover/item:translate-x-2 transition-all duration-150 bg-zinc-900 border border-zinc-800 text-[#f8fafc] text-[10.5px] font-normal px-2.5 py-1 rounded-[4px] shadow-[0_2px_8px_rgba(0,0,0,0.15)] whitespace-nowrap z-50 pointer-events-none">
+            Logout
+          </div>
+        </button>
       </div>
     </aside>
   );

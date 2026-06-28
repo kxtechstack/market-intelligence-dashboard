@@ -16,6 +16,9 @@ import { AlertItem, ChatMessage } from "./types";
 import { ShieldAlert } from "lucide-react";
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [activeTab, setActiveTab] = useState<string>("policy_risk_monitor");
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -142,23 +145,76 @@ export default function App() {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 3 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
-      id="app-container"
-      className="w-screen h-screen flex overflow-hidden bg-zinc-100 select-text"
-    >
-      {/* 1. Left Vertical Sidebar Rail */}
-      <LeftMenubar activeTab={activeTab} onTabChange={setActiveTab} />
+    <>
+      {!isLoggedIn ? (
+        <div className="w-screen h-screen flex items-center justify-center bg-zinc-50 select-text">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-sm bg-white p-8 border border-zinc-200 rounded-[6px] shadow-sm flex flex-col items-center"
+          >
+            <div className="w-10 h-10 bg-zinc-900 rounded-[6px] flex items-center justify-center mb-6">
+              <ShieldAlert className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-xl font-semibold tracking-tight text-zinc-900 mb-6">Welcome Back</h2>
+            
+            <form 
+              onSubmit={(e) => { e.preventDefault(); setIsLoggedIn(true); }}
+              className="w-full flex flex-col gap-4"
+            >
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-medium text-zinc-700">Email</label>
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  className="w-full h-10 px-3 text-[13px] border border-zinc-200 rounded-[4px] focus:outline-none focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed]/20 transition-all"
+                  placeholder="name@company.com"
+                />
+              </div>
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[12px] font-medium text-zinc-700">Password</label>
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  className="w-full h-10 px-3 text-[13px] border border-zinc-200 rounded-[4px] focus:outline-none focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed]/20 transition-all"
+                  placeholder="••••••••"
+                />
+              </div>
 
-      {/* 2. Content Region: Document Intelligence and Integrated AI Chat in 2-Pane Split */}
-      <div id="central-split-viewport" className="flex-1 h-full flex overflow-hidden">
-        
-        {/* Render selected workspace views */}
-        {renderWorkspaceContent()}
+              <button 
+                type="submit"
+                className="w-full h-10 mt-2 bg-zinc-900 hover:bg-black text-white text-[13px] font-medium rounded-[4px] transition-colors flex items-center justify-center gap-2"
+              >
+                Login
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 3 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          id="app-container"
+          className="w-screen h-screen flex overflow-hidden bg-zinc-100 select-text"
+        >
+          {/* 1. Left Vertical Sidebar Rail */}
+          <LeftMenubar activeTab={activeTab} onTabChange={setActiveTab} onLogout={() => setIsLoggedIn(false)} />
 
-      </div>
-    </motion.div>
+          {/* 2. Content Region: Document Intelligence and Integrated AI Chat in 2-Pane Split */}
+          <div id="central-split-viewport" className="flex-1 h-full flex overflow-hidden">
+            
+            {/* Render selected workspace views */}
+            {renderWorkspaceContent()}
+
+          </div>
+        </motion.div>
+      )}
+    </>
   );
 }
