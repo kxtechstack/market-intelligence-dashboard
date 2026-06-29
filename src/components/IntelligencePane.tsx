@@ -3,7 +3,7 @@ import {
   Calendar, 
   Check, Share2, Info, MoreHorizontal, FileText, Search,
   ShieldAlert, BookOpen, Scale, AlertTriangle, Cpu, Layers, Pencil,
-  Sparkles, Bookmark, CornerDownLeft, Trash2, ArrowUpRight
+  Sparkles, Bookmark, CornerDownLeft, Trash2, ArrowUpRight, Square
 } from "lucide-react";
 import { AlertItem, ChatMessage } from "../types";
 import { supabase } from "../lib/supabase";
@@ -224,6 +224,7 @@ export default function IntelligencePane({
 
   const chatScrollRef = React.useRef<HTMLDivElement>(null);
   const detailsViewportRef = React.useRef<HTMLDivElement>(null);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const formatDateHuman = (dateStr: string): string => {
     if (!dateStr) return "Unknown Date";
@@ -562,6 +563,8 @@ export default function IntelligencePane({
   const handleLeftChatSend = async (text: string) => {
     if (!text.trim() || leftChatLoading) return;
 
+    abortControllerRef.current = new AbortController();
+
     const userMessage: ChatMessage = {
       id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2),
       role: "user",
@@ -590,7 +593,8 @@ export default function IntelligencePane({
           question: text,
           clientId: selectedClient,
           industry: industry
-        })
+        }),
+        signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) throw new Error("API request failed");
@@ -606,7 +610,11 @@ export default function IntelligencePane({
       };
 
       setLeftChatHistory(prev => [...prev, assistantMessage]);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Request was aborted');
+        return;
+      }
       console.error(err);
       const errorMessage: ChatMessage = {
         id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2),
@@ -623,13 +631,25 @@ export default function IntelligencePane({
   const handleLeftKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (leftChatInput.trim()) {
+      if (leftChatLoading) {
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+          setLeftChatLoading(false);
+        }
+      } else if (leftChatInput.trim()) {
         handleLeftChatSend(leftChatInput);
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
+      if (leftChatLoading) {
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+          setLeftChatLoading(false);
+        }
+      }
       setLeftChatInput("");
       setIsChatExpanded(false);
+      (e.currentTarget as HTMLElement).blur();
     }
   };
 
@@ -1252,12 +1272,40 @@ export default function IntelligencePane({
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (leftChatInput.trim()) {
+                  if (leftChatLoading) {
+                    if (abortControllerRef.current) {
+                      abortControllerRef.current.abort();
+                      setLeftChatLoading(false);
+                    }
+                  } else if (leftChatInput.trim()) {
                     handleLeftChatSend(leftChatInput);
                   }
                 }}
-                className="relative flex-shrink-0"
+                className="relative flex-shrink-0 mt-2"
               >
+                {/* Suggestions near input when focused */}
+                {isChatFocused && leftChatInput.trim() === "" && !leftChatLoading && (
+                  <div className="absolute bottom-full left-0 right-0 z-50 max-h-[200px] overflow-y-auto animate-fade-in p-2 pb-2 mb-1">
+                    <div className="flex flex-wrap gap-2">
+                    {chatSuggestions.map((suggestion, idx) => {
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault(); // Prevent input blur so we keep focus or handle focus state cleanly
+                            setLeftChatInput(suggestion);
+                          }}
+                          className="bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-700 text-[11.5px] px-3 py-1.5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all cursor-pointer text-left flex items-center gap-1.5"
+                        >
+                          <Sparkles className="w-3 h-3 text-[#7c3aed]/70 shrink-0" />
+                          <span className="truncate">{suggestion}</span>
+                        </button>
+                      );
+                    })}
+                    </div>
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="Ask more about policy, regulations and risk intelligence"
@@ -1266,8 +1314,7 @@ export default function IntelligencePane({
                   onFocus={() => { setIsChatFocused(true); }}
                   onBlur={() => setTimeout(() => setIsChatFocused(false), 200)}
                   onKeyDown={handleLeftKeyDown}
-                  disabled={leftChatLoading}
-                  className="w-full bg-[#fcfbf9]/40 text-[13px] pl-3.5 pr-26 py-3 border border-zinc-200 rounded-[6px] focus:outline-none focus:border-[#7c3aed] focus:ring-2 focus:ring-[#7c3aed]/20 placeholder:text-zinc-400 disabled:opacity-50 font-sans transition-all duration-150"
+                  className="w-full bg-[#fcfbf9]/40 text-[13px] pl-3.5 pr-26 py-3 border border-zinc-200 rounded-[6px] focus:outline-none focus:border-[#7c3aed] focus:ring-2 focus:ring-[#7c3aed]/20 placeholder:text-zinc-400 font-sans transition-all duration-150"
                 />
                  <div className="absolute right-2 top-2.5 flex items-center gap-0.5">
                   <button
@@ -1298,41 +1345,22 @@ export default function IntelligencePane({
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (leftChatInput.trim()) {
+                      if (leftChatLoading) {
+                        if (abortControllerRef.current) {
+                          abortControllerRef.current.abort();
+                          setLeftChatLoading(false);
+                        }
+                      } else if (leftChatInput.trim()) {
                         handleLeftChatSend(leftChatInput);
                       }
                     }}
-                    disabled={leftChatLoading}
                     className="w-7 h-7 bg-zinc-900 border border-zinc-900 text-white flex items-center justify-center rounded-full hover:bg-black transition-colors cursor-pointer ml-1"
-                    title="Send"
+                    title={leftChatLoading ? "Stop generating" : "Send"}
                   >
-                    <CornerDownLeft className="w-3.5 h-3.5" />
+                    {leftChatLoading ? <Square className="w-3 h-3 fill-white" /> : <CornerDownLeft className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </form>
-              {/* Suggestions near input when focused */}
-              {isChatFocused && leftChatInput.trim() === "" && (
-                <div className="absolute bottom-[60px] left-0 right-0 z-50 max-h-[200px] overflow-y-auto animate-fade-in p-2 pb-4">
-                  <div className="flex flex-wrap gap-2">
-                  {chatSuggestions.map((suggestion, idx) => {
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault(); // Prevent input blur so we keep focus or handle focus state cleanly
-                          setLeftChatInput(suggestion);
-                        }}
-                        className="bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-700 text-[11.5px] px-3 py-1.5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all cursor-pointer text-left flex items-center gap-1.5"
-                      >
-                        <Sparkles className="w-3 h-3 text-[#7c3aed]/70" />
-                        <span>{suggestion}</span>
-                      </button>
-                    );
-                  })}
-                  </div>
-                </div>
-              )}
           </div>
         )}
         {activeTab === "bookmarks" && (
