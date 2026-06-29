@@ -1029,12 +1029,24 @@ export default function IntelligencePane({
               {/* 1 in a small box under the main text representing sources, visible link on hover */}
               <div className="flex items-center gap-1.5 select-text text-[11px] text-zinc-400 mt-1">
                 <span className="font-normal text-zinc-400">Source:</span>
-                <span 
-                  className="inline-flex items-center justify-center w-[18px] h-[18px] bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200 rounded text-[10.5px] font-bold text-zinc-500 hover:text-zinc-750 cursor-help transition-colors animate-fade-in select-none"
-                  title={selectedAlert.id === "cross-border-taxation" ? "Singapore Monetary Authority (MAS) Regulatory Consultation Platform" : `${selectedAlert.category} Primary Circular`}
-                >
-                  1
-                </span>
+                {selectedAlert.source_article_url ? (
+                  <a 
+                    href={selectedAlert.source_article_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center w-[18px] h-[18px] bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200 rounded text-[10.5px] font-bold text-zinc-500 hover:text-zinc-750 cursor-pointer transition-colors animate-fade-in select-none"
+                    title={selectedAlert.id === "cross-border-taxation" ? "Singapore Monetary Authority (MAS) Regulatory Consultation Platform" : `${selectedAlert.category} Primary Circular`}
+                  >
+                    1
+                  </a>
+                ) : (
+                  <span 
+                    className="inline-flex items-center justify-center w-[18px] h-[18px] bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200 rounded text-[10.5px] font-bold text-zinc-500 hover:text-zinc-750 cursor-help transition-colors animate-fade-in select-none"
+                    title={selectedAlert.id === "cross-border-taxation" ? "Singapore Monetary Authority (MAS) Regulatory Consultation Platform" : `${selectedAlert.category} Primary Circular`}
+                  >
+                    1
+                  </span>
+                )}
               </div>
             </div>
 
