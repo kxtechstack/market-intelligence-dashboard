@@ -219,7 +219,6 @@ export default function IntelligencePane({
   }[]>([]);
   const [leftChatInput, setLeftChatInput] = useState("");
   const [leftChatLoading, setLeftChatLoading] = useState(false);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(1);
   const [isChatExpanded, setIsChatExpanded] = useState(false);
   const [isChatFocused, setIsChatFocused] = useState(false);
 
@@ -373,6 +372,21 @@ export default function IntelligencePane({
         return "bg-[#fffbeb] border border-[#fde68a] text-[#78350f]";
       case "blue":
         return "bg-[#e0f2fe] border border-[#bae6fd] text-[#0369a1]";
+      case "emerald": return "bg-emerald-50 border border-emerald-200 text-emerald-800";
+      case "violet": return "bg-violet-50 border border-violet-200 text-violet-800";
+      case "indigo": return "bg-indigo-50 border border-indigo-200 text-indigo-800";
+      case "cyan": return "bg-cyan-50 border border-cyan-200 text-cyan-800";
+      case "sky": return "bg-sky-50 border border-sky-200 text-sky-800";
+      case "orange": return "bg-orange-50 border border-orange-200 text-orange-800";
+      case "purple": return "bg-purple-50 border border-purple-200 text-purple-800";
+      case "teal": return "bg-teal-50 border border-teal-200 text-teal-800";
+      case "yellow": return "bg-yellow-50 border border-yellow-200 text-yellow-800";
+      case "slate": return "bg-slate-50 border border-slate-200 text-slate-800";
+      case "red": return "bg-red-50 border border-red-200 text-red-800";
+      case "fuchsia": return "bg-fuchsia-50 border border-fuchsia-200 text-fuchsia-800";
+      case "lime": return "bg-lime-50 border border-lime-200 text-lime-800";
+      case "green": return "bg-green-50 border border-green-200 text-green-800";
+      case "gray": return "bg-gray-50 border border-gray-200 text-gray-800";
       default:
         return "bg-zinc-100 border border-zinc-200 text-zinc-650";
     }
@@ -380,11 +394,11 @@ export default function IntelligencePane({
 
   const getAlertImpactScore = (alert: AlertItem): number => {
     const impact = (alert.impact_level || "").toLowerCase();
-    if (impact === "critical") return 5;
-    if (impact === "high") return 4;
-    if (impact === "medium") return 3;
+    if (impact === "critical") return 4;
+    if (impact === "high") return 3;
+    if (impact === "medium") return 2;
     if (impact === "low") return 1;
-    return 3;
+    return 2;
   };
 
   const getImpactLabel = (alert: AlertItem): string => {
@@ -398,35 +412,66 @@ export default function IntelligencePane({
     return "blue";
   };
 
+  const getCategoryTagColor = (category: string) => {
+    switch ((category || "").trim()) {
+      case "Compliance Requirement": return "purple";
+      case "Licensing Change": return "green";
+      case "AML & KYC Compliance": return "indigo";
+      case "Sanctions & Embargo": return "rose";
+      case "Capital Requirements": return "blue";
+      case "Payments System": return "cyan";
+      case "Regulatory Risk": return "rose";
+      case "Regulatory Consultation": return "emerald";
+      case "Regulatory Enforcement": return "indigo";
+      case "Stablecoin & Crypto Regulation": return "purple";
+      case "Consumer Financial Protection": return "teal";
+      case "Federal Taxation": return "amber";
+      case "Trade & Tariffs": return "yellow";
+      case "Cross-Border Regulation": return "blue";
+      case "Corporate & Business Laws": return "slate";
+      case "Data Privacy & Protection": return "cyan";
+      case "Litigation & Legal Risk": return "red";
+      case "Cyber & Tech Risk": return "fuchsia";
+      case "Infrastructure Reform": return "lime";
+      case "Healthcare Regulation": return "emerald";
+      case "Life Insurance": return "green";
+      case "Environmental & Climate Regulation": return "green";
+      case "Labor & Employment Law": return "blue";
+      case "Government Policy Announcement": return "indigo";
+      case "Executive Order": return "violet";
+      case "Legislative Development": return "blue";
+      case "Central Bank Directive": return "purple";
+      case "Other Regulatory Risk": return "gray";
+      case "Regulatory Change": return "orange"
+      default: return "blue";
+    }
+  };
+
   const getUnifiedImpactBarClass = (alert: AlertItem, barIndex: number): string => {
     const score = getAlertImpactScore(alert);
     
     if (score === 0) {
-      // Lowest impact means nothing is filled and just green border.
-      return "bg-white border border-[#22c55e]";
+      return "bg-zinc-100 border border-zinc-200";
     }
 
     const isFilled = barIndex < score;
 
     if (isFilled) {
-      if (score === 5) {
+      if (score === 4) {
         return "bg-rose-500 border border-rose-500";
       }
-      if (score === 4) {
-        return "bg-[#f59e0b] border border-[#f59e0b]";
-      }
       if (score === 3) {
-        return "bg-[#fbbf24] border border-[#fbbf24]";
+        return "bg-orange-500 border border-orange-500";
       }
       if (score === 2) {
-        return "bg-[#fde047] border border-[#fde047]";
+        return "bg-amber-400 border border-amber-400";
       }
       if (score === 1) {
-        return "bg-[#fef08a] border border-[#fef08a]";
+        return "bg-emerald-400 border border-emerald-400";
       }
     }
 
-    return "border border-zinc-200 bg-white";
+    return "bg-zinc-100 border border-zinc-200";
   };
 
   const toggleMarkRead = (id: string) => {
@@ -466,22 +511,53 @@ export default function IntelligencePane({
     }, 3000);
   };
 
-  const getChatSuggestions = (): string[] => {
-    return [
-      "How does APRA's CPS 190 standard affect bank stress-testing models?",
-      "What are the core reporting guidelines under the revised CPS 320 standard?",
-      "How does CPS 511 impact executive remuneration and clawback rules?",
-      "What winding down protocols are required under CPS 900 corporate resolution?",
-      "How do the SPS 510 governance standards affect superannuation board term limits?",
-      "What are the reporting windows declared under the Critical Infrastructure (SOCI) Act?",
-      "How does the ATO draft taxation determination TD 2023/D3 impact outbound debt pricing?",
-      "What are the implications of the Treasury Laws Amendment for asset management?",
-      "How are clearing houses affected by the new cross-border payment regulations?",
-      "What are the privacy compliance standards for genetic testing datasets in insurance?",
-      "How do FMI Reforms address market liquidity and systemic failure risks?",
-      "What are the capital requirements and compliance rules for payment providers?"
-    ];
-  };
+  const [chatSuggestions, setChatSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function loadSuggestions() {
+      const defaultSuggestions = [
+        "What are the latest regulatory changes?",
+        "Which regulations require immediate action?",
+        "What compliance deadlines are approaching?"
+      ];
+
+      if (!selectedClient) {
+        setChatSuggestions(defaultSuggestions);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from("policy_signals")
+          .select("signal_title, category, summary")
+          .eq("client_id", selectedClient)
+          .order("date_detected", { ascending: false })
+          .limit(10);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          const suggestions = data.map((signal) => {
+            const cat = (signal.category || "").toLowerCase();
+            const title = signal.signal_title || "this regulation";
+            if (cat.includes("enforcement")) return `What are the compliance requirements following ${title}?`;
+            if (cat.includes("taxation") || cat.includes("tariff")) return `How does ${title} impact business costs?`;
+            if (cat.includes("licensing") || cat.includes("licensing change")) return `What steps are needed to comply with ${title}?`;
+            if (cat.includes("aml") || cat.includes("kyc")) return `What AML obligations arise from ${title}?`;
+            if (cat.includes("sanctions")) return `What sanctions risks does ${title} create?`;
+            if (cat.includes("data privacy")) return `What data protection actions are required under ${title}?`;
+            return `What is the business impact of ${title}?`;
+          });
+          setChatSuggestions(Array.from(new Set(suggestions)));
+        } else {
+          setChatSuggestions(defaultSuggestions);
+        }
+      } catch (err) {
+        console.error("Error fetching chat suggestions:", err);
+        setChatSuggestions(defaultSuggestions);
+      }
+    }
+    loadSuggestions();
+  }, [selectedClient]);
 
   const handleLeftChatSend = async (text: string) => {
     if (!text.trim() || leftChatLoading) return;
@@ -545,14 +621,7 @@ export default function IntelligencePane({
   };
 
   const handleLeftKeyDown = (e: React.KeyboardEvent) => {
-    const suggestions = getChatSuggestions();
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSelectedSuggestionIndex(prev => (prev + 1) % suggestions.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSelectedSuggestionIndex(prev => (prev - 1 + suggestions.length) % suggestions.length);
-    } else if (e.key === "Enter") {
+    if (e.key === "Enter") {
       e.preventDefault();
       if (leftChatInput.trim()) {
         handleLeftChatSend(leftChatInput);
@@ -729,8 +798,8 @@ export default function IntelligencePane({
                           borderClass = isSelected ? "border-zinc-400 ring-2 ring-zinc-400/25 shadow-sm" : "border-zinc-200";
                           textClass = "text-zinc-950";
                       }
-
-                      const tagBadgeClass = getTagStyles(resolvedColor);
+                      
+                      const tagBadgeClass = getTagStyles(getCategoryTagColor(alert.category));
 
                       return (
                         <div
@@ -758,7 +827,7 @@ export default function IntelligencePane({
                               IMPACT
                             </span>
                             <div className="flex gap-1 items-center">
-                              {Array.from({ length: 5 }).map((_, i) => {
+                              {Array.from({ length: 4 }).map((_, i) => {
                                 const colorCls = getUnifiedImpactBarClass(alert, i);
                                 return (
                                   <div
@@ -854,7 +923,7 @@ export default function IntelligencePane({
               
               {/* Category Pill styled like left column, and Bookmark/Export as icons on the right */}
               <div className="flex items-center justify-between gap-4 mt-1 select-text">
-                <span className={`rounded-[3px] py-0.5 px-2 text-[9px] font-semibold tracking-tight inline-block font-sans ${getTagStyles(resolveTagColor(selectedAlert))}`}>
+                <span className={`rounded-[3px] py-0.5 px-2 text-[9px] font-semibold tracking-tight inline-block font-sans ${getTagStyles(getCategoryTagColor(selectedAlert.category))}`}>
                   {selectedAlert.category}
                 </span>
 
@@ -937,7 +1006,7 @@ export default function IntelligencePane({
               <div className="flex flex-col items-end gap-1.5 min-w-[100px]">
                 <span className="text-[10px] font-bold tracking-widest text-zinc-400">IMPACT</span>
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => {
+                  {Array.from({ length: 4 }).map((_, i) => {
                     const colorCls = getUnifiedImpactBarClass(selectedAlert, i);
                     return (
                       <div
@@ -1230,29 +1299,26 @@ export default function IntelligencePane({
                 </div>
               </form>
               {/* Suggestions near input when focused */}
-              {isChatFocused && (
-                <div className="absolute bottom-[72px] left-3.5 right-3.5 bg-white border border-zinc-200 shadow-xl rounded-[6px] z-50 max-h-[300px] overflow-y-auto animate-fade-in p-1">
-                  {getChatSuggestions().map((suggestion, idx) => {
-                    const isSuggestionSelected = idx === selectedSuggestionIndex;
+              {isChatFocused && leftChatInput.trim() === "" && (
+                <div className="absolute bottom-[60px] left-0 right-0 z-50 max-h-[200px] overflow-y-auto animate-fade-in p-2 pb-4">
+                  <div className="flex flex-wrap gap-2">
+                  {chatSuggestions.map((suggestion, idx) => {
                     return (
-                      <div
+                      <button
                         key={idx}
-                        onClick={() => {
-                          handleLeftChatSend(suggestion);
-                          setIsChatFocused(false);
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // Prevent input blur so we keep focus or handle focus state cleanly
+                          setLeftChatInput(suggestion);
                         }}
-                        onMouseEnter={() => setSelectedSuggestionIndex(idx)}
-                        className={`flex items-center gap-2 px-2 py-1.5 cursor-pointer text-[12px] rounded ${
-                          isSuggestionSelected 
-                            ? "bg-zinc-100 text-zinc-950 font-medium" 
-                            : "text-zinc-600 hover:bg-zinc-50"
-                        }`}
+                        className="bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-700 text-[11.5px] px-3 py-1.5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all cursor-pointer text-left flex items-center gap-1.5"
                       >
-                        <span className="text-zinc-400">&rarr;</span>
-                        <span className="truncate">{suggestion}</span>
-                      </div>
+                        <Sparkles className="w-3 h-3 text-[#7c3aed]/70" />
+                        <span>{suggestion}</span>
+                      </button>
                     );
                   })}
+                  </div>
                 </div>
               )}
           </div>
