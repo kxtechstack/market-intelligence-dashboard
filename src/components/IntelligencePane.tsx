@@ -27,6 +27,8 @@ export default function IntelligencePane({
 
   const [isBookmarked, setIsBookmarked] = useState<Record<string, boolean>>({});
   const [bookmarkedAlerts, setBookmarkedAlerts] = useState<AlertItem[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<Record<string, boolean>>({});
+  const [lastHiddenAlert, setLastHiddenAlert] = useState<AlertItem | null>(null);
   const [dailyHighlight, setDailyHighlight] = useState<string | null>(null);
   const [externalSimilarArticles, setExternalSimilarArticles] = useState<{ title: string; url: string; signal_id?: string }[]>([]);
   const [isFetchingSimilar, setIsFetchingSimilar] = useState(false);
@@ -51,6 +53,7 @@ export default function IntelligencePane({
       const { data: joinedData, error: joinError } = await supabase
         .from("bookmarks")
         .select(`
+          created_at,
           policy_signals (*)
         `)
         .eq("client_id", selectedClient)
@@ -62,6 +65,7 @@ export default function IntelligencePane({
         const d = item.policy_signals;
         return {
           ...d,
+          bookmark_created_at: item.created_at,
           business_impact: typeof d.business_impact === 'string' 
             ? JSON.parse(d.business_impact) 
             : (d.business_impact || [])
@@ -70,6 +74,26 @@ export default function IntelligencePane({
       setBookmarkedAlerts(alerts);
     } catch (err) {
       console.error("Error fetching bookmarks:", err);
+    }
+  };
+
+  const fetchHiddenArticles = async () => {
+    if (!selectedClient) return;
+    try {
+      const { data, error } = await supabase
+        .from("hidden_articles")
+        .select("policy_signal_id")
+        .eq("client_id", selectedClient);
+
+      if (error) throw error;
+
+      const ids: Record<string, boolean> = {};
+      data.forEach(h => {
+        ids[h.policy_signal_id] = true;
+      });
+      setHiddenIds(ids);
+    } catch (err) {
+      console.error("Error fetching hidden articles:", err);
     }
   };
 
@@ -150,6 +174,7 @@ export default function IntelligencePane({
   useEffect(() => {
     fetchBookmarks();
     fetchDailyHighlight();
+    fetchHiddenArticles();
   }, [selectedClient]);
 
   useEffect(() => {
@@ -195,8 +220,8 @@ export default function IntelligencePane({
   }, []);
 
   const dashboardAlerts = useMemo(() => {
-     return alerts.filter(a => selectedClient ? a.client_id === selectedClient : true);
-  }, [alerts, selectedClient]);
+    return alerts.filter(a => (selectedClient ? a.client_id === selectedClient : true) && !hiddenIds[a.id]);
+  }, [alerts, selectedClient, hiddenIds]);
 
   useEffect(() => {
     if (dashboardAlerts.length > 0) {
@@ -227,12 +252,18 @@ export default function IntelligencePane({
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const formatDateHuman = (dateStr: string): string => {
-    if (!dateStr) return "Unknown Date";
-    const d = new Date(dateStr);
-    const day = d.getUTCDate();
-    const month = d.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
-    const year = d.getUTCFullYear();
-    return `${day} ${month} ${year}`;
+    if (!dateStr) return "N/A";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "N/A";
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }).format(d);
+    } catch (e) {
+      return "N/A";
+    }
   };
 
   React.useEffect(() => {
@@ -504,11 +535,17 @@ export default function IntelligencePane({
   };
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const triggerToast = (msg: string) => {
+  const triggerToast = (msg: string, isHideAction = false) => {
+    if (!isHideAction) setLastHiddenAlert(null);
     setToastMessage(msg);
     setTimeout(() => {
-      setToastMessage((prev) => (prev === msg ? null : prev));
+      setToastMessage((prev) => {
+        if (prev === msg) {
+          setLastHiddenAlert(null);
+          return null;
+        }
+        return prev;
+      });
     }, 3000);
   };
 
@@ -948,6 +985,35 @@ export default function IntelligencePane({
                 </span>
 
                 <div className="flex items-center gap-1.5 shrink-0 select-none">
+                  <button
+                    id="not-interested-button"
+                    onClick={async () => {
+                      if (!selectedAlert || !selectedClient) return;
+                      try {
+                        const { error } = await supabase
+                          .from("hidden_articles")
+                          .insert([
+                            {
+                              client_id: selectedClient,
+                              policy_signal_id: selectedAlert.id
+                            }
+                          ]);
+                        if (error) throw error;
+
+                        setHiddenIds(prev => ({ ...prev, [selectedAlert.id]: true }));
+                        setLastHiddenAlert(selectedAlert);
+                        triggerToast(`Hidden: ${selectedAlert.signal_title}`, true);
+                      } catch (err) {
+                        console.error("Error hiding article:", err);
+                        triggerToast("Failed to hide article");
+                      }
+                    }}
+                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[3px] flex items-center justify-center transition-colors"
+                    title="Not Interested"
+                  >
+                    <Square className="w-3 h-3" />
+                  </button>
+
                   <button
                     id="bookmark-doc-button"
                     onClick={async () => {
@@ -1400,11 +1466,10 @@ export default function IntelligencePane({
                           {alert.category}
                         </span>
                       </div>
-                      <p className="text-[12px] text-zinc-600 line-clamp-2 mt-2 leading-relaxed">
-                        {alert.summary}
-                      </p>
                       <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-zinc-100 text-[11px] text-zinc-400">
-                        <span>Updated {formatDateHuman(alert.source_published_date)}</span>
+                        <span className="text-zinc-500 font-medium">
+                          Bookmarked on {alert.bookmark_created_at ? formatDateHuman(alert.bookmark_created_at) : "N/A"}
+                        </span>
                         <span className="text-[#7c3aed] font-medium hover:underline flex items-center gap-0.5">
                           Read Insight &rarr;
                         </span>
@@ -1419,9 +1484,42 @@ export default function IntelligencePane({
 
         {/* Gorgeous bottom toast notifier */}
         {toastMessage && (
-          <div className="absolute bottom-5 right-5 bg-zinc-900 text-white text-xs py-2 px-4 rounded shadow-lg transition-all duration-300 transform translate-y-0 flex items-center gap-2 border border-zinc-800 animate-in fade-in slide-in-from-bottom-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#7c3aed] animate-ping" />
-            <span>{toastMessage}</span>
+          <div 
+            id="app-toast-alert" 
+            className="absolute bottom-5 right-5 bg-zinc-900 text-white text-xs py-2 px-4 rounded shadow-lg transition-all duration-300 transform translate-y-0 flex items-center gap-3 border border-zinc-800 animate-in fade-in slide-in-from-bottom-2"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#7c3aed] animate-ping" />
+              <span>{toastMessage}</span>
+            </div>
+            {lastHiddenAlert && (
+              <button
+                onClick={async () => {
+                  if (!selectedClient || !lastHiddenAlert) return;
+                  try {
+                    const { error } = await supabase
+                      .from("hidden_articles")
+                      .delete()
+                      .eq("client_id", selectedClient)
+                      .eq("policy_signal_id", lastHiddenAlert.id);
+                    if (error) throw error;
+
+                    setHiddenIds(prev => {
+                      const next = { ...prev };
+                      delete next[lastHiddenAlert.id];
+                      return next;
+                    });
+                    setLastHiddenAlert(null);
+                    setToastMessage(null);
+                  } catch (err) {
+                    console.error("Error undoing hide:", err);
+                  }
+                }}
+                className="text-violet-400 hover:text-violet-300 underline font-medium text-[11px] ml-1 cursor-pointer"
+              >
+                Undo
+              </button>
+            )}
           </div>
         )}
 

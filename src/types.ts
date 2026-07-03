@@ -15,6 +15,7 @@ export interface AlertItem {
   date_detected: string;
   job_id: string;
   created_at: string;
+  bookmark_created_at?: string;
 }
 
 export interface ChatMessage {
