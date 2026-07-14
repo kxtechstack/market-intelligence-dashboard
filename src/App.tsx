@@ -1,5 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { motion } from "motion/react";
+import { supabase } from "./lib/supabase";
 import LeftMenubar from "./components/LeftMenubar";
 import IntelligencePane from "./components/IntelligencePane";
 import LatestPane from "./components/LatestPane";
@@ -13,15 +14,61 @@ import MyBookmarksPane from "./components/MyBookmarksPane";
 import SettingsPane from "./components/SettingsPane";
 import SupportPane from "./components/SupportPane";
 import { AlertItem, ChatMessage } from "./types";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, Loader2 } from "lucide-react";
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("policy_risk_monitor");
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setIsAuthenticating(true);
+
+    try {
+      // 1. Authenticate with Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+
+      // 2. Look up client_id and id in admin.client_users
+      const { data: userData, error: userError } = await supabase
+        .schema('admin')
+        .from('client_users')
+        .select('id, client_id')
+        .eq('email', email.toLowerCase())
+        .single();
+
+      if (userError) {
+        console.error("Client lookup error:", userError);
+        throw new Error("User associated client not found. Please contact support.");
+      }
+
+      if (!userData?.client_id) {
+        throw new Error("No client assigned to this account.");
+      }
+
+      setUserId(userData.id);
+      setClientId(userData.client_id);
+      setIsLoggedIn(true);
+    } catch (err: any) {
+      setLoginError(err.message || "An unexpected error occurred during login.");
+      setIsLoggedIn(false);
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
   // Function to push programmatic queries to AI Chat from buttons in other workspaces
   const handleSendToChat = (prompt: string) => {
@@ -87,6 +134,8 @@ export default function App() {
       case "policy_risk_monitor":
         return (
           <IntelligencePane
+            clientId={clientId || ""}
+            userId={userId || ""}
             selectedAlert={selectedAlert}
             onSelectAlert={(alert) => setSelectedAlert(alert)}
           />
@@ -108,7 +157,13 @@ export default function App() {
         return <VoiceOfCustomerPane onReturn={handleReturn} />;
 
       case "foreward_outlook":
-        return <ForewardOutlookPane onReturn={handleReturn} />;
+        return (
+          <ForewardOutlookPane 
+            onReturn={handleReturn} 
+            clientId={clientId || ""}
+            userId={userId || ""}
+          />
+        );
 
       case "decision_intelligence":
         return <DecisionIntelligencePane onReturn={handleReturn} />;
@@ -159,9 +214,15 @@ export default function App() {
             <h2 className="text-xl font-semibold tracking-tight text-zinc-900 mb-6">Welcome Back</h2>
             
             <form 
-              onSubmit={(e) => { e.preventDefault(); setIsLoggedIn(true); }}
+              onSubmit={handleLogin}
               className="w-full flex flex-col gap-4"
             >
+              {loginError && (
+                <div className="w-full p-3 bg-rose-50 border border-rose-100 rounded-[4px] text-rose-600 text-[12px] leading-relaxed">
+                  {loginError}
+                </div>
+              )}
+              
               <div className="flex flex-col gap-1.5">
                 <label className="text-[12px] font-medium text-zinc-700">Email</label>
                 <input 
@@ -169,7 +230,8 @@ export default function App() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
-                  className="w-full h-10 px-3 text-[13px] border border-zinc-200 rounded-[4px] focus:outline-none focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed]/20 transition-all"
+                  disabled={isAuthenticating}
+                  className="w-full h-10 px-3 text-[13px] border border-zinc-200 rounded-[4px] focus:outline-none focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed]/20 transition-all disabled:opacity-50"
                   placeholder="name@company.com"
                 />
               </div>
@@ -181,16 +243,23 @@ export default function App() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
-                  className="w-full h-10 px-3 text-[13px] border border-zinc-200 rounded-[4px] focus:outline-none focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed]/20 transition-all"
+                  disabled={isAuthenticating}
+                  className="w-full h-10 px-3 text-[13px] border border-zinc-200 rounded-[4px] focus:outline-none focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed]/20 transition-all disabled:opacity-50"
                   placeholder="••••••••"
                 />
               </div>
 
               <button 
                 type="submit"
-                className="w-full h-10 mt-2 bg-zinc-900 hover:bg-black text-white text-[13px] font-medium rounded-[4px] transition-colors flex items-center justify-center gap-2"
+                disabled={isAuthenticating}
+                className="w-full h-10 mt-2 bg-zinc-900 hover:bg-black text-white text-[13px] font-medium rounded-[4px] transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Login
+                {isAuthenticating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Authenticating...
+                  </>
+                ) : "Login"}
               </button>
             </form>
           </motion.div>

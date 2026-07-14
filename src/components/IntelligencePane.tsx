@@ -9,19 +9,21 @@ import { AlertItem, ChatMessage } from "../types";
 import { supabase } from "../lib/supabase";
 
 interface IntelligencePaneProps {
+  clientId: string;
+  userId: string;
   selectedAlert: AlertItem | null;
   onSelectAlert: (alert: AlertItem) => void;
 }
 
 export default function IntelligencePane({ 
+  clientId,
+  userId,
   selectedAlert, 
   onSelectAlert
 }: IntelligencePaneProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const [clients, setClients] = useState<string[]>([]);
-  const [selectedClient, setSelectedClient] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -34,12 +36,13 @@ export default function IntelligencePane({
   const [isFetchingSimilar, setIsFetchingSimilar] = useState(false);
 
   const fetchBookmarks = async () => {
-    if (!selectedClient) return;
+    if (!clientId || !userId) return;
     try {
       const { data, error } = await supabase
         .from("bookmarks")
         .select("policy_signal_id")
-        .eq("client_id", selectedClient);
+        .eq("client_id", clientId)
+        .eq("user_id", userId);
 
       if (error) throw error;
       
@@ -56,7 +59,8 @@ export default function IntelligencePane({
           created_at,
           policy_signals (*)
         `)
-        .eq("client_id", selectedClient)
+        .eq("client_id", clientId)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
       if (joinError) throw joinError;
@@ -78,12 +82,13 @@ export default function IntelligencePane({
   };
 
   const fetchHiddenArticles = async () => {
-    if (!selectedClient) return;
+    if (!clientId || !userId) return;
     try {
       const { data, error } = await supabase
         .from("hidden_articles")
         .select("policy_signal_id")
-        .eq("client_id", selectedClient);
+        .eq("client_id", clientId)
+        .eq("user_id", userId);
 
       if (error) throw error;
 
@@ -98,12 +103,12 @@ export default function IntelligencePane({
   };
 
   const fetchDailyHighlight = async () => {
-    if (!selectedClient) return;
+    if (!clientId) return;
     try {
       const { data, error } = await supabase
         .from("daily_highlights")
         .select("*")
-        .eq("client_id", selectedClient)
+        .eq("client_id", clientId)
         .order("created_at", { ascending: false })
         .limit(1);
 
@@ -134,18 +139,31 @@ export default function IntelligencePane({
       const response = await fetch(url);
       
       if (response.status === 404) {
-        setExternalSimilarArticles([]);
+        const current = alerts.find(a => a.id === signalId);
+        if (current) {
+          const localSimilar = alerts
+            .filter(a => a.id !== signalId && (a.category === current.category || a.industry === current.industry))
+            .slice(0, 3)
+            .map(a => ({
+              title: a.signal_title,
+              url: a.source_article_url,
+              signal_id: a.id
+            }));
+          setExternalSimilarArticles(localSimilar);
+        } else {
+          setExternalSimilarArticles([]);
+        }
         return;
       }
 
       if (!response.ok) {
-        console.error(`Fetch similar articles failed for ID: ${signalId}. Status: ${response.status} ${response.statusText}`);
+        console.warn(`Fetch similar articles failed for ID: ${signalId}. Status: ${response.status} ${response.statusText}`);
         throw new Error(`API response not ok (${response.status})`);
       }
       
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        console.error(`Invalid content type: ${contentType} for ID: ${signalId}`);
+        console.warn(`Invalid content type: ${contentType} for ID: ${signalId}`);
         throw new Error("Response not JSON");
       }
 
@@ -153,11 +171,37 @@ export default function IntelligencePane({
       if (data && data.similar) {
         setExternalSimilarArticles(data.similar);
       } else {
-        setExternalSimilarArticles([]);
+        const current = alerts.find(a => a.id === signalId);
+        if (current) {
+          const localSimilar = alerts
+            .filter(a => a.id !== signalId && (a.category === current.category || a.industry === current.industry))
+            .slice(0, 3)
+            .map(a => ({
+              title: a.signal_title,
+              url: a.source_article_url,
+              signal_id: a.id
+            }));
+          setExternalSimilarArticles(localSimilar);
+        } else {
+          setExternalSimilarArticles([]);
+        }
       }
     } catch (error) {
-      console.error("Error fetching similar articles:", error);
-      setExternalSimilarArticles([]);
+      console.warn("Soft handling: Error fetching similar articles, falling back to local matches:", error);
+      const current = alerts.find(a => a.id === signalId);
+      if (current) {
+        const localSimilar = alerts
+          .filter(a => a.id !== signalId && (a.category === current.category || a.industry === current.industry))
+          .slice(0, 3)
+          .map(a => ({
+            title: a.signal_title,
+            url: a.source_article_url,
+            signal_id: a.id
+          }));
+        setExternalSimilarArticles(localSimilar);
+      } else {
+        setExternalSimilarArticles([]);
+      }
     } finally {
       setIsFetchingSimilar(false);
     }
@@ -175,15 +219,17 @@ export default function IntelligencePane({
     fetchBookmarks();
     fetchDailyHighlight();
     fetchHiddenArticles();
-  }, [selectedClient]);
+  }, [clientId, userId]);
 
   useEffect(() => {
     async function loadData() {
+      if (!clientId) return;
       try {
         setIsLoading(true);
         const { data, error } = await supabase
           .from("policy_signals")
           .select("*")
+          .eq("client_id", clientId)
           .order("source_published_date", { ascending: false });
 
         if (error) {
@@ -200,12 +246,6 @@ export default function IntelligencePane({
           })) as AlertItem[];
           
           setAlerts(parsedData);
-          
-          const uniqueClients = Array.from(new Set(parsedData.map(d => String(d.client_id || "").trim()))).filter(Boolean);
-          setClients(uniqueClients);
-          if (uniqueClients.length > 0) {
-             setSelectedClient(uniqueClients[0]);
-          }
         } else {
           setAlerts([]);
         }
@@ -217,11 +257,11 @@ export default function IntelligencePane({
       }
     }
     loadData();
-  }, []);
+  }, [clientId]);
 
   const dashboardAlerts = useMemo(() => {
-    return alerts.filter(a => (selectedClient ? a.client_id === selectedClient : true) && !hiddenIds[a.id]);
-  }, [alerts, selectedClient, hiddenIds]);
+    return alerts.filter(a => !hiddenIds[a.id]);
+  }, [alerts, hiddenIds]);
 
   useEffect(() => {
     if (dashboardAlerts.length > 0) {
@@ -351,9 +391,15 @@ export default function IntelligencePane({
         alert.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (alert.summary && alert.summary.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      return matchSearch;
+      let matchDate = true;
+      if (startDateStr && endDateStr && alert.source_published_date) {
+        const pubDateStr = alert.source_published_date.split('T')[0];
+        matchDate = pubDateStr >= startDateStr && pubDateStr <= endDateStr;
+      }
+      
+      return matchSearch && matchDate;
     });
-  }, [searchQuery, dashboardAlerts]);
+  }, [searchQuery, dashboardAlerts, startDateStr, endDateStr]);
 
   // Helper to format date with UPPERCASE month: '18 JULY 2026' and ordinal suffix
   const formatAlertGroupDate = (alert: AlertItem): string => {
@@ -559,7 +605,7 @@ export default function IntelligencePane({
         "What compliance deadlines are approaching?"
       ];
 
-      if (!selectedClient) {
+      if (!clientId) {
         setChatSuggestions(defaultSuggestions);
         return;
       }
@@ -567,7 +613,7 @@ export default function IntelligencePane({
         const { data, error } = await supabase
           .from("policy_signals")
           .select("signal_title, category, summary")
-          .eq("client_id", selectedClient)
+          .eq("client_id", clientId)
           .order("date_detected", { ascending: false })
           .limit(10);
 
@@ -595,7 +641,7 @@ export default function IntelligencePane({
       }
     }
     loadSuggestions();
-  }, [selectedClient]);
+  }, [clientId]);
 
   const handleLeftChatSend = async (text: string) => {
     if (!text.trim() || leftChatLoading) return;
@@ -615,10 +661,10 @@ export default function IntelligencePane({
 
     try {
       // Find industry for current client
-      const currentClientAlert = alerts.find(a => String(a.client_id) === String(selectedClient));
+      const currentClientAlert = alerts.find(a => String(a.client_id) === String(clientId));
       const industry = currentClientAlert?.industry || "";
 
-      console.log(`Sending /ask - Client ID: ${selectedClient}`);
+      console.log(`Sending /ask - Client ID: ${clientId}`);
       console.log(`Sending /ask - Industry: ${industry}`);
 
       const response = await fetch("https://kx-pipeline-production.up.railway.app/ask", {
@@ -628,7 +674,7 @@ export default function IntelligencePane({
         },
         body: JSON.stringify({
           question: text,
-          clientId: selectedClient,
+          clientId: clientId,
           industry: industry
         }),
         signal: abortControllerRef.current.signal
@@ -702,17 +748,6 @@ export default function IntelligencePane({
             <h2 id="roadmap-heading-title" className="text-[19px] font-semibold tracking-tight text-zinc-900 select-none">
               Policy & Risk Monitor
             </h2>
-            {clients.length > 1 && (
-              <select
-                value={selectedClient}
-                onChange={(e) => setSelectedClient(e.target.value)}
-                className="text-[12px] border border-zinc-200 bg-white rounded-[4px] px-2 py-1 text-zinc-700 outline-none focus:border-violet-500 cursor-pointer"
-              >
-                {clients.map(c => (
-                  <option key={c} value={c}>Client ID: {c}</option>
-                ))}
-              </select>
-            )}
           </div>
           {isEditingDates ? (
             <div className="flex items-center gap-1">
@@ -798,9 +833,125 @@ export default function IntelligencePane({
               ) : (
                 orderedGroupDates.map((dateGroup, gIdx) => {
                   const alertsInGroup = groupedAlerts[dateGroup] || [];
+                  const is11thJuly = dateGroup.toUpperCase().includes("11TH JULY 2026") || dateGroup.toUpperCase().includes("11 JULY 2026");
                   
                   return (
                     <div key={dateGroup} className="flex flex-col gap-2">
+                      {/* Short Synopsis for 11th July 2026 (rendered ABOVE the date header) */}
+                      {is11thJuly && (
+                        <div className="mb-5 p-5 border border-zinc-200 bg-white rounded-[8px] flex flex-col gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in pr-3">
+                          <div>
+                            <h4 className="text-[15px] font-semibold tracking-tight text-zinc-900 font-sans">
+                              What changed vs previous period
+                            </h4>
+                            <p className="text-[12.5px] text-zinc-500 leading-normal font-sans font-normal mt-0.5">
+                              Comparing this week to last week — this is what you'd put in a client update, everything else is context.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col divide-y divide-zinc-100">
+                            {/* Row 1: Trade & tariffs */}
+                            <div className="flex items-center justify-between py-1.5 gap-4">
+                              <div className="w-[180px] shrink-0">
+                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">Trade & tariffs</span>
+                              </div>
+                              <div className="flex-1 flex items-center gap-2 flex-wrap">
+                                <span className={`inline-flex items-center text-[10.5px] font-semibold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("slate")}`}>
+                                  Monitor
+                                </span>
+                                <span className="text-zinc-400 text-xs shrink-0">&rarr;</span>
+                                <span className={`inline-flex items-center text-[10.5px] font-bold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("rose")}`}>
+                                  Act now
+                                </span>
+                                <span className="text-[11.5px] text-zinc-500 font-normal font-sans shrink-0 leading-tight">
+                                  +5 signals moved it
+                                </span>
+                              </div>
+                              <div className="w-[80px] shrink-0 flex justify-end">
+                                <svg className="w-16 h-6 stroke-red-500 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 2, strokeLinecap: 'round' }}>
+                                  <path d="M 5,22 Q 35,19 65,10 T 95,4" />
+                                </svg>
+                              </div>
+                            </div>
+
+                            {/* Row 2: Data & privacy */}
+                            <div className="flex items-center justify-between py-1.5 gap-4">
+                              <div className="w-[180px] shrink-0">
+                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">Data & privacy</span>
+                              </div>
+                              <div className="flex-1 flex items-center gap-2 flex-wrap">
+                                <span className={`inline-flex items-center text-[10.5px] font-semibold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("amber")}`}>
+                                  Watch closely
+                                </span>
+                                <span className="text-zinc-400 text-xs shrink-0">&rarr;</span>
+                                <span className={`inline-flex items-center text-[10.5px] font-bold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("blue")}`}>
+                                  Monitor
+                                </span>
+                                <span className="text-[11.5px] text-zinc-500 font-normal font-sans shrink-0 leading-tight">
+                                  +2 signals moved it
+                                </span>
+                              </div>
+                              <div className="w-[80px] shrink-0 flex justify-end">
+                                <svg className="w-16 h-6 stroke-blue-500 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 2, strokeLinecap: 'round' }}>
+                                  <path d="M 5,4 Q 35,8 65,17 T 95,23" />
+                                </svg>
+                              </div>
+                            </div>
+
+                            {/* Row 3: Ingredient bans & safety */}
+                            <div className="flex items-center justify-between py-1.5 gap-4">
+                              <div className="w-[180px] shrink-0">
+                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">Ingredient bans & safety</span>
+                              </div>
+                              <div className="flex-1">
+                                <span className="text-[12px] text-zinc-600 font-normal font-sans leading-tight">
+                                  +3 new signals, posture unchanged (Watch closely)
+                                </span>
+                              </div>
+                              <div className="w-[80px] shrink-0 flex justify-end">
+                                <svg className="w-16 h-6 stroke-zinc-400 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 1.5, strokeLinecap: 'round' }}>
+                                  <path d="M 5,15 Q 25,14 45,16 T 75,14 T 95,15" />
+                                </svg>
+                              </div>
+                            </div>
+
+                            {/* Row 4: Labeling & disclosure */}
+                            <div className="flex items-center justify-between py-1.5 gap-4">
+                              <div className="w-[180px] shrink-0">
+                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">Labeling & disclosure</span>
+                              </div>
+                              <div className="flex-1">
+                                <span className="text-[12px] text-zinc-600 font-normal font-sans leading-tight">
+                                  +2 new signals, posture unchanged (Monitor)
+                                </span>
+                              </div>
+                              <div className="w-[80px] shrink-0 flex justify-end">
+                                <svg className="w-16 h-6 stroke-zinc-400 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 1.5, strokeLinecap: 'round' }}>
+                                  <path d="M 5,15 Q 25,14 45,16 T 75,14 T 95,15" />
+                                </svg>
+                              </div>
+                            </div>
+
+                            {/* Row 5: ESG & sustainability */}
+                            <div className="flex items-center justify-between py-1.5 gap-4">
+                              <div className="w-[180px] shrink-0">
+                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">ESG & sustainability</span>
+                              </div>
+                              <div className="flex-1">
+                                <span className="text-[12px] text-zinc-500 font-normal font-sans leading-tight">
+                                  +1 new signal, posture unchanged (Deprioritize)
+                                </span>
+                              </div>
+                              <div className="w-[80px] shrink-0 flex justify-end">
+                                <svg className="w-16 h-6 stroke-zinc-300 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 1.5, strokeLinecap: 'round' }}>
+                                  <path d="M 5,16 Q 25,15 45,17 T 75,15 T 95,16" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Date Header */}
                       <h3 className="text-[10px] font-bold text-zinc-600 tracking-wider mb-1.5 select-none uppercase">
                         {dateGroup}
@@ -988,13 +1139,14 @@ export default function IntelligencePane({
                   <button
                     id="not-interested-button"
                     onClick={async () => {
-                      if (!selectedAlert || !selectedClient) return;
+                      if (!selectedAlert || !clientId || !userId) return;
                       try {
                         const { error } = await supabase
                           .from("hidden_articles")
                           .insert([
                             {
-                              client_id: selectedClient,
+                              client_id: clientId,
+                              user_id: userId,
                               policy_signal_id: selectedAlert.id
                             }
                           ]);
@@ -1017,7 +1169,7 @@ export default function IntelligencePane({
                   <button
                     id="bookmark-doc-button"
                     onClick={async () => {
-                      if (!selectedAlert || !selectedClient) return;
+                      if (!selectedAlert || !clientId || !userId) return;
                       const isCurrentlyBookmarked = isBookmarked[selectedAlert.id];
                       
                       try {
@@ -1026,7 +1178,8 @@ export default function IntelligencePane({
                           const { error } = await supabase
                             .from("bookmarks")
                             .delete()
-                            .eq("client_id", selectedClient)
+                            .eq("client_id", clientId)
+                            .eq("user_id", userId)
                             .eq("policy_signal_id", selectedAlert.id);
                           if (error) throw error;
                           triggerToast(`Removed bookmark for ${selectedAlert.signal_title}`);
@@ -1036,7 +1189,8 @@ export default function IntelligencePane({
                             .from("bookmarks")
                             .insert([
                               {
-                                client_id: selectedClient,
+                                client_id: clientId,
+                                user_id: userId,
                                 policy_signal_id: selectedAlert.id
                               }
                             ]);
@@ -1495,12 +1649,13 @@ export default function IntelligencePane({
             {lastHiddenAlert && (
               <button
                 onClick={async () => {
-                  if (!selectedClient || !lastHiddenAlert) return;
+                  if (!clientId || !userId || !lastHiddenAlert) return;
                   try {
                     const { error } = await supabase
                       .from("hidden_articles")
                       .delete()
-                      .eq("client_id", selectedClient)
+                      .eq("client_id", clientId)
+                      .eq("user_id", userId)
                       .eq("policy_signal_id", lastHiddenAlert.id);
                     if (error) throw error;
 

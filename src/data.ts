@@ -7,7 +7,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "competitive_radar", icon: "Radar", label: "Competitive Radar" },
   { id: "voice_of_customer", icon: "MessageSquare", label: "Voice of Customer" },
   { id: "policy_risk_monitor", icon: "ShieldAlert", label: "Policy & Risk Monitor", badge: "Live" },
-  { id: "foreward_outlook", icon: "Compass", label: "Foreward Outlook" },
+  { id: "foreward_outlook", icon: "Compass", label: "Forward Outlook" },
   { id: "decision_intelligence", icon: "Layers", label: "Decision Intelligence" },
 ];
 
