@@ -841,7 +841,7 @@ export default function IntelligencePane({
                       {is11thJuly && (
                         <div className="mb-5 p-5 border border-zinc-200 bg-white rounded-[8px] flex flex-col gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in pr-3">
                           <div>
-                            <h4 className="text-[15px] font-semibold tracking-tight text-zinc-900 font-sans">
+                            <h4 className="text-[15px] font-medium tracking-tight text-zinc-800 font-sans">
                               What changed vs previous period
                             </h4>
                             <p className="text-[12.5px] text-zinc-500 leading-normal font-sans font-normal mt-0.5">
@@ -853,7 +853,7 @@ export default function IntelligencePane({
                             {/* Row 1: Trade & tariffs */}
                             <div className="flex items-center justify-between py-1.5 gap-4">
                               <div className="w-[180px] shrink-0">
-                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">Trade & tariffs</span>
+                                <span className="text-[13px] font-medium text-zinc-800 font-sans">Trade & tariffs</span>
                               </div>
                               <div className="flex-1 flex items-center gap-2 flex-wrap">
                                 <span className={`inline-flex items-center text-[10.5px] font-semibold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("slate")}`}>
@@ -877,7 +877,7 @@ export default function IntelligencePane({
                             {/* Row 2: Data & privacy */}
                             <div className="flex items-center justify-between py-1.5 gap-4">
                               <div className="w-[180px] shrink-0">
-                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">Data & privacy</span>
+                                <span className="text-[13px] font-medium text-zinc-800 font-sans">Data & privacy</span>
                               </div>
                               <div className="flex-1 flex items-center gap-2 flex-wrap">
                                 <span className={`inline-flex items-center text-[10.5px] font-semibold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("amber")}`}>
@@ -901,7 +901,7 @@ export default function IntelligencePane({
                             {/* Row 3: Ingredient bans & safety */}
                             <div className="flex items-center justify-between py-1.5 gap-4">
                               <div className="w-[180px] shrink-0">
-                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">Ingredient bans & safety</span>
+                                <span className="text-[13px] font-medium text-zinc-800 font-sans">Ingredient bans & safety</span>
                               </div>
                               <div className="flex-1">
                                 <span className="text-[12px] text-zinc-600 font-normal font-sans leading-tight">
@@ -918,7 +918,7 @@ export default function IntelligencePane({
                             {/* Row 4: Labeling & disclosure */}
                             <div className="flex items-center justify-between py-1.5 gap-4">
                               <div className="w-[180px] shrink-0">
-                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">Labeling & disclosure</span>
+                                <span className="text-[13px] font-medium text-zinc-800 font-sans">Labeling & disclosure</span>
                               </div>
                               <div className="flex-1">
                                 <span className="text-[12px] text-zinc-600 font-normal font-sans leading-tight">
@@ -935,7 +935,7 @@ export default function IntelligencePane({
                             {/* Row 5: ESG & sustainability */}
                             <div className="flex items-center justify-between py-1.5 gap-4">
                               <div className="w-[180px] shrink-0">
-                                <span className="text-[13px] font-semibold text-zinc-900 font-sans">ESG & sustainability</span>
+                                <span className="text-[13px] font-medium text-zinc-800 font-sans">ESG & sustainability</span>
                               </div>
                               <div className="flex-1">
                                 <span className="text-[12px] text-zinc-500 font-normal font-sans leading-tight">
