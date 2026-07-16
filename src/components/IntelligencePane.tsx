@@ -133,7 +133,7 @@ export default function IntelligencePane({
     }
     setIsFetchingSimilar(true);
     try {
-      const url = `https://kx-pipeline-production.up.railway.app/similar/${encodeURIComponent(signalId)}`;
+      const url = `${import.meta.env.VITE_API_URL}/similar/${encodeURIComponent(signalId)}`;
       console.log(`Calling /similar URL: ${url}`);
       console.log(`Calling /similar Signal ID: ${signalId}`);
       const response = await fetch(url);
@@ -667,7 +667,7 @@ export default function IntelligencePane({
       console.log(`Sending /ask - Client ID: ${clientId}`);
       console.log(`Sending /ask - Industry: ${industry}`);
 
-      const response = await fetch("https://kx-pipeline-production.up.railway.app/ask", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/ask`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

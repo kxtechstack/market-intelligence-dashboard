@@ -1008,7 +1008,7 @@ export default function ForewardOutlookPane({
       // Find industry/sector of current trend to send context to pipeline API
       const industryText = selectedTrend ? `${selectedTrend.sector} Retail Strategy` : "";
       
-      const response = await fetch("https://kx-pipeline-production.up.railway.app/ask", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

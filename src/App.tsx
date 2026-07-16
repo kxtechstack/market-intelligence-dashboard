@@ -13,6 +13,7 @@ import DecisionIntelligencePane from "./components/DecisionIntelligencePane";
 import MyBookmarksPane from "./components/MyBookmarksPane";
 import SettingsPane from "./components/SettingsPane";
 import SupportPane from "./components/SupportPane";
+import SetPasswordPane from "./components/SetPasswordPane";
 import { AlertItem, ChatMessage } from "./types";
 import { ShieldAlert, Loader2 } from "lucide-react";
 
@@ -25,6 +26,7 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("policy_risk_monitor");
+  const [isRecoveryFlow, setIsRecoveryFlow] = useState(() => window.location.hash.includes('access_token'));
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 
@@ -198,6 +200,9 @@ export default function App() {
         );
     }
   };
+  if (isRecoveryFlow) {
+    return <SetPasswordPane onDone={() => setIsRecoveryFlow(false)} />;
+  }
 
   return (
     <>
