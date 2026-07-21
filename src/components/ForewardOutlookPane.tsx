@@ -8,7 +8,7 @@ interface ForewardOutlookPaneProps {
   userId: string;
 }
 
-interface SourceItem {
+export interface SourceItem {
   id: string;
   source_name: string;
   details: string;
@@ -16,7 +16,7 @@ interface SourceItem {
   date: string;
 }
 
-interface TrendItem {
+export interface TrendItem {
   id: string;
   title: string;
   sector: "Consumer" | "Technology" | "Supply chain" | "Product" | "Sustainability";
@@ -48,7 +48,7 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-const RADAR_TRENDS: TrendItem[] = [
+export const RADAR_TRENDS: TrendItem[] = [
   {
     id: "hyper-personalization",
     title: "Hyper-Personalization",

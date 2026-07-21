@@ -147,7 +147,13 @@ export default function App() {
         return <LatestPane onReturn={handleReturn} />;
 
       case "market_dynamics":
-        return <MarketDynamicsPane onReturn={handleReturn} />;
+        return (
+          <MarketDynamicsPane 
+            onReturn={handleReturn} 
+            clientId={clientId || ""}
+            userId={userId || ""}
+          />
+        );
 
       case "find_opportunities":
         return <FindOpportunitiesPane onReturn={handleReturn} />;
