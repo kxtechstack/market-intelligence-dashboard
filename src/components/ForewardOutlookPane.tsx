@@ -27,7 +27,7 @@ export interface TrendItem {
   country: string;
   source_type: string;
   source_published_date: string;
-  impact_level: "High" | "Medium" | "Low";
+  impact_level: "Critical" | "High" | "Medium" | "Low";
   business_impact: string[];
   textAnchor: "start" | "end" | "middle";
   dx: number;

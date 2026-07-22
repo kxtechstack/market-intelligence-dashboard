@@ -217,9 +217,9 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-sm bg-white p-8 border border-zinc-200 rounded-[6px] shadow-sm flex flex-col items-center"
+            className="w-full max-w-sm bg-white p-8 border border-zinc-200 rounded-[4px] shadow-sm flex flex-col items-center"
           >
-            <div className="w-10 h-10 bg-zinc-900 rounded-[6px] flex items-center justify-center mb-6">
+            <div className="w-10 h-10 bg-zinc-900 rounded-[4px] flex items-center justify-center mb-6">
               <ShieldAlert className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-xl font-semibold tracking-tight text-zinc-900 mb-6">Welcome Back</h2>

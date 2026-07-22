@@ -9,10 +9,14 @@ interface LeftMenubarProps {
 
 export default function LeftMenubar({ activeTab, onTabChange, onLogout }: LeftMenubarProps) {
   // Map string icon names to actual Lucide component instances
-  const renderIcon = (iconName: string, isActive: boolean) => {
-    const iconClass = `w-[15px] h-[15px] transition-colors ${
-      isActive ? "text-[#7c3aed]" : "text-zinc-500 hover:text-zinc-800"
-    }`;
+  const renderIcon = (iconName: string, isActive: boolean, itemId?: string) => {
+    let iconColor = isActive ? "text-[#7c3aed]" : "text-zinc-500 hover:text-zinc-800";
+
+    if (itemId === 'decision_intelligence' && !isActive) {
+      iconColor = "text-zinc-800 hover:text-zinc-950";
+    }
+
+    const iconClass = `w-[15px] h-[15px] transition-colors ${iconColor}`;
 
     switch (iconName) {
       case "Clock":
@@ -74,10 +78,11 @@ export default function LeftMenubar({ activeTab, onTabChange, onLogout }: LeftMe
                   isActive
                     ? "bg-[#f5f3ff] text-[#7c3aed]"
                     : "hover:bg-zinc-100 text-zinc-500"
-                } ${item.id === 'decision_intelligence' ? 'border border-indigo-300' : ''}`}
+                }`}
               >
-                {renderIcon(item.icon, isActive)}
-                {item.badge && (
+                {renderIcon(item.icon, isActive, item.id)}
+                {/* Blob indicator for selected item */}
+                {isActive && (
                   <span className="absolute top-[4px] right-[4px] w-1.5 h-1.5 bg-[#7c3aed] rounded-full"></span>
                 )}
 
@@ -106,7 +111,7 @@ export default function LeftMenubar({ activeTab, onTabChange, onLogout }: LeftMe
                   : "hover:bg-zinc-100 text-zinc-500"
               }`}
             >
-              {renderIcon(item.icon, isActive)}
+              {renderIcon(item.icon, isActive, item.id)}
               
               {/* Micro tooltip on hover */}
               <div className="absolute left-[44px] top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 translate-x-1 group-hover/item:translate-x-2 transition-all duration-150 bg-zinc-900 border border-zinc-800 text-[#f8fafc] text-[10.5px] font-normal px-2.5 py-1 rounded-[4px] shadow-[0_2px_8px_rgba(0,0,0,0.15)] whitespace-nowrap z-50 pointer-events-none">
