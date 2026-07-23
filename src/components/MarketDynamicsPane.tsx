@@ -1509,33 +1509,6 @@ export default function MarketDynamicsPane({
             </span>
           </div>
 
-          {/* Clean minimal dropdown selector to switch trends since left pane is empty */}
-          <div className="flex items-center gap-1.5 shrink-0 select-none">
-            <select
-              value={selectedGridSignal ? "selected-grid-signal" : selectedTrendId}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === "selected-grid-signal") {
-                  // Do nothing as it represents the currently clicked grid signal
-                } else {
-                  setSelectedTrendId(val);
-                  setSelectedGridSignal(null);
-                }
-              }}
-              className="text-[11px] border border-zinc-200 bg-[#fafafa] hover:bg-[#f4f4f5] rounded-[4px] px-2 py-1 text-zinc-700 outline-none focus:border-zinc-300 cursor-pointer max-w-[140px] truncate font-sans font-medium transition-colors"
-            >
-              {selectedGridSignal && (
-                <option value="selected-grid-signal">
-                  {selectedGridSignal.title}
-                </option>
-              )}
-              {RADAR_TRENDS.map((trend) => (
-                <option key={trend.id} value={trend.id}>
-                  {trend.title}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {/* Tab switcher: contents */}
