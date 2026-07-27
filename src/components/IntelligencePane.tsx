@@ -57,10 +57,11 @@ export default function IntelligencePane({
         .from("bookmarks")
         .select(`
           created_at,
-          policy_signals (*)
+          policy_signals!inner (*)
         `)
         .eq("client_id", clientId)
         .eq("user_id", userId)
+        .eq("policy_signals.module_id", "777a2b2e-8bb2-44ef-a4f2-1c0c1e03b960")
         .order("created_at", { ascending: false });
 
       if (joinError) throw joinError;
@@ -230,6 +231,7 @@ export default function IntelligencePane({
           .from("policy_signals")
           .select("*")
           .eq("client_id", clientId)
+          .eq("module_id", "777a2b2e-8bb2-44ef-a4f2-1c0c1e03b960")
           .order("source_published_date", { ascending: false });
 
         if (error) {
@@ -614,6 +616,7 @@ export default function IntelligencePane({
           .from("policy_signals")
           .select("signal_title, category, summary")
           .eq("client_id", clientId)
+          .eq("module_id", "777a2b2e-8bb2-44ef-a4f2-1c0c1e03b960")
           .order("date_detected", { ascending: false })
           .limit(10);
 
