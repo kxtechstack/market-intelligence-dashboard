@@ -14,6 +14,8 @@ export interface SourceItem {
   details: string;
   category: "Research & Development" | "Innovation" | "Capital investment" | "Patent";
   date: string;
+  organization?: string;
+  source_url?: string;
 }
 
 export interface TrendItem {
@@ -845,24 +847,174 @@ export default function ForewardOutlookPane({
   clientId,
   userId
 }: ForewardOutlookPaneProps) {
+  const [trends, setTrends] = useState<TrendItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSignalsLoading, setIsSignalsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("insights");
-  const [selectedTrendId, setSelectedTrendId] = useState<string>("embedded-fintech");
+  const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
-  const [selectedSignalId, setSelectedSignalId] = useState<string | null>(() => {
-    const initialTrend = RADAR_TRENDS.find(t => t.id === "embedded-fintech") || RADAR_TRENDS[0];
-    return initialTrend?.sources?.[0]?.id || null;
-  });
+  const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
+
+  const FORWARD_OUTLOOK_MODULE_ID = "2eb989fd-0ea0-4320-b73a-f7eb8b970473";
+
+  useEffect(() => {
+    async function fetchTrends() {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("trend_snapshots_latest")
+          .select("*")
+          .eq("module_id", FORWARD_OUTLOOK_MODULE_ID)
+          .eq("client_id", clientId);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          // Group trends by sector to distribute them within their respective segments
+          const trendsBySector: Record<string, any[]> = {};
+          data.forEach(item => {
+            const sector = (item.sector || "Consumer").toLowerCase();
+            if (!trendsBySector[sector]) trendsBySector[sector] = [];
+            trendsBySector[sector].push(item);
+          });
+
+          const sectorRanges: Record<string, { start: number, end: number }> = {
+            "consumer": { start: 144, end: 175 },
+            "technology": { start: 108, end: 144 },
+            "supply chain": { start: 72, end: 108 },
+            "product": { start: 36, end: 72 },
+            "sustainability": { start: 5, end: 36 }
+          };
+
+          const mappedTrends: TrendItem[] = [];
+          
+          Object.entries(trendsBySector).forEach(([sectorKey, sectorTrends]) => {
+            const range = sectorRanges[sectorKey] || sectorRanges["consumer"];
+            const segmentWidth = range.end - range.start;
+            
+            sectorTrends.forEach((item, index) => {
+              // Calculate angle within the sector's wedge
+              // Use a small buffer to avoid items being right on the divider lines
+              const step = segmentWidth / (sectorTrends.length + 1);
+              const angle = range.start + step * (index + 1);
+              
+              let r = 135; // default near
+              if (item.ring === "mid_term") r = 215;
+              if (item.ring === "long_term") r = 295;
+
+              mappedTrends.push({
+                id: item.trend_id,
+                title: item.name,
+                sector: item.sector || "Consumer",
+                term: (item.ring === "near_term" ? "Near-Term" : item.ring === "mid_term" ? "Mid-Term" : "Long-Term") as any,
+                r,
+                angle,
+                summary: item.write_up?.summary || "",
+                country: "Global",
+                source_type: "Market Intelligence",
+                source_published_date: item.created_at,
+                impact_level: item.write_up?.impact || "Medium",
+                business_impact: item.write_up?.business_impact || [],
+                textAnchor: angle > 90 ? "end" : angle < 90 ? "start" : "middle",
+                dx: angle > 100 ? -22 : angle < 80 ? 22 : 0,
+                dy: angle > 80 && angle < 100 ? -15 : 4,
+                confidence: item.dot_size > 7 ? "High" : item.dot_size > 4 ? "Medium" : "Low",
+                signalsCount: item.dot_size || 0, // Fallback to dot_size until signals are fetched
+                trendStatus: "Stable",
+                statValue1: "",
+                statValue2: "",
+                sparklinePath: "M0 14 L10 15 L20 11 L30 12 L40 8",
+                sources: [],
+                similar_trends: item.similar_trends || [] // We'll store this for later use
+              } as any);
+            });
+          });
+
+          setTrends(mappedTrends);
+          if (mappedTrends.length > 0) {
+            setSelectedTrendId(mappedTrends[0].id);
+          }
+        } else {
+          setTrends([]);
+          setSelectedTrendId(null);
+        }
+      } catch (err) {
+        console.error("Error fetching trends:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchTrends();
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!selectedTrendId) return;
+
+    async function fetchSignals() {
+      setIsSignalsLoading(true);
+      try {
+        const { data: membershipData, error: membershipError } = await supabase
+          .from("trend_membership")
+          .select("signal_id")
+          .eq("trend_id", selectedTrendId);
+
+        if (membershipError) throw membershipError;
+
+        if (membershipData && membershipData.length > 0) {
+          const signalIds = membershipData.map(m => m.signal_id);
+
+          const { data: signalsData, error: signalsError } = await supabase
+            .from("policy_signals")
+            .select("*")
+            .in("id", signalIds);
+
+          if (signalsError) throw signalsError;
+
+          if (signalsData) {
+            const mappedSignals: SourceItem[] = signalsData.map(s => ({
+              id: s.id,
+              source_name: s.signal_title || "Signal",
+              details: s.summary || "",
+              category: s.signal_type as any || "Innovation",
+              date: s.source_published_date ? new Date(s.source_published_date).toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : "Jul 23",
+              organization: s.organization,
+              source_url: s.source_article_url
+            }));
+
+            setTrends(prev => prev.map(t => 
+              t.id === selectedTrendId 
+                ? { ...t, sources: mappedSignals, signalsCount: mappedSignals.length } 
+                : t
+            ));
+          }
+        } else {
+          setTrends(prev => prev.map(t => 
+            t.id === selectedTrendId 
+              ? { ...t, sources: [], signalsCount: 0 } 
+              : t
+          ));
+        }
+      } catch (err) {
+        console.error("Error fetching signals:", err);
+      } finally {
+        setIsSignalsLoading(false);
+      }
+    }
+
+    fetchSignals();
+  }, [selectedTrendId]);
   
   useEffect(() => {
     setIsSourcesExpanded(true);
-    const trend = RADAR_TRENDS.find(t => t.id === selectedTrendId) || RADAR_TRENDS[0];
+    const trend = trends.find(t => t.id === selectedTrendId);
     if (trend && trend.sources && trend.sources.length > 0) {
       setSelectedSignalId(trend.sources[0].id);
     } else {
       setSelectedSignalId(null);
     }
-  }, [selectedTrendId]);
+  }, [selectedTrendId, trends]);
   
   // Date states (retained for identical design/functionality)
   const [startDateStr, setStartDateStr] = useState("");
@@ -882,30 +1034,17 @@ export default function ForewardOutlookPane({
   const [isFetchingSimilar, setIsFetchingSimilar] = useState(false);
 
   useEffect(() => {
-    if (!selectedTrendId) return;
+    if (!selectedTrendId || trends.length === 0) return;
     
     setIsFetchingSimilar(true);
-    // Simulate a brief delay then find local similar trends
-    const timer = setTimeout(() => {
-      const current = RADAR_TRENDS.find(t => t.id === selectedTrendId);
-      if (current) {
-        const localSimilar = RADAR_TRENDS
-          .filter(t => t.id !== selectedTrendId && t.sector === current.sector)
-          .slice(0, 3)
-          .map(t => ({
-            id: t.id,
-            title: t.title,
-            sector: t.sector
-          }));
-        setSimilarFutureProspects(localSimilar);
-      } else {
-        setSimilarFutureProspects([]);
-      }
-      setIsFetchingSimilar(false);
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [selectedTrendId]);
+    const trend = trends.find(t => t.id === selectedTrendId);
+    if (trend && (trend as any).similar_trends) {
+      setSimilarFutureProspects((trend as any).similar_trends);
+    } else {
+      setSimilarFutureProspects([]);
+    }
+    setIsFetchingSimilar(false);
+  }, [selectedTrendId, trends]);
 
   // Bookmarks states (persisted locally)
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
@@ -976,8 +1115,8 @@ export default function ForewardOutlookPane({
 
   // Selected Trend Item
   const selectedTrend = useMemo(() => {
-    return RADAR_TRENDS.find(t => t.id === selectedTrendId) || RADAR_TRENDS[0];
-  }, [selectedTrendId]);
+    return trends.find(t => t.id === selectedTrendId) || null;
+  }, [selectedTrendId, trends]);
 
   // SVG Radar Coordinates Calculation helper
   const cx = 400;
@@ -991,7 +1130,7 @@ export default function ForewardOutlookPane({
 
   // Handle chat submission
   const handleChatSend = async (text: string) => {
-    if (!text.trim() || chatLoading) return;
+    if (!text.trim() || chatLoading || !selectedTrend) return;
 
     const userMsg: ChatMessage = {
       id: Math.random().toString(36).substring(2),
@@ -1037,7 +1176,7 @@ export default function ForewardOutlookPane({
         const assistantMsg: ChatMessage = {
           id: Math.random().toString(36).substring(2),
           role: "model",
-          text: `Based on an analysis of **${selectedTrend.title}** within the **${selectedTrend.sector}** space: this development directly affects Near-Term loyalty frameworks. We recommend allocating up to 12% of the tactical innovation budget to evaluate API-first pilot capabilities. Let me know if you would like to run additional scenario models.`,
+          text: `Based on an analysis of **${selectedTrend?.title || "the selected trend"}** within the **${selectedTrend?.sector || "its"}** space: this development directly affects Near-Term loyalty frameworks. We recommend allocating up to 12% of the tactical innovation budget to evaluate API-first pilot capabilities. Let me know if you would like to run additional scenario models.`,
           timestamp: new Date()
         };
         setChatHistory(prev => [...prev, assistantMsg]);
@@ -1086,6 +1225,7 @@ export default function ForewardOutlookPane({
   };
 
   const formattedPublishDate = useMemo(() => {
+    if (!selectedTrend) return "";
     const d = new Date(selectedTrend.source_published_date);
     if (isNaN(d.getTime())) return "July 2026";
     return d.toLocaleDateString("en-US", {
@@ -1399,79 +1539,75 @@ export default function ForewardOutlookPane({
               <text x="700" y="370" textAnchor="middle" className="font-mono text-[9px] font-bold tracking-widest fill-zinc-600">LONG-TERM</text>
 
               {/* Trend Nodes/Dots */}
-              {RADAR_TRENDS.map((trend) => {
-                const pt = getCoords(trend.r, trend.angle);
-                const isSelected = selectedTrendId === trend.id;
-                const isHovered = hoveredNodeId === trend.id;
-                const isPulse = trend.id === "embedded-fintech";
-                const nodeRadius = getNodeRadius(trend, isSelected, isHovered);
+              {isLoading ? (
+                <g>
+                  <text x="400" y="200" textAnchor="middle" className="text-zinc-400 text-sm animate-pulse">Syncing horizon data...</text>
+                </g>
+              ) : trends.length === 0 ? (
+                <g>
+                  <text x="400" y="200" textAnchor="middle" className="text-zinc-400 text-sm">No trends available for this client.</text>
+                </g>
+              ) : (
+                trends.map((trend) => {
+                  const pt = getCoords(trend.r, trend.angle);
+                  const isSelected = selectedTrendId === trend.id;
+                  const isHovered = hoveredNodeId === trend.id;
+                  const nodeRadius = getNodeRadius(trend, isSelected, isHovered);
 
-                return (
-                  <g 
-                    key={trend.id} 
-                    className="group"
-                    onMouseEnter={() => setHoveredNodeId(trend.id)}
-                    onMouseLeave={() => setHoveredNodeId(null)}
-                  >
-                    {/* Pulsing ring for high-priority/highlighted or selected nodes */}
-                    {isPulse && (
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={nodeRadius + 4}
-                        fill="none"
-                        stroke="#7c3aed"
-                        strokeWidth="1.5"
-                        className="animate-ping opacity-75"
-                        style={{ transformOrigin: `${pt.x}px ${pt.y}px` }}
-                      />
-                    )}
-                    {isSelected && (
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={nodeRadius + 3.5}
-                        fill="none"
-                        stroke="#7c3aed"
-                        strokeWidth="1.5"
-                        className="transition-all duration-150"
-                      />
-                    )}
-                    {/* Glowing hover circle (touch/click target) */}
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r="18"
-                      fill="transparent"
-                      className="cursor-pointer"
-                      onClick={() => setSelectedTrendId(trend.id)}
-                    />
-                    {/* Solid node circle */}
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={nodeRadius}
-                      fill={isSelected || isHovered ? "#7c3aed" : "#18181b"}
-                      className="cursor-pointer transition-all duration-150"
-                      onClick={() => setSelectedTrendId(trend.id)}
-                    />
-                    {/* Text labels adjacent to node */}
-                    <text
-                      x={pt.x + trend.dx - 8}
-                      y={pt.y + trend.dy}
-                      textAnchor={trend.textAnchor}
-                      onClick={() => setSelectedTrendId(trend.id)}
-                      className={`font-sans text-[10px] cursor-pointer font-medium select-none tracking-tight transition-colors duration-150 ${
-                        isSelected || isHovered
-                          ? "fill-[#7c3aed] font-bold" 
-                          : "fill-zinc-700 hover:fill-[#7c3aed]"
-                      }`}
+                  return (
+                    <g 
+                      key={trend.id} 
+                      className="group"
+                      onMouseEnter={() => setHoveredNodeId(trend.id)}
+                      onMouseLeave={() => setHoveredNodeId(null)}
                     >
-                      {trend.title}
-                    </text>
-                  </g>
-                );
-              })}
+                      {isSelected && (
+                        <circle
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={nodeRadius + 3.5}
+                          fill="none"
+                          stroke="#7c3aed"
+                          strokeWidth="1.5"
+                          className="transition-all duration-150"
+                        />
+                      )}
+                      {/* Glowing hover circle (touch/click target) */}
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="18"
+                        fill="transparent"
+                        className="cursor-pointer"
+                        onClick={() => setSelectedTrendId(trend.id)}
+                      />
+                      {/* Solid node circle */}
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={nodeRadius}
+                        fill={isSelected || isHovered ? "#7c3aed" : "#18181b"}
+                        className="cursor-pointer transition-all duration-150"
+                        onClick={() => setSelectedTrendId(trend.id)}
+                      />
+                      {/* Text labels adjacent to node */}
+                      <text
+                        x={pt.x + trend.dx - 8}
+                        y={pt.y + trend.dy}
+                        textAnchor={trend.textAnchor}
+                        onClick={() => setSelectedTrendId(trend.id)}
+                        className={`font-sans text-[10px] cursor-pointer font-medium select-none tracking-tight transition-colors duration-150 ${
+                          isSelected || isHovered
+                            ? "fill-[#7c3aed] font-bold" 
+                            : "fill-zinc-700 hover:fill-[#7c3aed]"
+                        }`}
+                      >
+                        {trend.title}
+                      </text>
+                    </g>
+                  );
+                })
+              )}
             </svg>
           </div>
 
@@ -1529,7 +1665,12 @@ export default function ForewardOutlookPane({
         </div>
 
         {/* Dynamic switcher content */}
-        {activeTab === "insights" && selectedTrend && (
+        {isLoading ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-[#fafafa]/30">
+            <Loader2 className="w-6 h-6 text-zinc-400 animate-spin mb-3" />
+            <p className="text-zinc-500 text-[12px]">Synchronizing live horizon analysis...</p>
+          </div>
+        ) : activeTab === "insights" && selectedTrend ? (
           <div key={selectedTrend.id} className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-5 animate-fade-in bg-[#fafafa]/30 select-text">
             
             {/* Category, Actions and Title */}
@@ -1665,7 +1806,7 @@ export default function ForewardOutlookPane({
               <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3.5 mt-1 select-text">
                 <div className="flex items-center justify-between select-none">
                   <span className="text-[13px] font-bold text-zinc-700 font-sans">
-                    Signals ({selectedTrend.sources.length})
+                    Signals ({isSignalsLoading ? "..." : selectedTrend.sources.length})
                   </span>
                   <button 
                     onClick={() => setIsSourcesExpanded(!isSourcesExpanded)}
@@ -1689,7 +1830,16 @@ export default function ForewardOutlookPane({
                 {/* List of source tags/pills directly - NO dots, NO categorization as requested, COLLAPSIBLE */}
                 {isSourcesExpanded && (
                   <div className="flex flex-col gap-2 mt-1 animate-fade-in">
-                    {selectedTrend.sources.map(src => {
+                    {isSignalsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-5 h-5 text-zinc-300 animate-spin" />
+                      </div>
+                    ) : selectedTrend.sources.length === 0 ? (
+                      <div className="text-[12px] text-zinc-400 py-4 text-center">
+                        No signals associated with this horizon trend.
+                      </div>
+                    ) : (
+                      selectedTrend.sources.map(src => {
                       const isSelected = selectedSignalId === src.id;
                       const cat = (src.category || "").toLowerCase();
                       
@@ -1767,13 +1917,18 @@ export default function ForewardOutlookPane({
                                 <div className="flex items-center justify-between py-1 border-b border-zinc-50">
                                   <span className="text-zinc-600 text-[10.5px]">Organisation</span>
                                   <span className="text-zinc-900 text-[10.5px] font-medium">
-                                    {src.category === "Patent" ? "Undisclosed fintech infra co" : "Industry Intelligence"}
+                                    {src.organization || (src.category === "Patent" ? "Undisclosed fintech infra co" : "Industry Intelligence")}
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between py-1">
                                   <span className="text-zinc-600 text-[10.5px]">Source</span>
-                                  <a href="#" className="text-[#3b82f6] text-[10.5px] font-medium hover:underline flex items-center gap-1">
-                                    {src.category === "Patent" ? "USPTO filing" : "Market Report"}
+                                  <a 
+                                    href={src.source_url || "#"} 
+                                    target={src.source_url ? "_blank" : undefined}
+                                    rel={src.source_url ? "noopener noreferrer" : undefined}
+                                    className="text-[#3b82f6] text-[10.5px] font-medium hover:underline flex items-center gap-1"
+                                  >
+                                    {src.source_url ? "Original article" : (src.category === "Patent" ? "USPTO filing" : "Market Report")}
                                     <Share2 className="w-2.5 h-2.5" />
                                   </a>
                                 </div>
@@ -1782,7 +1937,8 @@ export default function ForewardOutlookPane({
                           )}
                         </div>
                       );
-                    })}
+                    })
+                  )}
                   </div>
                 )}
               </div>
@@ -1798,14 +1954,14 @@ export default function ForewardOutlookPane({
                       Fetching similar prospects...
                     </div>
                   ) : similarFutureProspects.length > 0 ? (
-                    similarFutureProspects.map((prospect, idx) => (
+                    similarFutureProspects.map((prospect: any, idx) => (
                       <div className="flex items-start gap-2 py-0.5" key={idx}>
                         <FileText className="w-3.5 h-3.5 text-zinc-400 mt-[2px] shrink-0 select-none" />
                         <button
-                          onClick={() => setSelectedTrendId(prospect.id)}
+                          onClick={() => (prospect.trend_id || prospect.id) && setSelectedTrendId(prospect.trend_id || prospect.id)}
                           className="text-left text-[12px] text-zinc-700 hover:text-[#7c3aed] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer"
                         >
-                          {prospect.title}
+                          {prospect.name || prospect.title}
                         </button>
                       </div>
                     ))
@@ -1845,7 +2001,7 @@ export default function ForewardOutlookPane({
               </div>
 
             </div>
-        )}
+        ) : null}
 
         {activeTab === "ask_marketgenie" && (
           <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col h-full animate-fade-in text-left">
@@ -1856,7 +2012,7 @@ export default function ForewardOutlookPane({
                     <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-3">
                       <Sparkles className="w-8 h-8 text-zinc-400" />
                     </div>
-                    <p className="text-sm text-zinc-500 font-medium">Ask MarketGenie About {selectedTrend.title}</p>
+                    <p className="text-sm text-zinc-500 font-medium">Ask MarketGenie About {selectedTrend?.title || "Trend"}</p>
                     <p className="text-xs text-zinc-400 mt-1">Query potential compliance, integration, and strategy timelines.</p>
                   </div>
                 ) : (
@@ -1886,9 +2042,9 @@ export default function ForewardOutlookPane({
               {chatHistory.length === 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-3 select-none">
                   {[
-                    `Timeline for ${selectedTrend.title}`,
-                    `Regional risks of ${selectedTrend.title}`,
-                    `Competitors using ${selectedTrend.title}`
+                    `Timeline for ${selectedTrend?.title || "trend"}`,
+                    `Regional risks of ${selectedTrend?.title || "trend"}`,
+                    `Competitors using ${selectedTrend?.title || "trend"}`
                   ].map((s, idx) => (
                     <button
                       key={idx}
@@ -1908,7 +2064,7 @@ export default function ForewardOutlookPane({
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleChatSend(chatInput)}
-                  placeholder={`Ask MarketGenie about ${selectedTrend.title}...`}
+                  placeholder={`Ask MarketGenie about ${selectedTrend?.title || "this trend"}...`}
                   className="flex-1 bg-zinc-50 border border-zinc-200 rounded-[4px] px-3 py-1.5 text-xs outline-none focus:border-zinc-300 focus:bg-white text-zinc-800"
                 />
                 <button
