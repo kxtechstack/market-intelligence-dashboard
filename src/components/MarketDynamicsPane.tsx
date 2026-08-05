@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Bookmark, Share2, FileText, Send, Loader2, ArrowUpRight, AlertTriangle, Minus, ArrowDownRight, Pencil, Check, ArrowUp, ArrowRight, ArrowDown } from "lucide-react";
+import { supabase } from "../lib/supabase";
 import { RADAR_TRENDS, TrendItem, SourceItem } from "./ForewardOutlookPane";
+
+const MARKET_DYNAMICS_MODULE_ID = "55c5ee19-bfca-468b-81b3-b89ca4f303c8";
 
 interface MarketDynamicsPaneProps {
   onReturn: () => void;
@@ -214,26 +217,49 @@ const getTagStyles = (tagColor: string) => {
 };
 
 interface SignalDetailData {
+  id?: string;
   title: string;
   category: string;
+  sector: string;
   term: "Near-Term" | "Mid-Term" | "Long-Term";
   impact_level: "Critical" | "High" | "Medium" | "Low";
   confidence: "High" | "Medium" | "Low";
   summary: string;
   business_impact: string[];
-  sources: {
-    id: string;
-    source_name: string;
-    details: string;
-    category: "Research & Development" | "Innovation" | "Capital investment";
-    date: string;
-  }[];
+  sources: SourceItem[];
+  country: string;
+  last_enriched_at?: string;
 }
+
+const SUBMODULE_SUMMARIES: Record<string, string> = {
+  "FUNDING & INVESTMENT ACTIVITY": "Accelerating: third consecutive week of growth, concentrated in two sectors. Transaction volumes remain elevated with substantial support from late-stage growth rounds.",
+  "FUNDING & INVESTMENT": "Accelerating: third consecutive week of growth, concentrated in two sectors. Transaction volumes remain elevated with substantial support from late-stage growth rounds.",
+  "INDUSTRY STRUCTURE": "Emerging: early consolidation signals, worth monitoring not yet acting on. Minor mergers and strategic repositioning indicate potential sector consolidation over the next fiscal cycle.",
+  "TALENT MOVEMENT": "Accelerating: turnover concentrated at two firms, both also flagged under structure. Executive migrations are creating specialized clusters of expertise in risk and operational management.",
+  "MACRO & ECONOMIC": "Stable: no material change, low near-term relevance to client positioning. Macro indicators and central bank policy adjustments are currently maintaining historical ranges without disruption.",
+  "TECH ADOPTION": "Cooling: adoption announcements slowed after a strong prior quarter. Customers are shifting focus from rapid experimentation to optimizing and scaling existing tool deployments."
+};
+
+const getSubmoduleIconInfo = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes("funding") || n.includes("investment")) return { type: "up-right" as const, color: "text-emerald-600" };
+  if (n.includes("industry") || n.includes("structure")) return { type: "warning" as const, color: "text-amber-600" };
+  if (n.includes("talent") || n.includes("movement")) return { type: "up-right" as const, color: "text-emerald-600" };
+  if (n.includes("macro") || n.includes("economic")) return { type: "minus" as const, color: "text-zinc-400" };
+  if (n.includes("tech") || n.includes("adoption")) return { type: "down-right" as const, color: "text-zinc-400" };
+  return { type: "minus" as const, color: "text-zinc-400" };
+};
+
+const getSubmoduleSummary = (name: string) => {
+  const n = name.toUpperCase();
+  return SUBMODULE_SUMMARIES[n] || "Monitoring activity within this dimension. Strategic indicators suggest stable progression with periodic evaluations required to maintain competitive positioning.";
+};
 
 const SIGNAL_DETAILS: Record<string, SignalDetailData> = {
   "Scalp-serum brands are pulling most new category funding": {
     title: "Scalp-serum brands are pulling most new category funding",
     category: "Funding & investment",
+    sector: "Funding & investment",
     term: "Near-Term",
     impact_level: "High",
     confidence: "High",
@@ -258,11 +284,13 @@ const SIGNAL_DETAILS: Record<string, SignalDetailData> = {
         category: "Research & Development",
         date: "Jun 29"
       }
-    ]
+    ],
+    country: "Global"
   },
   "Series B round closed for eco-friendly packaging pioneer": {
     title: "Series B round closed for eco-friendly packaging pioneer",
     category: "Funding & investment",
+    sector: "Funding & investment",
     term: "Mid-Term",
     impact_level: "High",
     confidence: "High",
@@ -301,11 +329,13 @@ const SIGNAL_DETAILS: Record<string, SignalDetailData> = {
         category: "Innovation",
         date: "Apr 11"
       }
-    ]
+    ],
+    country: "Global"
   },
   "Private-label is closing the formulation gap": {
     title: "Private-label is closing the formulation gap",
     category: "Industry structure",
+    sector: "Industry structure",
     term: "Near-Term",
     impact_level: "Medium",
     confidence: "Medium",
@@ -337,11 +367,13 @@ const SIGNAL_DETAILS: Record<string, SignalDetailData> = {
         category: "Innovation",
         date: "Jun 10"
       }
-    ]
+    ],
+    country: "Global"
   },
   "A competitor's Chief Innovation Officer departed after delayed launches": {
     title: "A competitor's Chief Innovation Officer departed after delayed launches",
     category: "Talent movement",
+    sector: "Talent movement",
     term: "Near-Term",
     impact_level: "Medium",
     confidence: "High",
@@ -366,7 +398,8 @@ const SIGNAL_DETAILS: Record<string, SignalDetailData> = {
         category: "Innovation",
         date: "Jun 15"
       }
-    ]
+    ],
+    country: "Global"
   }
 };
 
@@ -385,14 +418,19 @@ const getSignalDetails = (sig: {title: string; desc: string}, selectedCategory: 
 
   const sourceTemplates = [
     {
-      source_name: "Industry Intelligence Report",
-      category: "Research & Development" as const,
+      source_name: sig.title,
+      category: "Innovation" as const,
       details_suffix: "highlighting structural shifts and consumer volume deviations."
     },
     {
-      source_name: "Capital Markets Weekly",
+      source_name: "Capital Markets Analysis",
       category: "Capital investment" as const,
       details_suffix: "noting aggressive capital reallocation toward high-growth niches."
+    },
+    {
+      source_name: "Industry Intelligence Report",
+      category: "Research & Development" as const,
+      details_suffix: "documenting shelf-space expansions and regional distributor audits."
     },
     {
       source_name: "Retail Intelligence Monthly",
@@ -429,19 +467,18 @@ const getSignalDetails = (sig: {title: string; desc: string}, selectedCategory: 
     term: (Math.abs(hash) % 3 === 0 ? "Near-Term" : Math.abs(hash) % 3 === 1 ? "Mid-Term" : "Long-Term") as "Near-Term" | "Mid-Term" | "Long-Term",
     impact_level: (Math.abs(hash) % 3 === 0 ? "High" : Math.abs(hash) % 3 === 1 ? "Medium" : "Low") as "High" | "Medium" | "Low",
     confidence: (Math.abs(hash) % 2 === 0 ? "High" : "Medium") as "High" | "Medium",
-    summary: `${sig.desc} This development highlights evolving dynamics within the ${selectedCategory.toLowerCase()} landscape, indicating a shift in consumer interest or strategic corporate behavior that decision-makers should monitor closely.`,
-    business_impact: [
-      `Monitor this development's progress as it influences regional market share and competitor positioning.`,
-      `Evaluate operational operational alignment to determine if adaptation of current R&D or marketing strategies is required.`,
-      `Establish secondary tracking metrics to capture downstream impacts on pricing and distribution channels.`
-    ],
-    sources: generatedSources
+    summary: sig.desc,
+    business_impact: [],
+    sources: generatedSources,
+    country: ""
   };
 };
 
 interface SignalContent {
+  id?: string;
   title: string;
   desc: string;
+  short_summary?: string;
 }
 
 interface SignalGridItem {
@@ -801,124 +838,307 @@ export default function MarketDynamicsPane({
   const [activeTab, setActiveTab] = useState<string>("insights");
   const [selectedTrendId, setSelectedTrendId] = useState<string>("embedded-fintech");
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
-  const [selectedGridSignal, setSelectedGridSignal] = useState<{title: string; desc: string} | null>(() => {
-    return {
-      title: "Scalp-serum brands are pulling most new category funding",
-      desc: "3 of 4 rounds this quarter went to scalp-health positioning; reformulation weighted toward styling now lags the funding trend."
-    };
-  });
-  const [selectedSignalId, setSelectedSignalId] = useState<string | null>(() => {
-    const details = getSignalDetails({
-      title: "Scalp-serum brands are pulling most new category funding",
-      desc: "3 of 4 rounds this quarter went to scalp-health positioning; reformulation weighted toward styling now lags the funding trend."
-    }, "Funding & investment");
-    return details?.sources?.[0]?.id || null;
-  });
+  const [richSignals, setRichSignals] = useState<SignalGridItem[]>([]);
+  const [marketInsights, setMarketInsights] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [signalSubCardTitles, setSignalSubCardTitles] = useState<Record<string, string[]>>({});
+  
+  const [selectedGridSignal, setSelectedGridSignal] = useState<SignalContent | null>(null);
+  const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
+  const [activeSignalDetail, setActiveSignalDetail] = useState<SignalDetailData | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
 
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
-  const [selectedCategory, setSelectedCategory] = useState<string>("Funding & investment");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+
+  useEffect(() => {
+    async function fetchMarketDynamics() {
+      setIsLoading(true);
+      try {
+        // 1. Fetch enabled signal configuration for the client
+        const { data: enabledSignalsData, error: enabledSignalsError } = await supabase
+          .schema("admin")
+          .from("client_signals")
+          .select(`
+            id,
+            signal_id,
+            is_enabled,
+            signal:signals(
+              id,
+              signal_name,
+              module_id,
+              submodule_id,
+              submodule:submodules(
+                id,
+                submodule_name,
+                module_id
+              )
+            )
+          `)
+          .eq("client_id", clientId)
+          .eq("is_enabled", true);
+
+        if (enabledSignalsError) throw enabledSignalsError;
+
+        // Filter for this specific module ID locally
+        const enabledSignals = (enabledSignalsData || [])
+          .filter((cs: any) => cs.signal?.module_id === MARKET_DYNAMICS_MODULE_ID)
+          .sort((a: any, b: any) => {
+            const subA = a.signal.submodule.submodule_name;
+            const subB = b.signal.submodule.submodule_name;
+            if (subA !== subB) return subA.localeCompare(subB);
+            return a.signal.signal_name.localeCompare(b.signal.signal_name);
+          });
+
+        // 2. Fetch market insights from public schema
+        const { data: insightsData, error: insightsError } = await supabase
+          .from("market_insights")
+          .select("*")
+          .eq("module_id", MARKET_DYNAMICS_MODULE_ID)
+          .eq("client_id", clientId);
+
+        if (insightsError) throw insightsError;
+        setMarketInsights(insightsData || []);
+
+        if (enabledSignals.length > 0) {
+          // Group enabled signals by submodule
+          const submodulesMap: Record<string, { name: string, signals: any[] }> = {};
+          enabledSignals.forEach((cs: any) => {
+            const sm = cs.signal.submodule;
+            if (!submodulesMap[sm.id]) {
+              submodulesMap[sm.id] = { name: sm.submodule_name, signals: [] };
+            }
+            submodulesMap[sm.id].signals.push(cs.signal);
+          });
+
+          const newRichSignals: SignalGridItem[] = [];
+          const newSubCardTitles: Record<string, string[]> = {};
+
+          Object.entries(submodulesMap).forEach(([smId, smData]) => {
+            const submoduleName = smData.name;
+            const submoduleSignals = smData.signals;
+            
+            // Map insights to these signals
+            const titles: string[] = submoduleSignals.map(s => s.signal_name);
+            const contents: SignalContent[][] = submoduleSignals.map(signal => {
+               return (insightsData || [])
+                 .filter(item => item.signal_id === signal.id)
+                 .map(item => ({
+                   id: item.id,
+                   title: item.title || item.summary || "",
+                   desc: item.summary || "",
+                   short_summary: item.short_summary || ""
+                 }));
+            });
+
+            const iconInfo = getSubmoduleIconInfo(submoduleName);
+
+            newRichSignals.push({
+              category: submoduleName.toUpperCase(),
+              status: "Stable", 
+              iconType: iconInfo.type, 
+              iconColor: iconInfo.color, 
+              contents,
+              signalsCount: contents.flat().length
+            });
+
+            newSubCardTitles[submoduleName] = titles;
+          });
+
+          setRichSignals(newRichSignals);
+          setSignalSubCardTitles(newSubCardTitles);
+          
+          if (newRichSignals.length > 0) {
+            const firstSubmoduleName = Object.values(submodulesMap)[0].name;
+            setSelectedCategory(firstSubmoduleName);
+          }
+        } else {
+          setRichSignals([]);
+          setSignalSubCardTitles({});
+          setMarketInsights([]);
+        }
+      } catch (err) {
+        console.error("Error fetching market dynamics:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchMarketDynamics();
+  }, [clientId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedInsightId) {
+      setActiveSignalDetail(null);
+      return;
+    }
+
+    async function fetchSignalDetails() {
+      setActiveSignalDetail(null);
+      setIsDetailLoading(true);
+      try {
+        const insight = marketInsights.find(mi => mi.id === selectedInsightId);
+        if (!insight || cancelled) {
+          if (!insight) setIsDetailLoading(false);
+          return;
+        }
+
+        const { data: signalsData, error: signalsError } = await supabase
+          .from("market_dynamics_signals")
+          .select("*")
+          .eq("insight_id", selectedInsightId);
+
+        if (cancelled) return;
+        if (signalsError) throw signalsError;
+
+        const mappedSources = (signalsData || []).map(s => ({
+          id: s.id,
+          source_name: s.signal_title || "Signal",
+          details: s.summary || "",
+          category: (s.category || "General") as any,
+          date: s.published_date ? new Date(s.published_date).toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : "Jul 23",
+          organization: s.organization,
+          source_url: s.source_url
+        }));
+
+        const detail: SignalDetailData = {
+          id: insight.id,
+          title: insight.title || insight.summary || "",
+          category: insight.category || "General",
+          sector: insight.category || "General",
+          term: (insight.ring === "long_term" ? "Long-Term" : insight.ring === "mid_term" ? "Mid-Term" : "Near-Term") as any,
+          impact_level: (() => {
+            const rel = (insight.relevance_level || "").toLowerCase();
+            if (rel === "critical") return "Critical";
+            if (rel === "high") return "High";
+            if (rel === "medium") return "Medium";
+            if (rel === "low") return "Low";
+            return "Medium";
+          })() as any,
+          confidence: (() => {
+            const conf = (insight.write_up?.confidence || "").toLowerCase();
+            if (conf === "high") return "High";
+            if (conf === "medium") return "Medium";
+            if (conf === "low") return "Low";
+            return "High";
+          })() as any,
+          summary: insight.summary || "",
+          business_impact: (() => {
+            const bi = insight.business_impact;
+            if (!bi) return [];
+            if (typeof bi === 'string') {
+              try {
+                return JSON.parse(bi);
+              } catch (e) {
+                return [bi];
+              }
+            }
+            return Array.isArray(bi) ? bi : [];
+          })(),
+          sources: mappedSources,
+          country: insight.country || "",
+          last_enriched_at: insight.last_enriched_at
+        };
+
+        if (cancelled) return;
+        setActiveSignalDetail(detail);
+        if (mappedSources.length > 0) {
+          setSelectedSignalId(mappedSources[0].id);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Error fetching signal details:", err);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsDetailLoading(false);
+        }
+      }
+    }
+
+    fetchSignalDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInsightId, marketInsights]);
 
   const activeGridSignals = useMemo(() => {
-    if (selectedTrendId === "embedded-fintech") {
-      return RICH_SIGNALS;
-    }
-    return SPARSE_SIGNALS;
-  }, [selectedTrendId]);
+    return richSignals.length > 0 ? richSignals : RICH_SIGNALS;
+  }, [richSignals]);
 
   const currentCategoryData = useMemo(() => {
-    let key = "FUNDING & INVESTMENT";
-    if (selectedCategory === "Industry structure") {
-      key = "INDUSTRY STRUCTURE";
-    } else if (selectedCategory === "Talent movement") {
-      key = "TALENT MOVEMENT";
-    } else if (selectedCategory === "Macro & economic") {
-      key = "MACRO & ECONOMIC";
-    } else if (selectedCategory === "Tech adoption") {
-      key = "TECH ADOPTION";
-    }
+    const key = selectedCategory.toUpperCase();
     return activeGridSignals.find(s => s.category === key) || activeGridSignals[0];
   }, [activeGridSignals, selectedCategory]);
 
   const currentSubCardTitles = useMemo(() => {
+    // If we have live titles for this category, use them
+    const liveTitles = signalSubCardTitles[selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1).toLowerCase()] || 
+                       signalSubCardTitles[selectedCategory] || 
+                       signalSubCardTitles[selectedCategory.toUpperCase()];
+    
+    if (liveTitles) return liveTitles;
+
+    // Fallback to hardcoded titles for existing hardcoded data
     switch (selectedCategory) {
       case "Funding & investment":
-        return [
-          "Funding rounds announced",
-          "Venture capital investments",
-          "Private equity investments"
-        ];
+        return ["Funding rounds announced", "Venture capital investments", "Private equity investments"];
       case "Industry structure":
-        return [
-          "Market consolidation",
-          "Mergers & acquisitions",
-          "New industry entrants"
-        ];
+        return ["Market consolidation", "Mergers & acquisitions", "New industry entrants"];
       case "Talent movement":
-        return [
-          "CEO/CXO appointments",
-          "Leadership exits",
-          "Mass hiring initiatives"
-        ];
+        return ["CEO/CXO appointments", "Leadership exits", "Mass hiring initiatives"];
       case "Macro & economic":
-        return [
-          "Interest rate changes",
-          "Inflation updates",
-          "GDP growth forecasts"
-        ];
+        return ["Interest rate changes", "Inflation updates", "GDP growth forecasts"];
       case "Tech adoption":
-        return [
-          "AI adoption",
-          "Cloud migration",
-          "Digital transformation programs"
-        ];
+        return ["AI adoption", "Cloud migration", "Digital transformation programs"];
       default:
-        return [
-          "Signal Category 1",
-          "Signal Category 2",
-          "Signal Category 3"
-        ];
+        return ["Signal Category 1", "Signal Category 2", "Signal Category 3"];
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, signalSubCardTitles]);
 
   const getSectionTitle = (category: string) => {
-    switch (category) {
-      case "Funding & investment":
-        return "Funding & Investment Activity";
-      case "Industry structure":
-        return "Industry Structure Changes";
-      case "Talent movement":
-        return "Talent Movement (Sector-Level)";
-      case "Macro & economic":
-        return "Macro & Economic Signals";
-      case "Tech adoption":
-        return "Technology Adoption Signals";
-      default:
-        return `${category} Activity`;
-    }
+    const cat = category.toLowerCase();
+    if (cat.includes("funding") || cat.includes("investment")) return "Funding & Investment";
+    if (cat.includes("industry structure")) return "Industry Structure Changes";
+    if (cat.includes("talent movement")) return "Talent Movement (Sector-Level)";
+    if (cat.includes("macro") || cat.includes("economic")) return "Macro & Economic Signals";
+    if (cat.includes("tech") || cat.includes("adoption")) return "Technology Adoption Signals";
+    return category;
   };
 
   // Automatically select the first available signal when selectedCategory changes
   useEffect(() => {
-    let key = "FUNDING & INVESTMENT";
-    if (selectedCategory === "Industry structure") {
-      key = "INDUSTRY STRUCTURE";
-    } else if (selectedCategory === "Talent movement") {
-      key = "TALENT MOVEMENT";
-    } else if (selectedCategory === "Macro & economic") {
-      key = "MACRO & ECONOMIC";
-    } else if (selectedCategory === "Tech adoption") {
-      key = "TECH ADOPTION";
-    }
+    if (!selectedCategory || activeGridSignals.length === 0) return;
+
+    const key = selectedCategory.toUpperCase();
     const catData = activeGridSignals.find(s => s.category === key) || activeGridSignals[0];
+    
     if (catData && catData.contents) {
-      let firstSignal: { title: string; desc: string } | null = null;
-      for (const list of catData.contents) {
-        if (list && list.length > 0) {
-          firstSignal = list[0];
-          break;
+      // Only auto-select if nothing is selected or the selected signal is not in the current category
+      const isCurrentSignalInCategory = selectedGridSignal && catData.contents.some(list => 
+        list.some(sig => {
+          if (selectedGridSignal.id && sig.id) return sig.id === selectedGridSignal.id;
+          return sig.title === selectedGridSignal.title;
+        })
+      );
+
+      if (!selectedGridSignal || !isCurrentSignalInCategory) {
+        let firstSignal: SignalContent | null = null;
+        for (const list of catData.contents) {
+          if (list && list.length > 0) {
+            firstSignal = list[0];
+            break;
+          }
+        }
+        if (firstSignal) {
+          setSelectedGridSignal(firstSignal);
+          setSelectedInsightId(firstSignal.id || null);
         }
       }
-      setSelectedGridSignal(firstSignal);
     }
   }, [selectedCategory, activeGridSignals]);
   
@@ -926,12 +1146,9 @@ export default function MarketDynamicsPane({
     setIsSourcesExpanded(true);
     setExpandedCards({});
     if (selectedGridSignal) {
-      const details = getSignalDetails(selectedGridSignal, selectedCategory);
-      if (details && details.sources && details.sources.length > 0) {
-        setSelectedSignalId(details.sources[0].id);
-      } else {
-        setSelectedSignalId(null);
-      }
+      // For grid signals, we wait for fetchSignalDetails to set the real selectedSignalId
+      // We can clear it here to avoid showing a mismatch
+      setSelectedSignalId(null);
     } else {
       const trend = RADAR_TRENDS.find(t => t.id === selectedTrendId) || RADAR_TRENDS[0];
       if (trend && trend.sources && trend.sources.length > 0) {
@@ -1056,10 +1273,13 @@ export default function MarketDynamicsPane({
   }, [selectedTrendId]);
 
   const renderedTrend = useMemo(() => {
+    if (activeSignalDetail && selectedInsightId && activeSignalDetail.id === selectedInsightId) {
+      return activeSignalDetail;
+    }
     if (selectedGridSignal) {
       const details = getSignalDetails(selectedGridSignal, selectedCategory);
       return {
-        id: details.title,
+        id: selectedInsightId || details.title,
         title: details.title,
         sector: details.category as any,
         term: details.term,
@@ -1075,12 +1295,13 @@ export default function MarketDynamicsPane({
         dx: 0,
         dy: 0,
         confidence: details.confidence,
-        signalsCount: details.sources.length,
+        signalsCount: selectedInsightId ? 0 : details.sources.length,
         trendStatus: "Trending up" as const,
         statValue1: "",
         statValue2: "",
         sparklinePath: "M0 15 L8 12 L16 14 L24 8 L32 9 L40 3",
-        sources: details.sources.map(src => {
+        // If we have selectedInsightId, we are loading real sources, so hide mock ones
+        sources: selectedInsightId ? [] : details.sources.map(src => {
           const originalCat = src.category;
           const mappedCat = mapToEightCategories({
             source_name: src.source_name,
@@ -1118,7 +1339,7 @@ export default function MarketDynamicsPane({
         };
       })
     };
-  }, [selectedGridSignal, selectedTrend, selectedCategory]);
+  }, [selectedGridSignal, selectedTrend, selectedCategory, activeSignalDetail, selectedInsightId]);
 
   const isCurrentTrendBookmarked = bookmarkedIds.includes(renderedTrend.id);
 
@@ -1218,14 +1439,15 @@ export default function MarketDynamicsPane({
   };
 
   const formattedPublishDate = useMemo(() => {
-    const d = new Date(renderedTrend.source_published_date);
-    if (isNaN(d.getTime())) return "July 2026";
+    const dateVal = activeSignalDetail?.last_enriched_at || renderedTrend.source_published_date;
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "July 21, 2026";
     return d.toLocaleDateString("en-US", {
       month: "long",
       day: "numeric",
       year: "numeric"
     });
-  }, [renderedTrend]);
+  }, [activeSignalDetail, renderedTrend]);
 
   return (
     <div id="market-dynamics-dashboard" className="flex-1 h-full flex bg-white divide-x divide-zinc-200 overflow-hidden">
@@ -1307,127 +1529,46 @@ export default function MarketDynamicsPane({
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-[#fafafa]/50">
                {/* Market Dynamics Category Cards */}
           <div className="flex flex-col gap-1.5 animate-fade-in select-text">
-            
-            {/* Card 1: Funding & investment */}
-            <div 
-              onClick={() => setSelectedCategory("Funding & investment")}
-              className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
-                selectedCategory === "Funding & investment"
-                  ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
-                  : "border-zinc-200/85 hover:border-zinc-300"
-              }`}
-            >
-              <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
-                <ArrowUpRight className="w-4 h-4 text-emerald-600 shrink-0" strokeWidth={2.4} />
-                <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
-                  Funding & investment
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
-                  Accelerating: third consecutive week of growth, concentrated in two sectors. Transaction volumes remain elevated with substantial support from late-stage growth rounds.
-                </p>
-              </div>
-            </div>
+            {richSignals.map((signal) => {
+              const displayName = signal.category.charAt(0).toUpperCase() + signal.category.slice(1).toLowerCase();
+              // Try to find original name for exact match with summaries
+              const rawName = Object.keys(signalSubCardTitles).find(k => k.toUpperCase() === signal.category) || displayName;
+              const isSelected = selectedCategory.toUpperCase() === signal.category;
 
-            {/* Card 2: Industry structure */}
-            <div 
-              onClick={() => setSelectedCategory("Industry structure")}
-              className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
-                selectedCategory === "Industry structure"
-                  ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
-                  : "border-zinc-200/85 hover:border-zinc-300"
-              }`}
-            >
-              <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" strokeWidth={2.4} />
-                <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
-                  Industry structure
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
-                  Emerging: early consolidation signals, worth monitoring not yet acting on. Minor mergers and strategic repositioning indicate potential sector consolidation over the next fiscal cycle.
-                </p>
-              </div>
-            </div>
-
-            {/* Card 3: Talent movement */}
-            <div 
-              onClick={() => setSelectedCategory("Talent movement")}
-              className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
-                selectedCategory === "Talent movement"
-                  ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
-                  : "border-zinc-200/85 hover:border-zinc-300"
-              }`}
-            >
-              <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
-                <ArrowUpRight className="w-4 h-4 text-emerald-600 shrink-0" strokeWidth={2.4} />
-                <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
-                  Talent movement
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
-                  Accelerating: turnover concentrated at two firms, both also flagged under structure. Executive migrations are creating specialized clusters of expertise in risk and operational management.
-                </p>
-              </div>
-            </div>
-
-            {/* Card 4: Macro & economic */}
-            <div 
-              onClick={() => setSelectedCategory("Macro & economic")}
-              className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
-                selectedCategory === "Macro & economic"
-                  ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
-                  : "border-zinc-200/85 hover:border-zinc-300"
-              }`}
-            >
-              <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
-                <Minus className="w-4 h-4 text-zinc-400 shrink-0" strokeWidth={2.4} />
-                <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
-                  Macro & economic
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
-                  Stable: no material change, low near-term relevance to client positioning. Macro indicators and central bank policy adjustments are currently maintaining historical ranges without disruption.
-                </p>
-              </div>
-            </div>
-
-            {/* Card 5: Tech adoption */}
-            <div 
-              onClick={() => setSelectedCategory("Tech adoption")}
-              className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
-                selectedCategory === "Tech adoption"
-                  ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
-                  : "border-zinc-200/85 hover:border-zinc-300"
-              }`}
-            >
-              <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
-                <ArrowDownRight className="w-4 h-4 text-zinc-400 shrink-0" strokeWidth={2.4} />
-                <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
-                  Tech adoption
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
-                  Cooling: adoption announcements slowed after a strong prior quarter. Customers are shifting focus from rapid experimentation to optimizing and scaling existing tool deployments.
-                </p>
-              </div>
-            </div>
-
+              return (
+                <div 
+                  key={signal.category}
+                  onClick={() => setSelectedCategory(rawName)}
+                  className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
+                    isSelected
+                      ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
+                      : "border-zinc-200/85 hover:border-zinc-300"
+                  }`}
+                >
+                  <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
+                    {getStatusIcon(signal.iconType, signal.iconColor)}
+                    <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
+                      {rawName}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
+                      {getSubmoduleSummary(rawName)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="border-t border-zinc-200/40 my-1.5 select-none"></div>
 
           {/* Market Signals Grid Section */}
           <div className="flex-1 flex flex-col min-h-0">
-            {/* Dynamic Activity title header */}
+            {/* Static Activity title header */}
             <div className="pb-2 pt-1 flex items-center justify-between select-none">
               <span className="text-[13.5px] font-bold text-zinc-800 font-sans tracking-wide uppercase">
-                {getSectionTitle(selectedCategory)}
+                ACTIVITY
               </span>
             </div>
 
@@ -1451,15 +1592,21 @@ export default function MarketDynamicsPane({
                     {signalsList.length > 0 ? (
                       <div className="flex flex-col">
                         {signalsList.map((sig, sigIdx) => {
-                          const isSelected = selectedGridSignal?.title === sig.title;
+                          const isSelected = selectedGridSignal?.id && sig.id 
+                            ? selectedGridSignal.id === sig.id 
+                            : selectedGridSignal?.title === sig.title;
                           return (
                             <div 
                               key={sigIdx} 
                               onClick={() => {
                                 if (isSelected) {
                                   setSelectedGridSignal(null);
+                                  setSelectedInsightId(null);
+                                  setActiveSignalDetail(null);
                                 } else {
+                                  setActiveSignalDetail(null);
                                   setSelectedGridSignal(sig);
+                                  setSelectedInsightId(sig.id || null);
                                 }
                               }}
                               className={`px-4 py-3.5 border-b border-zinc-100 last:border-b-0 transition-all text-left cursor-pointer flex flex-col gap-1 ${
@@ -1474,7 +1621,7 @@ export default function MarketDynamicsPane({
                                 {sig.title}
                               </h4>
                               <p className="text-[11px] text-zinc-650 font-normal font-sans leading-relaxed mt-1">
-                                {sig.desc}
+                                {sig.short_summary || sig.desc}
                               </p>
                             </div>
                           );
@@ -1551,7 +1698,12 @@ export default function MarketDynamicsPane({
         {/* Dynamic switcher content */}
         {/* Dynamic switcher content */}
         {activeTab === "insights" && renderedTrend && (
-          <div key={renderedTrend.id} className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-5 animate-fade-in bg-[#fafafa]/30 select-text">
+          <div key={renderedTrend.id} className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-5 animate-fade-in bg-[#fafafa]/30 select-text relative">
+            {isDetailLoading && (
+              <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] flex items-center justify-center z-10 animate-in fade-in duration-300">
+                 <Loader2 className="w-6 h-6 text-violet-600 animate-spin" />
+              </div>
+            )}
             
             {/* Category, Actions and Title */}
             <div className="flex flex-col gap-2">
@@ -1598,7 +1750,7 @@ export default function MarketDynamicsPane({
                 </div>
                 <div>
                   <span className="font-semibold text-zinc-800">Country:</span>{" "}
-                  <span className="text-zinc-600">IN</span>
+                  <span className="text-zinc-600">{(renderedTrend as any).country || ""}</span>
                 </div>
               </div>
 
@@ -1736,13 +1888,18 @@ export default function MarketDynamicsPane({
                               <div className="flex items-center justify-between py-1 border-b border-zinc-50">
                                 <span className="text-zinc-600">Organisation</span>
                                 <span className="text-zinc-900 font-medium">
-                                  Industry Intelligence
+                                  {src.organization || "Industry Intelligence"}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between py-1">
                                 <span className="text-zinc-600">Source</span>
-                                <a href="#" className="text-[#3b82f6] font-medium hover:underline flex items-center gap-1">
-                                  Market Report
+                                <a 
+                                  href={src.source_url || "#"} 
+                                  target={src.source_url ? "_blank" : undefined}
+                                  rel={src.source_url ? "noopener noreferrer" : undefined}
+                                  className="text-[#3b82f6] font-medium hover:underline flex items-center gap-1"
+                                >
+                                  {src.source_url ? "Original article" : "Market Report"}
                                   <Share2 className="w-2.5 h-2.5" />
                                 </a>
                               </div>
@@ -1771,7 +1928,12 @@ export default function MarketDynamicsPane({
                     <div className="flex items-start gap-2 py-0.5 text-[12px]" key={idx}>
                       <FileText className="w-3.5 h-3.5 text-zinc-400 mt-[2px] shrink-0 select-none" />
                       <button
-                        onClick={() => setSelectedTrendId(prospect.id)}
+                        onClick={() => {
+                          setSelectedTrendId(prospect.id);
+                          setSelectedGridSignal(null);
+                          setSelectedInsightId(null);
+                          setActiveSignalDetail(null);
+                        }}
                         className="text-left text-zinc-700 hover:text-[#7c3aed] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans"
                       >
                         {prospect.title}
@@ -1912,6 +2074,9 @@ export default function MarketDynamicsPane({
                       key={trend.id}
                       onClick={() => {
                         setSelectedTrendId(trend.id);
+                        setSelectedGridSignal(null);
+                        setSelectedInsightId(null);
+                        setActiveSignalDetail(null);
                         setActiveTab("insights");
                       }}
                       className={`p-3 border rounded-[4px] cursor-pointer transition-all ${
