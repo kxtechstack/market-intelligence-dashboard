@@ -22,6 +22,7 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [clientId, setClientId] = useState<string | null>(null);
+  const [industry, setIndustry] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -61,8 +62,21 @@ export default function App() {
         throw new Error("No client assigned to this account.");
       }
 
+      // 3. Fetch client industry from admin.clients
+      const { data: clientData, error: clientError } = await supabase
+        .schema('admin')
+        .from('clients')
+        .select('industry')
+        .eq('id', userData.client_id)
+        .single();
+
+      if (clientError) {
+        console.error("Client industry fetch error:", clientError);
+      }
+
       setUserId(userData.id);
       setClientId(userData.client_id);
+      setIndustry(clientData?.industry || "Retail");
       setIsLoggedIn(true);
     } catch (err: any) {
       setLoginError(err.message || "An unexpected error occurred during login.");
@@ -137,6 +151,7 @@ export default function App() {
         return (
           <IntelligencePane
             clientId={clientId || ""}
+            industry={industry || ""}
             userId={userId || ""}
             selectedAlert={selectedAlert}
             onSelectAlert={(alert) => setSelectedAlert(alert)}
@@ -151,6 +166,7 @@ export default function App() {
           <MarketDynamicsPane 
             onReturn={handleReturn} 
             clientId={clientId || ""}
+            industry={industry || ""}
             userId={userId || ""}
           />
         );
@@ -169,6 +185,7 @@ export default function App() {
           <ForewardOutlookPane 
             onReturn={handleReturn} 
             clientId={clientId || ""}
+            industry={industry || ""}
             userId={userId || ""}
           />
         );

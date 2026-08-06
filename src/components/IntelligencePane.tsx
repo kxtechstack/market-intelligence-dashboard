@@ -6,11 +6,13 @@ import {
   Sparkles, Bookmark, CornerDownLeft, Trash2, ArrowUpRight, Square
 } from "lucide-react";
 import { AlertItem, ChatMessage } from "../types";
+import { ChatSources } from "./ChatSources";
 import { POLICY_RISK_MODULE_ID } from "../constants";
 import { supabase } from "../lib/supabase";
 
 interface IntelligencePaneProps {
   clientId: string;
+  industry: string;
   userId: string;
   selectedAlert: AlertItem | null;
   onSelectAlert: (alert: AlertItem) => void;
@@ -18,6 +20,7 @@ interface IntelligencePaneProps {
 
 export default function IntelligencePane({ 
   clientId,
+  industry,
   userId,
   selectedAlert, 
   onSelectAlert
@@ -664,10 +667,6 @@ export default function IntelligencePane({
     setLeftChatLoading(true);
 
     try {
-      // Find industry for current client
-      const currentClientAlert = alerts.find(a => String(a.client_id) === String(clientId));
-      const industry = currentClientAlert?.industry || "";
-
       console.log(`Sending /ask - Client ID: ${clientId}`);
       console.log(`Sending /ask - Industry: ${industry}`);
 
@@ -1412,41 +1411,7 @@ export default function IntelligencePane({
                                 <div className="whitespace-pre-wrap font-normal animate-fade-in">
                                   {msg.text}
                                 </div>
-                                {msg.sources && msg.sources.length > 0 && (
-                                  <div className="mt-3 pt-3 border-t border-zinc-200/60">
-                                    <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                                      <Search className="w-3 h-3" />
-                                      Sources & References
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                      {msg.sources.map((source, sIdx) => {
-                                        const isObj = typeof source === 'object' && source !== null;
-                                        const url = isObj ? (source as any).url : (typeof source === 'string' && source.startsWith('http') ? source : null);
-                                        const displayTitle = isObj ? (source as any).title : (typeof source === 'string' ? source : "");
-
-                                        return (
-                                          <div key={sIdx} className="flex items-start gap-1.5 group">
-                                            <div className="w-1 h-1 rounded-full bg-zinc-300 mt-1.5 shrink-0" />
-                                            {url ? (
-                                              <a 
-                                                href={url} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="text-[11px] text-[#7c3aed] hover:underline break-all leading-normal text-left"
-                                              >
-                                                {displayTitle}
-                                              </a>
-                                            ) : (
-                                              <span className="text-[11px] text-zinc-600 leading-normal italic text-left">
-                                                {displayTitle}
-                                              </span>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
+                                <ChatSources sources={msg.sources || []} />
                                 {msg.detailedText && (
                                   <div className="mt-2 text-[12px] font-normal leading-relaxed text-zinc-700 animate-fade-in">
                                     {msg.detailedText}{" "}

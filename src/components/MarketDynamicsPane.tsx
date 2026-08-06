@@ -2,11 +2,13 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Bookmark, Share2, FileText, Send, Loader2, ArrowUpRight, AlertTriangle, Minus, ArrowDownRight, Pencil, Check, ArrowUp, ArrowRight, ArrowDown } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { RADAR_TRENDS, TrendItem, SourceItem } from "./ForewardOutlookPane";
+import { ChatSources } from "./ChatSources";
 import { MARKET_DYNAMICS_MODULE_ID } from "../constants";
 
 interface MarketDynamicsPaneProps {
   onReturn: () => void;
   clientId: string;
+  industry: string;
   userId: string;
 }
 
@@ -15,6 +17,7 @@ interface ChatMessage {
   role: "user" | "model";
   text: string;
   timestamp: Date;
+  sources?: (string | { title: string; url: string })[];
 }
 
 // Design helper functions copied exactly from ForewardOutlookPane
@@ -832,6 +835,7 @@ const getStatusIcon = (iconType: string, iconColor: string) => {
 export default function MarketDynamicsPane({ 
   onReturn,
   clientId,
+  industry,
   userId
 }: MarketDynamicsPaneProps) {
   const [activeTab, setActiveTab] = useState<string>("insights");
@@ -1358,15 +1362,13 @@ export default function MarketDynamicsPane({
     setChatLoading(true);
 
     try {
-      const industryText = renderedTrend ? `${renderedTrend.sector} Retail Strategy` : "";
-      
       const response = await fetch(`${import.meta.env.VITE_API_URL}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: text,
           clientId: clientId,
-          industry: industryText,
+          industry: industry,
           moduleId: MARKET_DYNAMICS_MODULE_ID
         })
       });
@@ -1379,6 +1381,7 @@ export default function MarketDynamicsPane({
         id: Math.random().toString(36).substring(2),
         role: "model",
         text: data.answer || "I've analyzed that trend and generated custom strategic guidance.",
+        sources: data.sources || [],
         timestamp: new Date()
       };
 
@@ -2001,6 +2004,7 @@ export default function MarketDynamicsPane({
                     }`}
                   >
                     <p className="whitespace-pre-wrap">{msg.text}</p>
+                    <ChatSources sources={msg.sources || []} />
                   </div>
                 ))
               )}

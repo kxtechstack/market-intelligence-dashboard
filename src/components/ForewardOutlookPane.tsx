@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { ChatSources } from "./ChatSources";
 import { FORWARD_OUTLOOK_MODULE_ID } from "../constants";
 
 interface ForewardOutlookPaneProps {
   onReturn: () => void;
   clientId: string;
+  industry: string;
   userId: string;
 }
 
@@ -49,6 +51,7 @@ interface ChatMessage {
   role: "user" | "model";
   text: string;
   timestamp: Date;
+  sources?: (string | { title: string; url: string })[];
 }
 
 export const RADAR_TRENDS: TrendItem[] = [
@@ -846,6 +849,7 @@ const getTagStyles = (tagColor: string) => {
 export default function ForewardOutlookPane({ 
   onReturn,
   clientId,
+  industry,
   userId
 }: ForewardOutlookPaneProps) {
   const [trends, setTrends] = useState<TrendItem[]>([]);
@@ -1145,16 +1149,13 @@ export default function ForewardOutlookPane({
     setChatLoading(true);
 
     try {
-      // Find industry/sector of current trend to send context to pipeline API
-      const industryText = selectedTrend ? `${selectedTrend.sector} Retail Strategy` : "";
-      
       const response = await fetch(`${import.meta.env.VITE_API_URL}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: text,
           clientId: clientId,
-          industry: industryText,
+          industry: industry,
           moduleId: FORWARD_OUTLOOK_MODULE_ID
         })
       });
@@ -1167,6 +1168,7 @@ export default function ForewardOutlookPane({
         id: Math.random().toString(36).substring(2),
         role: "model",
         text: data.answer || "I've analyzed that trend and generated custom strategic guidance.",
+        sources: data.sources || [],
         timestamp: new Date()
       };
 
@@ -2028,6 +2030,7 @@ export default function ForewardOutlookPane({
                       }`}
                     >
                       <p className="font-sans whitespace-pre-wrap">{msg.text}</p>
+                      <ChatSources sources={msg.sources || []} />
                     </div>
                   ))
                 )}
