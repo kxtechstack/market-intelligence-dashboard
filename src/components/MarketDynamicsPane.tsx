@@ -2,8 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Bookmark, Share2, FileText, Send, Loader2, ArrowUpRight, AlertTriangle, Minus, ArrowDownRight, Pencil, Check, ArrowUp, ArrowRight, ArrowDown } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { RADAR_TRENDS, TrendItem, SourceItem } from "./ForewardOutlookPane";
-
-const MARKET_DYNAMICS_MODULE_ID = "55c5ee19-bfca-468b-81b3-b89ca4f303c8";
+import { MARKET_DYNAMICS_MODULE_ID } from "../constants";
 
 interface MarketDynamicsPaneProps {
   onReturn: () => void;
@@ -1367,7 +1366,8 @@ export default function MarketDynamicsPane({
         body: JSON.stringify({
           question: text,
           clientId: clientId,
-          industry: industryText
+          industry: industryText,
+          moduleId: MARKET_DYNAMICS_MODULE_ID
         })
       });
 

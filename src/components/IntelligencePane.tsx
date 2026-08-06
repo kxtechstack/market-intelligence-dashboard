@@ -6,6 +6,7 @@ import {
   Sparkles, Bookmark, CornerDownLeft, Trash2, ArrowUpRight, Square
 } from "lucide-react";
 import { AlertItem, ChatMessage } from "../types";
+import { POLICY_RISK_MODULE_ID } from "../constants";
 import { supabase } from "../lib/supabase";
 
 interface IntelligencePaneProps {
@@ -678,7 +679,8 @@ export default function IntelligencePane({
         body: JSON.stringify({
           question: text,
           clientId: clientId,
-          industry: industry
+          industry: industry,
+          moduleId: POLICY_RISK_MODULE_ID
         }),
         signal: abortControllerRef.current.signal
       });

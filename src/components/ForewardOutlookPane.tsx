@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { FORWARD_OUTLOOK_MODULE_ID } from "../constants";
 
 interface ForewardOutlookPaneProps {
   onReturn: () => void;
@@ -1153,7 +1154,8 @@ export default function ForewardOutlookPane({
         body: JSON.stringify({
           question: text,
           clientId: clientId,
-          industry: industryText
+          industry: industryText,
+          moduleId: FORWARD_OUTLOOK_MODULE_ID
         })
       });
 
