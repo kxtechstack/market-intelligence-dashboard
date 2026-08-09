@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf } from "lucide-react";
+import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { ChatSources } from "./ChatSources";
 import { FORWARD_OUTLOOK_MODULE_ID } from "../constants";
@@ -876,6 +876,7 @@ export default function ForewardOutlookPane({
         if (error) throw error;
 
         if (data && data.length > 0) {
+          console.log("Trend item keys:", Object.keys(data[0]));
           // Group trends by sector to distribute them within their respective segments
           const trendsBySector: Record<string, any[]> = {};
           data.forEach(item => {
@@ -1051,31 +1052,78 @@ export default function ForewardOutlookPane({
     setIsFetchingSimilar(false);
   }, [selectedTrendId, trends]);
 
-  // Bookmarks states (persisted locally)
-  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(`bookmarks_outlook_${clientId}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Bookmarks states (Supabase backed)
+  const [isBookmarked, setIsBookmarked] = useState<Record<string, boolean>>({});
+  const [hiddenIds, setHiddenIds] = useState<Record<string, boolean>>({});
+  const [lastHiddenTrend, setLastHiddenTrend] = useState<TrendItem | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(`bookmarks_outlook_${clientId}`, JSON.stringify(bookmarkedIds));
-    } catch (err) {
-      console.error("Failed to save bookmarks:", err);
-    }
-  }, [bookmarkedIds, clientId]);
-
-  const toggleBookmark = (id: string) => {
-    setBookmarkedIds(prev => 
-      prev.includes(id) ? prev.filter(bId => bId !== id) : [...prev, id]
-    );
+  const triggerToast = (msg: string, isHideAction = false) => {
+    if (!isHideAction) setLastHiddenTrend(null);
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => {
+        if (prev === msg) {
+          setLastHiddenTrend(null);
+          return null;
+        }
+        return prev;
+      });
+    }, 3000);
   };
 
-  const isCurrentTrendBookmarked = bookmarkedIds.includes(selectedTrendId);
+  const fetchBookmarks = async () => {
+    if (!clientId || !userId) return;
+    try {
+      const { data, error } = await supabase
+        .from("bookmarks")
+        .select("trend_cluster_id")
+        .eq("client_id", clientId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      
+      const ids: Record<string, boolean> = {};
+      data.forEach(b => {
+        if (b.trend_cluster_id) ids[b.trend_cluster_id] = true;
+      });
+      setIsBookmarked(ids);
+    } catch (err) {
+      console.error("Error fetching bookmarks:", err);
+    }
+  };
+
+  const fetchHiddenArticles = async () => {
+    if (!clientId || !userId) return;
+    try {
+      const { data, error } = await supabase
+        .from("hidden_articles")
+        .select("trend_cluster_id")
+        .eq("client_id", clientId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+
+      const ids: Record<string, boolean> = {};
+      data.forEach(h => {
+        if (h.trend_cluster_id) ids[h.trend_cluster_id] = true;
+      });
+      setHiddenIds(ids);
+    } catch (err) {
+      console.error("Error fetching hidden articles:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBookmarks();
+    fetchHiddenArticles();
+    // Debug schema
+    async function checkSchema() {
+      const { data, error } = await supabase.from("bookmarks").select("*").limit(1);
+      console.log("Bookmarks schema check:", { data, error });
+    }
+    checkSchema();
+  }, [clientId, userId]);
 
   // Load fallback dates matching Policy & Risk Monitor defaults
   useEffect(() => {
@@ -1119,9 +1167,13 @@ export default function ForewardOutlookPane({
   }, [startDateStr, endDateStr]);
 
   // Selected Trend Item
+  const filteredTrends = useMemo(() => {
+    return trends.filter(t => !hiddenIds[t.id]);
+  }, [trends, hiddenIds]);
+
   const selectedTrend = useMemo(() => {
-    return trends.find(t => t.id === selectedTrendId) || null;
-  }, [selectedTrendId, trends]);
+    return filteredTrends.find(t => t.id === selectedTrendId) || null;
+  }, [selectedTrendId, filteredTrends]);
 
   // SVG Radar Coordinates Calculation helper
   const cx = 400;
@@ -1552,7 +1604,7 @@ export default function ForewardOutlookPane({
                   <text x="400" y="200" textAnchor="middle" className="text-zinc-400 text-sm">No trends available for this client.</text>
                 </g>
               ) : (
-                trends.map((trend) => {
+                filteredTrends.map((trend) => {
                   const pt = getCoords(trend.r, trend.angle);
                   const isSelected = selectedTrendId === trend.id;
                   const isHovered = hoveredNodeId === trend.id;
@@ -1662,8 +1714,8 @@ export default function ForewardOutlookPane({
                   : "border-transparent text-zinc-500 hover:text-zinc-800"
               }`}
             >
-              <Bookmark className={`w-3 h-3 ${bookmarkedIds.length > 0 ? "text-violet-600 fill-violet-600" : "text-current opacity-70"}`} />
-              <span>Bookmark ({bookmarkedIds.length})</span>
+              <Bookmark className={`w-3 h-3 ${Object.keys(isBookmarked).length > 0 ? "text-violet-600 fill-violet-600" : "text-current opacity-70"}`} />
+              <span>Bookmark ({Object.keys(isBookmarked).length})</span>
             </button>
           </div>
         </div>
@@ -1729,19 +1781,86 @@ export default function ForewardOutlookPane({
               <div className="flex items-center justify-end gap-4 mt-1 select-text">
                 <div className="flex items-center gap-1.5 shrink-0 select-none">
                     <button
-                      onClick={() => toggleBookmark(selectedTrend.id)}
-                      className={`w-[22px] h-[22px] border rounded-[3px] flex items-center justify-center transition-colors duration-150 ${
-                        isCurrentTrendBookmarked
-                          ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
-                          : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
-                      }`}
-                      title={isCurrentTrendBookmarked ? "Remove Bookmark" : "Bookmark"}
+                      id="not-interested-button"
+                      onClick={async () => {
+                        if (!selectedTrend || !clientId || !userId) return;
+                        try {
+                          const { error } = await supabase
+                            .from("hidden_articles")
+                            .insert([
+                              {
+                                client_id: clientId,
+                                user_id: userId,
+                                trend_cluster_id: selectedTrend.id
+                              }
+                            ]);
+                          if (error) throw error;
+
+                          setHiddenIds(prev => ({ ...prev, [selectedTrend.id]: true }));
+                          setLastHiddenTrend(selectedTrend);
+                          triggerToast(`Hidden: ${selectedTrend.title}`, true);
+                        } catch (err: any) {
+                          console.error("Error hiding article:", err);
+                          triggerToast(`Failed to hide article: ${err.message || "Unknown error"}`);
+                        }
+                      }}
+                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[3px] flex items-center justify-center transition-colors"
+                      title="Not Interested"
                     >
-                      <Bookmark className={`w-3 h-3 ${isCurrentTrendBookmarked ? "text-amber-500 fill-amber-500" : ""}`} />
+                      <Square className="w-3 h-3" />
                     </button>
 
                     <button
-                      onClick={() => alert(`Exported strategic brief for ${selectedTrend.title} to PDF draft.`)}
+                      id="bookmark-doc-button"
+                      onClick={async () => {
+                        if (!selectedTrend || !clientId || !userId) return;
+                        const isCurrentlyBookmarked = isBookmarked[selectedTrend.id];
+                        
+                        try {
+                          if (isCurrentlyBookmarked) {
+                            // DELETE
+                            const { error } = await supabase
+                              .from("bookmarks")
+                              .delete()
+                              .eq("client_id", clientId)
+                              .eq("user_id", userId)
+                              .eq("trend_cluster_id", selectedTrend.id);
+                            if (error) throw error;
+                            triggerToast(`Removed bookmark for ${selectedTrend.title}`);
+                          } else {
+                            // INSERT
+                            const { error } = await supabase
+                              .from("bookmarks")
+                              .insert([
+                                {
+                                  client_id: clientId,
+                                  user_id: userId,
+                                  trend_cluster_id: selectedTrend.id
+                                }
+                              ]);
+                            if (error) throw error;
+                            triggerToast(`Saved bookmark for ${selectedTrend.title}`);
+                          }
+                          // Refresh bookmarks
+                          await fetchBookmarks();
+                        } catch (err: any) {
+                          console.error("Error toggling bookmark:", err);
+                          triggerToast(`Failed to update bookmark: ${err.message || "Unknown error"}`);
+                        }
+                      }}
+                      className={`w-[22px] h-[22px] border rounded-[3px] flex items-center justify-center transition-colors duration-150 ${
+                        isBookmarked[selectedTrend.id]
+                          ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
+                          : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
+                      }`}
+                      title={isBookmarked[selectedTrend.id] ? "Remove Bookmark" : "Bookmark"}
+                    >
+                      <Bookmark className={`w-3 h-3 ${isBookmarked[selectedTrend.id] ? "text-amber-500 fill-amber-500" : ""}`} />
+                    </button>
+
+                    <button
+                      id="export-doc-button"
+                      onClick={() => triggerToast(`Exported strategic brief for ${selectedTrend.title} to PDF draft.`)}
                       className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50 rounded-[3px] flex items-center justify-center transition-colors"
                       title="Export"
                     >
@@ -2086,7 +2205,7 @@ export default function ForewardOutlookPane({
           <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-3 animate-fade-in text-left bg-[#fafafa]">
             <h2 className="text-[13px] font-bold text-zinc-900 tracking-tight">Bookmarked Strategic Horizons</h2>
               
-              {bookmarkedIds.length === 0 ? (
+              {Object.keys(isBookmarked).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Bookmark className="w-8 h-8 text-zinc-200 mb-2" />
                   <p className="text-xs text-zinc-400 font-medium">No bookmarked outlook items yet.</p>
@@ -2096,8 +2215,8 @@ export default function ForewardOutlookPane({
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {bookmarkedIds.map(bId => {
-                    const trend = RADAR_TRENDS.find(t => t.id === bId);
+                  {Object.keys(isBookmarked).map(bId => {
+                    const trend = trends.find(t => t.id === bId) || RADAR_TRENDS.find(t => t.id === bId);
                     if (!trend) return null;
                     return (
                       <div
@@ -2132,6 +2251,50 @@ export default function ForewardOutlookPane({
             </div>
           )}
       </div>
+
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
+          <div className="bg-zinc-900 text-white text-[12px] px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <span>{toastMessage}</span>
+            {lastHiddenTrend && (
+              <button 
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (!lastHiddenTrend || !clientId || !userId) return;
+                  try {
+                    const { error } = await supabase
+                      .from("hidden_articles")
+                      .delete()
+                      .eq("client_id", clientId)
+                      .eq("user_id", userId)
+                      .eq("trend_cluster_id", lastHiddenTrend.id);
+                    if (error) throw error;
+                    
+                    setHiddenIds(prev => {
+                      const next = { ...prev };
+                      delete next[lastHiddenTrend.id];
+                      return next;
+                    });
+                    setLastHiddenTrend(null);
+                    setToastMessage(null);
+                  } catch (err) {
+                    console.error("Error undoing hide:", err);
+                  }
+                }}
+                className="flex items-center gap-1.5 text-violet-300 hover:text-violet-200 font-bold transition-colors"
+              >
+                <CornerDownLeft className="w-3 h-3" />
+                UNDO
+              </button>
+            )}
+            {!lastHiddenTrend && (
+              <button onClick={() => setToastMessage(null)} className="opacity-50 hover:opacity-100 transition-opacity">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );
