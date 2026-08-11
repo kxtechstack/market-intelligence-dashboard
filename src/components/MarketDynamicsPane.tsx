@@ -231,6 +231,7 @@ interface SignalDetailData {
   sources: SourceItem[];
   country: string;
   last_enriched_at?: string;
+  created_at?: string;
 }
 
 const SUBMODULE_SUMMARIES: Record<string, string> = {
@@ -901,7 +902,7 @@ export default function MarketDynamicsPane({
 
         // 2. Fetch market insights from public schema
         const { data: insightsData, error: insightsError } = await supabase
-          .from("market_insights")
+          .from("market_insights_live")
           .select("*")
           .eq("module_id", MARKET_DYNAMICS_MODULE_ID)
           .eq("client_id", clientId);
@@ -1010,7 +1011,7 @@ export default function MarketDynamicsPane({
           source_name: s.signal_title || "Signal",
           details: s.summary || "",
           category: (s.category || "General") as any,
-          date: s.published_date ? new Date(s.published_date).toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : "Jul 23",
+          date: (s.last_enriched_at || s.published_date) ? new Date(s.last_enriched_at || s.published_date).toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : "Jul 23",
           organization: s.organization,
           source_url: s.source_url
         }));
@@ -1022,7 +1023,7 @@ export default function MarketDynamicsPane({
           sector: insight.category || "General",
           term: (insight.ring === "long_term" ? "Long-Term" : insight.ring === "mid_term" ? "Mid-Term" : "Near-Term") as any,
           impact_level: (() => {
-            const rel = (insight.relevance_level || "").toLowerCase();
+            const rel = (insight.relevance_level_live || "").toLowerCase();
             if (rel === "critical") return "Critical";
             if (rel === "high") return "High";
             if (rel === "medium") return "Medium";
@@ -1051,7 +1052,8 @@ export default function MarketDynamicsPane({
           })(),
           sources: mappedSources,
           country: insight.country || "",
-          last_enriched_at: insight.last_enriched_at
+          last_enriched_at: insight.last_enriched_at,
+          created_at: insight.created_at
         };
 
         if (cancelled) return;
@@ -1077,20 +1079,75 @@ export default function MarketDynamicsPane({
     };
   }, [selectedInsightId, marketInsights]);
 
+  // Date states (retained for identical design/functionality)
+  const [startDateStr, setStartDateStr] = useState("");
+  const [endDateStr, setEndDateStr] = useState("");
+  const [defaultStartDate, setDefaultStartDate] = useState("");
+  const [defaultEndDate, setDefaultEndDate] = useState("");
+  const [isEditingDates, setIsEditingDates] = useState(false);
+
+  // Load fallback dates matching Policy & Risk Monitor defaults
+  useEffect(() => {
+    const today = new Date();
+    const past = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+    const minStr = formatDate(past);
+    const maxStr = formatDate(today);
+    setStartDateStr(minStr);
+    setEndDateStr(maxStr);
+    setDefaultStartDate(minStr);
+    setDefaultEndDate(maxStr);
+  }, []);
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const formattedDateRange = useMemo(() => {
+    if (!startDateStr || !endDateStr) return "Loading...";
+    const formatDate = (dateStr: string) => {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const utcDate = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
+      return utcDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    };
+    return `${formatDate(startDateStr)} – ${formatDate(endDateStr)}`;
+  }, [startDateStr, endDateStr]);
+
   const filteredMarketInsights = useMemo(() => {
-    return marketInsights.filter(insight => !hiddenIds[insight.id]);
-  }, [marketInsights, hiddenIds]);
+    return marketInsights.filter(insight => {
+      if (hiddenIds[insight.id]) return false;
+      const effectiveDate = insight.last_enriched_at || insight.created_at;
+      if (startDateStr && endDateStr && effectiveDate) {
+        const dateStr = effectiveDate.split('T')[0];
+        return dateStr >= startDateStr && dateStr <= endDateStr;
+      }
+      return true;
+    });
+  }, [marketInsights, hiddenIds, startDateStr, endDateStr]);
 
   const filteredRichSignals = useMemo(() => {
+    const validIds = new Set(filteredMarketInsights.map(mi => mi.id));
     return richSignals.filter(signal => {
-      // If any of the contents (insights) are NOT hidden, keep the submodule
       const allInsights = signal.contents.flat();
-      if (allInsights.length === 0) return true; // Keep empty submodules
-      return allInsights.some(insight => !hiddenIds[insight.id]);
+      if (allInsights.length === 0) return true;
+      return allInsights.some(insight => validIds.has(insight.id));
     }).map(signal => {
-      // Also filter hidden insights INSIDE the submodule
-      const filteredContents = signal.contents.map(group => 
-        group.filter(insight => !hiddenIds[insight.id])
+      const filteredContents = signal.contents.map(group =>
+        group.filter(insight => validIds.has(insight.id))
       );
       return {
         ...signal,
@@ -1098,7 +1155,7 @@ export default function MarketDynamicsPane({
         signalsCount: filteredContents.flat().length
       };
     });
-  }, [richSignals, hiddenIds]);
+  }, [richSignals, filteredMarketInsights]);
 
   const activeGridSignals = useMemo(() => {
     return filteredRichSignals.length > 0 ? filteredRichSignals : RICH_SIGNALS;
@@ -1298,53 +1355,7 @@ export default function MarketDynamicsPane({
   }, [clientId, userId]);
 
 
-  // Date states (retained for identical design/functionality)
-  const [startDateStr, setStartDateStr] = useState("");
-  const [endDateStr, setEndDateStr] = useState("");
-  const [defaultStartDate, setDefaultStartDate] = useState("");
-  const [defaultEndDate, setDefaultEndDate] = useState("");
-  const [isEditingDates, setIsEditingDates] = useState(false);
 
-  // Load fallback dates matching Policy & Risk Monitor defaults
-  useEffect(() => {
-    const today = new Date();
-    const past = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const formatDate = (d: Date) => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
-    const minStr = formatDate(past);
-    const maxStr = formatDate(today);
-    setStartDateStr(minStr);
-    setEndDateStr(maxStr);
-    setDefaultStartDate(minStr);
-    setDefaultEndDate(maxStr);
-  }, []);
-
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }, []);
-
-  const formattedDateRange = useMemo(() => {
-    if (!startDateStr || !endDateStr) return "Loading...";
-    const formatDate = (dateStr: string) => {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr;
-      const utcDate = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
-      return utcDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    };
-    return `${formatDate(startDateStr)} – ${formatDate(endDateStr)}`;
-  }, [startDateStr, endDateStr]);
 
   // Selected Trend Item
   const selectedTrend = useMemo(() => {
@@ -1487,20 +1498,20 @@ export default function MarketDynamicsPane({
   const renderImpactBars = (impact: "Critical" | "High" | "Medium" | "Low") => {
     const barCount = 4;
     let filledCount = 2;
-    let barColor = "bg-amber-500";
+    let barColor = "bg-yellow-400";
 
     if (impact === "Critical") {
       filledCount = 4;
-      barColor = "bg-rose-600";
+      barColor = "bg-red-600";
     } else if (impact === "High") {
       filledCount = 3;
-      barColor = "bg-violet-600";
+      barColor = "bg-orange-500";
     } else if (impact === "Medium") {
       filledCount = 2;
-      barColor = "bg-violet-400";
+      barColor = "bg-yellow-400";
     } else {
       filledCount = 1;
-      barColor = "bg-zinc-300";
+      barColor = "bg-emerald-400";
     }
 
     return (
@@ -1518,7 +1529,7 @@ export default function MarketDynamicsPane({
   };
 
   const formattedPublishDate = useMemo(() => {
-    const dateVal = activeSignalDetail?.last_enriched_at || renderedTrend.source_published_date;
+    const dateVal = activeSignalDetail?.last_enriched_at || activeSignalDetail?.created_at || renderedTrend.source_published_date;
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return "July 21, 2026";
     return d.toLocaleDateString("en-US", {
@@ -2241,7 +2252,7 @@ export default function MarketDynamicsPane({
                           {(trend as any).category || (trend as any).sector} • {(trend as any).ring || (trend as any).term}
                         </span>
                         <span className="text-[10px] text-zinc-500 font-medium">
-                          {(trend as any).relevance_level || (trend as any).impact_level}
+                          {(trend as any).relevance_level_live || (trend as any).impact_level}
                         </span>
                       </div>
                       <h3 className="text-xs font-bold text-zinc-800">{(trend as any).title || (trend as any).summary}</h3>

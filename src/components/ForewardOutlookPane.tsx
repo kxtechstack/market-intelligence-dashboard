@@ -919,7 +919,7 @@ export default function ForewardOutlookPane({
                 summary: item.write_up?.summary || "",
                 country: "Global",
                 source_type: "Market Intelligence",
-                source_published_date: item.created_at,
+                source_published_date: item.last_updated_at || item.created_at,
                 impact_level: item.write_up?.impact || "Medium",
                 business_impact: item.write_up?.business_impact || [],
                 textAnchor: angle > 90 ? "end" : angle < 90 ? "start" : "middle",
@@ -1168,8 +1168,15 @@ export default function ForewardOutlookPane({
 
   // Selected Trend Item
   const filteredTrends = useMemo(() => {
-    return trends.filter(t => !hiddenIds[t.id]);
-  }, [trends, hiddenIds]);
+    return trends.filter(t => {
+      if (hiddenIds[t.id]) return false;
+      if (startDateStr && endDateStr && t.source_published_date) {
+        const dateStr = t.source_published_date.split('T')[0];
+        return dateStr >= startDateStr && dateStr <= endDateStr;
+      }
+      return true;
+    });
+  }, [trends, hiddenIds, startDateStr, endDateStr]);
 
   const selectedTrend = useMemo(() => {
     return filteredTrends.find(t => t.id === selectedTrendId) || null;
