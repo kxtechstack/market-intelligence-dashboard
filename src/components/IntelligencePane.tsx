@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { AlertItem, ChatMessage } from "../types";
 import { ChatSources } from "./ChatSources";
-import { POLICY_RISK_MODULE_ID } from "../constants";
+import { POLICY_RISK_MODULE_ID, API_URL } from "../constants";
 import { supabase } from "../lib/supabase";
 
 interface IntelligencePaneProps {
@@ -138,7 +138,7 @@ export default function IntelligencePane({
     }
     setIsFetchingSimilar(true);
     try {
-      const url = `${import.meta.env.VITE_API_URL}/similar/${encodeURIComponent(signalId)}`;
+      const url = `${API_URL}/similar/${encodeURIComponent(signalId)}`;
       console.log(`Calling /similar URL: ${url}`);
       console.log(`Calling /similar Signal ID: ${signalId}`);
       const response = await fetch(url);
@@ -670,7 +670,7 @@ export default function IntelligencePane({
       console.log(`Sending /ask - Client ID: ${clientId}`);
       console.log(`Sending /ask - Industry: ${industry}`);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/ask`, {
+      const response = await fetch(`${API_URL}/ask`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1411,7 +1411,7 @@ export default function IntelligencePane({
                                 <div className="whitespace-pre-wrap font-normal animate-fade-in">
                                   {msg.text}
                                 </div>
-                                <ChatSources sources={msg.sources || []} />
+                                <ChatSources sources={'sources' in msg ? (msg as any).sources || [] : []} />
                                 {msg.detailedText && (
                                   <div className="mt-2 text-[12px] font-normal leading-relaxed text-zinc-700 animate-fade-in">
                                     {msg.detailedText}{" "}

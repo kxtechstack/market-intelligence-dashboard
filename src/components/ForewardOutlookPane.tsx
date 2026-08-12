@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { ChatSources } from "./ChatSources";
-import { FORWARD_OUTLOOK_MODULE_ID } from "../constants";
+import { FORWARD_OUTLOOK_MODULE_ID, API_URL } from "../constants";
 
 interface ForewardOutlookPaneProps {
   onReturn: () => void;
@@ -1208,7 +1208,7 @@ export default function ForewardOutlookPane({
     setChatLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/ask`, {
+      const response = await fetch(`${API_URL}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1257,7 +1257,7 @@ export default function ForewardOutlookPane({
   }, [chatHistory, chatLoading]);
 
   // Render unified impact indicator
-  const renderImpactBars = (impact: "High" | "Medium" | "Low") => {
+  const renderImpactBars = (impact: string) => {
     const barCount = 4;
     let filledCount = 2;
     let barColor = "bg-amber-500";

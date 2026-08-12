@@ -191,7 +191,15 @@ export default function App() {
         );
 
       case "decision_intelligence":
-        return <DecisionIntelligencePane onReturn={handleReturn} />;
+        return (
+          <DecisionIntelligencePane 
+            onReturn={handleReturn}
+            onTabChange={setActiveTab}
+            clientId={clientId || ""}
+            industry={industry || ""}
+            userId={userId || ""}
+          />
+        );
 
       case "my_bookmarks":
         return <MyBookmarksPane onReturn={handleReturn} />;

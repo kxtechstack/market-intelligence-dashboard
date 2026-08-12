@@ -3,7 +3,7 @@ import { Sparkles, Bookmark, Share2, FileText, Send, Loader2, ArrowUpRight, Aler
 import { supabase } from "../lib/supabase";
 import { RADAR_TRENDS, TrendItem, SourceItem } from "./ForewardOutlookPane";
 import { ChatSources } from "./ChatSources";
-import { MARKET_DYNAMICS_MODULE_ID } from "../constants";
+import { MARKET_DYNAMICS_MODULE_ID, API_URL } from "../constants";
 
 interface MarketDynamicsPaneProps {
   onReturn: () => void;
@@ -1268,7 +1268,7 @@ export default function MarketDynamicsPane({
 
     setIsFetchingSimilar(true);
 
-    fetch(`${import.meta.env.VITE_API_URL}/similar-insight/${selectedInsightId}`)
+    fetch(`${API_URL}/similar-insight/${selectedInsightId}`)
       .then(res => res.json())
       .then(data => {
         const mapped = (data.similar || []).map((item: any) => ({
@@ -1449,7 +1449,7 @@ export default function MarketDynamicsPane({
     setChatLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/ask`, {
+      const response = await fetch(`${API_URL}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

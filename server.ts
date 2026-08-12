@@ -46,12 +46,19 @@ app.post("/api/chat", async (req, res) => {
     const formattedContents = [];
     const systemInstruction = 
       "You are Graceview, a highly professional AI market intelligence analyst built for Knometrix.\n" +
-      "You assist users in digesting, querying, and analyzing market policy changes, regulatory roadmap events, and financial market insights.\n\n" +
-      "Formatting & Style requirements:\n" +
-      "- Maintain an elegant, highly professional, objective, and precise tone.\n" +
-      "- Under no circumstances use unsolicited exclamation marks or hyperbole.\n" +
-      "- Present lists, tables, or itemized segments with clean markdown.\n" +
-      "- Keep introductory/conversational filler to an absolute minimum. Proceed straight to answering the user.";
+      "You assist users in evaluating business, regulatory, competitive, and market intelligence decisions.\n\n" +
+      "CRITICAL RESPONSE FORMATTING REQUIREMENT:\n" +
+      "For inference-based business questions and decision queries, you MUST structure your response using this EXACT consistent structure:\n" +
+      "1. Title Header (e.g. ### Decision Intelligence Assessment: [Full Uncut Question Topic])\n" +
+      "2. Outlook: Heading `#### Outlook` followed by 1-2 line prediction/assessment summary and context sentences.\n" +
+      "3. Key Movement & Impact Analysis: Heading `#### Key Movement & Impact Analysis` followed by a clean Markdown table with metrics/scenarios/movements.\n" +
+      "4. Driving Factors: Heading `#### Driving Factors` (or `#### What is driving this?`) followed by 3-5 bullet points.\n" +
+      "5. What to Watch: Heading `#### What to Watch` followed by key indicators to monitor.\n" +
+      "6. Decision Implication: Heading `#### Decision Implication` followed by actionable guidance.\n" +
+      "7. Bottom Line: Heading `#### Bottom Line` followed by executive summary sentence.\n" +
+      "8. Confidence & Evidence: Heading `#### Confidence & Evidence` followed by confidence level and signal strength.\n" +
+      "9. Key Signals Leading to This Intelligence: Heading `#### Key Signals Leading to This Intelligence` followed by 3-4 specific detected market/regulatory/data signals styled as a list of Markdown links with empty anchor hrefs, e.g., `- [Signal Description or Report Title Name](#)`.\n\n" +
+      "Maintain an elegant, highly professional, objective, and precise tone.";
 
     if (history && Array.isArray(history)) {
       for (const msg of history) {
@@ -70,7 +77,7 @@ app.post("/api/chat", async (req, res) => {
     let responseText = "";
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: formattedContents,
         config: {
           systemInstruction,
@@ -80,14 +87,65 @@ app.post("/api/chat", async (req, res) => {
       responseText = response.text || "No response received.";
     } catch (apiError: any) {
       console.warn("Gemini API call failed", apiError);
-      responseText = `### Graceview Regulatory Analyst
-I am currently receiving a high volume of requests or experiencing an API connectivity issue. To assist with your query regarding **"${message}"**, please refer directly to the detailed insights on the policy board or try again later.`;
+      responseText = `### Graceview Decision Intelligence
+I am currently processing your request off-line. Please refer to the synthesized decision intelligence report for **"${message}"**.`;
     }
 
-    res.json({ text: responseText });
+    res.json({ text: responseText, answer: responseText });
   } catch (error: any) {
     console.error("API Chat error:", error);
-    res.status(550).json({ error: error.message || "An internal error occurred." });
+    res.status(500).json({ error: error.message || "An internal error occurred." });
+  }
+});
+
+app.post("/api/ask", async (req, res) => {
+  try {
+    const { question, clientId, industry } = req.body;
+    const message = question || "Provide decision intelligence assessment.";
+
+    let ai;
+    try {
+      ai = getAI();
+    } catch (err: any) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    const systemInstruction = 
+      "You are Graceview, a highly professional AI market intelligence analyst built for Knometrix.\n" +
+      "You assist users in evaluating business, regulatory, competitive, and market intelligence decisions.\n\n" +
+      "CRITICAL RESPONSE FORMATTING REQUIREMENT:\n" +
+      "For inference-based business questions and decision queries, you MUST structure your response using this EXACT consistent structure:\n" +
+      "1. Title Header (e.g. ### Decision Intelligence Assessment: [Full Uncut Question Topic])\n" +
+      "2. Outlook: Heading `#### Outlook` followed by 1-2 line prediction/assessment summary and context sentences.\n" +
+      "3. Key Movement & Impact Analysis: Heading `#### Key Movement & Impact Analysis` followed by a clean Markdown table with metrics/scenarios/movements.\n" +
+      "4. Driving Factors: Heading `#### Driving Factors` (or `#### What is driving this?`) followed by 3-5 bullet points.\n" +
+      "5. What to Watch: Heading `#### What to Watch` followed by key indicators to monitor.\n" +
+      "6. Decision Implication: Heading `#### Decision Implication` followed by actionable guidance.\n" +
+      "7. Bottom Line: Heading `#### Bottom Line` followed by executive summary sentence.\n" +
+      "8. Confidence & Evidence: Heading `#### Confidence & Evidence` followed by confidence level and signal strength.\n" +
+      "9. Key Signals Leading to This Intelligence: Heading `#### Key Signals Leading to This Intelligence` followed by 3-4 specific detected market/regulatory/data signals styled as a list of Markdown links with empty anchor hrefs, e.g., `- [Signal Description or Report Title Name](#)`.\n\n" +
+      "Maintain an elegant, highly professional, objective, and precise tone.";
+
+    let responseText = "";
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: 'user', parts: [{ text: `[Client: ${clientId || "General"}, Industry: ${industry || "Beauty & Personal Care"}]\nQuestion: ${message}` }] }],
+        config: {
+          systemInstruction,
+          temperature: 0.2,
+        },
+      });
+      responseText = response.text || "No response received.";
+    } catch (apiError: any) {
+      console.warn("Gemini API call failed", apiError);
+      responseText = `Failed to connect to AI engine.`;
+    }
+
+    res.json({ answer: responseText, text: responseText, sources: [] });
+  } catch (error: any) {
+    console.error("API Ask error:", error);
+    res.status(500).json({ error: error.message || "An internal error occurred." });
   }
 });
 

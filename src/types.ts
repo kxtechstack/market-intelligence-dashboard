@@ -25,8 +25,21 @@ export interface ChatMessage {
   timestamp: Date;
   isCustomResponse?: boolean;
   sources?: (string | { title: string; url: string })[];
+  heading?: string;
   detailedText?: string;
   matchedAlerts?: AlertItem[];
+  listItems?: Array<{
+    id: string;
+    title: string;
+    category?: string;
+    date?: string;
+    summary: string;
+    impact?: string;
+  }>;
+  linkInfo?: {
+    tabId: string;
+    tabLabel: string;
+  };
 }
 
 export interface SidebarItem {
