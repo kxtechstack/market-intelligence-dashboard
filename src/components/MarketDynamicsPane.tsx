@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Bookmark, Share2, FileText, Send, Loader2, ArrowUpRight, AlertTriangle, Minus, ArrowDownRight, Pencil, Check, ArrowUp, ArrowRight, ArrowDown, Square, Trash2, CornerDownLeft } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { RADAR_TRENDS, TrendItem, SourceItem } from "./ForewardOutlookPane";
+import { SourceItem } from "./ForewardOutlookPane";
 import { ChatSources } from "./ChatSources";
 import { MARKET_DYNAMICS_MODULE_ID, API_URL } from "../constants";
 
@@ -234,14 +234,7 @@ interface SignalDetailData {
   created_at?: string;
 }
 
-const SUBMODULE_SUMMARIES: Record<string, string> = {
-  "FUNDING & INVESTMENT ACTIVITY": "Accelerating: third consecutive week of growth, concentrated in two sectors. Transaction volumes remain elevated with substantial support from late-stage growth rounds.",
-  "FUNDING & INVESTMENT": "Accelerating: third consecutive week of growth, concentrated in two sectors. Transaction volumes remain elevated with substantial support from late-stage growth rounds.",
-  "INDUSTRY STRUCTURE": "Emerging: early consolidation signals, worth monitoring not yet acting on. Minor mergers and strategic repositioning indicate potential sector consolidation over the next fiscal cycle.",
-  "TALENT MOVEMENT": "Accelerating: turnover concentrated at two firms, both also flagged under structure. Executive migrations are creating specialized clusters of expertise in risk and operational management.",
-  "MACRO & ECONOMIC": "Stable: no material change, low near-term relevance to client positioning. Macro indicators and central bank policy adjustments are currently maintaining historical ranges without disruption.",
-  "TECH ADOPTION": "Cooling: adoption announcements slowed after a strong prior quarter. Customers are shifting focus from rapid experimentation to optimizing and scaling existing tool deployments."
-};
+const SUBMODULE_SUMMARIES: Record<string, string> = {};
 
 const getSubmoduleIconInfo = (name: string) => {
   const n = name.toLowerCase();
@@ -258,153 +251,7 @@ const getSubmoduleSummary = (name: string) => {
   return SUBMODULE_SUMMARIES[n] || "Monitoring activity within this dimension. Strategic indicators suggest stable progression with periodic evaluations required to maintain competitive positioning.";
 };
 
-const SIGNAL_DETAILS: Record<string, SignalDetailData> = {
-  "Scalp-serum brands are pulling most new category funding": {
-    title: "Scalp-serum brands are pulling most new category funding",
-    category: "Funding & investment",
-    sector: "Funding & investment",
-    term: "Near-Term",
-    impact_level: "High",
-    confidence: "High",
-    summary: "The clinical scalp-care and hair-health segment is experiencing an unprecedented venture capital influx, capturing 3 out of 4 new funding rounds this quarter. Investors are actively moving away from traditional cosmetic styling formulations, prioritizing dermatologist-backed claims and efficacy-proven scalp health positioning. This shift highlights a broader consumer migration toward wellness-oriented personal care ecosystems where scalp care is treated with the same clinical rigor as skincare.",
-    business_impact: [
-      "R&D departments must reprioritize formulation pipelines toward clinical scalp and root health solutions.",
-      "Marketing campaigns should emphasize dermatological backing and clinical claim validation to command premium pricing.",
-      "M&A teams should actively monitor early-stage scalp-health indie brands for potential acquisition before valuations peak."
-    ],
-    sources: [
-      {
-        id: "ss-s1",
-        source_name: "Cosmetic Venture Registry",
-        details: "Analysis of early-stage beauty investments showing a 75% concentration in active scalp-health startups.",
-        category: "Capital investment",
-        date: "Jul 18"
-      },
-      {
-        id: "ss-s2",
-        source_name: "Dermatological Formulation Journal",
-        details: "Clinical efficacy studies on peptide-infused scalp serums indicating superior hair retention metrics.",
-        category: "Research & Development",
-        date: "Jun 29"
-      }
-    ],
-    country: "Global"
-  },
-  "Series B round closed for eco-friendly packaging pioneer": {
-    title: "Series B round closed for eco-friendly packaging pioneer",
-    category: "Funding & investment",
-    sector: "Funding & investment",
-    term: "Mid-Term",
-    impact_level: "High",
-    confidence: "High",
-    summary: "A major packaging innovator secured a $15M Series B round to scale its bio-degradable polymer formulation facilities. This capital injection will allow for high-volume commercial production of zero-plastic, compostable cosmetic containers, directly addressing rising corporate demand for plastic-neutral packaging solutions ahead of upcoming European environmental compliance mandates.",
-    business_impact: [
-      "Secures long-term supply contracts with sustainable packaging suppliers before production capacity tightens.",
-      "Accelerates transition of hero product lines to certified biodegradable containers to elevate brand ESG credentials.",
-      "Helps meet upcoming regional plastic-use reduction targets ahead of regulatory deadlines."
-    ],
-    sources: [
-      {
-        id: "ep-s1",
-        source_name: "GreenTech Venture Capital",
-        details: "Official closing of $15M Series B funding round for EcoPack Solutions.",
-        category: "Capital investment",
-        date: "Jul 12"
-      },
-      {
-        id: "ep-s2",
-        source_name: "Sustainable Materials Gazette",
-        details: "Comparative lifecycle assessment of bio-degradable polymer formulations showing 90% reduction in carbon footprint.",
-        category: "Research & Development",
-        date: "Jul 02"
-      },
-      {
-        id: "ep-s4",
-        source_name: "Retail Packaging Review",
-        details: "Brand survey showing 82% of premium cosmetics executives are actively sourcing plastic alternative packaging.",
-        category: "Innovation",
-        date: "May 20"
-      },
-      {
-        id: "ep-s5",
-        source_name: "European ESG Compliance Audit",
-        details: "New directives penalizing non-recyclable multi-layered flexible cosmetic tubes by late next fiscal year.",
-        category: "Innovation",
-        date: "Apr 11"
-      }
-    ],
-    country: "Global"
-  },
-  "Private-label is closing the formulation gap": {
-    title: "Private-label is closing the formulation gap",
-    category: "Industry structure",
-    sector: "Industry structure",
-    term: "Near-Term",
-    impact_level: "Medium",
-    confidence: "Medium",
-    summary: "Two major retail giants have successfully launched private-label, sulfate-free personal care lines at price points 40% below national brands. As advanced ingredient alternatives become commoditized, the formulation barrier to entry has significantly dropped. Brands can no longer rely solely on basic 'clean' ingredients as a defensive moat; true clinical efficacy, brand equity, and proprietary technologies are now required to maintain pricing power.",
-    business_impact: [
-      "Requires brands to invest in proprietary, patented ingredient complexes to distinguish themselves from private-label alternatives.",
-      "Drives the need for personalized digital skincare diagnostics to create high-friction customer loyalty loops.",
-      "Exerts downward pricing pressure on standard clean-beauty formulas lacking clinical backing."
-    ],
-    sources: [
-      {
-        id: "pl-s1",
-        source_name: "Retail Intelligence Monthly",
-        details: "Market share analysis of premium own-brand personal care launches in major chains.",
-        category: "Innovation",
-        date: "Jul 05"
-      },
-      {
-        id: "pl-s2",
-        source_name: "Formulation Outsourcing Registry",
-        details: "Data showing 35% increase in private-label contract manufacturing volume for clinical-grade serums.",
-        category: "Capital investment",
-        date: "Jun 22"
-      },
-      {
-        id: "pl-s3",
-        source_name: "Consumer Pricing Index Survey",
-        details: "Over 64% of respondents report willingness to purchase retailer-owned private label clinical skincare if ingredients match premium brands.",
-        category: "Innovation",
-        date: "Jun 10"
-      }
-    ],
-    country: "Global"
-  },
-  "A competitor's Chief Innovation Officer departed after delayed launches": {
-    title: "A competitor's Chief Innovation Officer departed after delayed launches",
-    category: "Talent movement",
-    sector: "Talent movement",
-    term: "Near-Term",
-    impact_level: "Medium",
-    confidence: "High",
-    summary: "The departure of a key competitor's Chief Innovation Officer follows consecutive quarters of delayed clean-beauty and clinical-grade launches. This leadership disruption creates a strategic window of opportunity in the premium claim space, as the competitor's product pipeline is projected to experience temporary integration delays and strategic realignment.",
-    business_impact: [
-      "Opportunity to aggressively capture market share in active clinical formulations during the competitor's transition.",
-      "Consider headhunting key senior formulators from the competitor's departing team to strengthen internal R&D.",
-      "Accelerate internal launch timelines for comparable peptide-based skincare products."
-    ],
-    sources: [
-      {
-        id: "tm-s1",
-        source_name: "Beauty Industry Executive Search",
-        details: "Strategic leadership transition and pipeline impact analysis for leading personal care conglomerates.",
-        category: "Research & Development",
-        date: "Jun 28"
-      },
-      {
-        id: "tm-s2",
-        source_name: "Corporate Pipeline Tracker",
-        details: "In-depth competitor analysis highlighting delays in three major peptide formulation launches.",
-        category: "Innovation",
-        date: "Jun 15"
-      }
-    ],
-    country: "Global"
-  }
-};
+const SIGNAL_DETAILS: Record<string, SignalDetailData> = {};
 
 const getSignalDetails = (sig: {title: string; desc: string}, selectedCategory: string) => {
   if (SIGNAL_DETAILS[sig.title]) {
@@ -493,323 +340,9 @@ interface SignalGridItem {
   signalsCount: number | null;
 }
 
-const RICH_SIGNALS: SignalGridItem[] = [
-  {
-    category: "FUNDING & INVESTMENT",
-    status: "Emerging",
-    iconType: "up-right",
-    iconColor: "text-emerald-600",
-    contents: [
-      // Funding rounds announced
-      [
-        {
-          title: "Scalp-serum brands are pulling most new category funding",
-          desc: "3 of 4 rounds this quarter went to scalp-health positioning; reformulation weighted toward styling now lags the funding trend."
-        },
-        {
-          title: "Series B round closed for eco-friendly packaging pioneer",
-          desc: "Secured $15M to scale bio-degradable polymer formulation facilities across the region."
-        },
-        {
-          title: "Pre-seed activity surges in personalized AI diagnostics",
-          desc: "Five early-stage launches tracked in the skin-analysis and recommendation segment."
-        },
-        {
-          title: "Micro-encapsulation tech firm secures strategic bridge funding",
-          desc: "New $4.2M injection allows active ingredient stability studies to proceed ahead of schedule."
-        }
-      ],
-      // Venture capital investments
-      [
-        {
-          title: "Average round size up 35% year over year",
-          desc: "Concentrated in dermatologist-backed formulations; clinical claims are commanding a premium."
-        },
-        {
-          title: "Late-stage VC capital concentrating in clean chemistry",
-          desc: "Investors favor established clinical brands over pre-revenue hype products in current macro environment."
-        },
-        {
-          title: "Corporate VC arms launch targeted $50M biotechnology funds",
-          desc: "Major legacy incumbents shift from direct R&D to active early-stage investment portfolios."
-        },
-        {
-          title: "Venture debt facilities tapped to accelerate production lines",
-          desc: "Two leading clean brands choose debt over equity dilution to finance facility expansion."
-        }
-      ],
-      // Private equity investments
-      [
-        {
-          title: "A regional fund closed its first beauty-tech vehicle",
-          desc: "Expect more diagnostics-led entrants over the next two quarters."
-        },
-        {
-          title: "PE buyout of heritage natural skincare brand finalized",
-          desc: "Acquisition aims to optimize supply chain and expand digital distribution in APAC markets."
-        },
-        {
-          title: "Secondary market PE activity rises in manufacturing sector",
-          desc: "Sponsors consolidating formulation labs to achieve economies of scale and direct-to-brand synergy."
-        },
-        {
-          title: "Minority PE stakes acquired in specialized logistics providers",
-          desc: "Strategic investments focus on temperature-controlled fulfillment for active botanical serums."
-        }
-      ]
-    ],
-    signalsCount: 12
-  },
-  {
-    category: "INDUSTRY STRUCTURE",
-    status: "Emerging",
-    iconType: "up-right",
-    iconColor: "text-amber-600",
-    contents: [
-      // Market consolidation
-      [
-        {
-          title: "Private-label is closing the formulation gap",
-          desc: "Two retailers launched own-label sulfate-free lines at lower prices; the defensible edge now has to be efficacy, not formulation."
-        },
-        {
-          title: "Independent lab networks merge to counter rising compliance costs",
-          desc: "Consolidation of testing facilities expected to stabilize clinical trial pricing next half."
-        },
-        {
-          title: "Contract manufacturing capacity tightening in organic segments",
-          desc: "Two dominant players acquired local co-packers, limiting options for small independent brands."
-        },
-        {
-          title: "Regional retail chains acquire exclusive brand licenses",
-          desc: "Direct integration of brand properties into supermarket shelves signals high channel consolidation."
-        }
-      ],
-      // Mergers & acquisitions
-      [
-        {
-          title: "Two mid-tier labels reported in early merger talks",
-          desc: "Single source, unconfirmed — track, don't act yet."
-        },
-        {
-          title: "Premium wellness conglomerate acquires probiotic patent portfolio",
-          desc: "Reinforces vertical integration strategy for microbiome-focused product rollouts."
-        },
-        {
-          title: "Cross-border cosmetic distribution networks unify",
-          desc: "Acquisitions in Southern Europe establish a streamlined entry point for North American clean brands."
-        },
-        {
-          title: "Natural cosmetics brand acquired by pharmaceutical giant",
-          desc: "Large-scale acquisition targets therapeutic consumer segments with clinical backing."
-        }
-      ],
-      // New industry entrants
-      [
-        {
-          title: "A regional label entered men's grooming",
-          desc: "Targets a segment with flat incumbent share for two years — no longer uncontested."
-        },
-        {
-          title: "Biomedical research spin-off launches proprietary skincare line",
-          desc: "Utilizes patented cellular-regeneration peptide to target premium dermatologist-office channels."
-        },
-        {
-          title: "Direct-to-consumer fragrance startup debuts waterless formulas",
-          desc: "Eco-centric brand model aims to disrupt traditional retail counter experiences."
-        },
-        {
-          title: "Indie hair-health developer launches custom styling kits",
-          desc: "Bypasses major retailers via direct subscription model targeting gen-z consumers."
-        }
-      ]
-    ],
-    signalsCount: 12
-  },
-  {
-    category: "TALENT MOVEMENT",
-    status: "Stable",
-    iconType: "up-right",
-    iconColor: "text-emerald-600",
-    contents: [
-      // CEO/CXO appointments
-      [
-        {
-          title: "A competitor's Chief Innovation Officer departed after delayed launches",
-          desc: "Follows two quarters of delayed clean-beauty launches; a near-term opening in that claim space."
-        },
-        {
-          title: "Industry veteran appointed CEO of rapid-growth wellness brand",
-          desc: "Tasked with scaling retail partnerships and preparing the brand for European expansion."
-        },
-        {
-          title: "Incumbent tech giant's Lead Architect hired as CTO of beauty platform",
-          desc: "Indicates serious acceleration of custom skin-mapping AI and virtual try-on software."
-        },
-        {
-          title: "Former luxury goods executive joins startup as Chief Brand Officer",
-          desc: "Focuses on elevating visual packaging and editorial campaigns for the premium organic launch."
-        }
-      ],
-      // Leadership exits
-      [
-        {
-          title: "Senior formulators migrating to indie brand incubators",
-          desc: "Talent drain from legacy players accelerates, shifting formulation power to nimble market entry vehicles."
-        },
-        {
-          title: "VP of Global Marketing steps down amid campaign controversy",
-          desc: "Temporary leadership transition could slow brand repositioning efforts in Western markets."
-        },
-        {
-          title: "Chief Sustainability Officer resigns from heritage brand",
-          desc: "Reflects internal friction over corporate plastic-neutral targets and sourcing compliance."
-        },
-        {
-          title: "Head of Digital Products exits to join early-stage health tech",
-          desc: "Leaves a leadership vacuum in the active personalized-routine platform team."
-        }
-      ],
-      // Mass hiring initiatives
-      []
-    ],
-    signalsCount: 8
-  },
-  {
-    category: "MACRO & ECONOMIC",
-    status: "Stable",
-    iconType: "minus",
-    iconColor: "text-zinc-400",
-    contents: [
-      // Interest rate changes
-      [
-        {
-          title: "Macro indicators and central bank policy adjustments maintain ranges",
-          desc: "Policy adjustments are currently maintaining historical ranges without disruption, indicating low near-term relevance."
-        },
-        {
-          title: "Cost of capital increases pinch small formulation laboratories",
-          desc: "Higher interest rates delay equipment upgrades and slow early-phase R&D pipelines for non-funded builders."
-        },
-        {
-          title: "Credit tightening affects inventory financing for retail partners",
-          desc: "Distributors reducing safety stock levels, shifting inventory burden back to manufacturing brands."
-        },
-        {
-          title: "Central bank signal suggests stable borrowing rates for two quarters",
-          desc: "Firms can proceed with medium-term planning under lower macroeconomic volatility."
-        }
-      ],
-      // Inflation updates
-      [
-        {
-          title: "Raw material cost inflation stabilizing across organic oils",
-          desc: "Key natural extracts show price moderation after multi-quarter supply chain bottlenecks."
-        },
-        {
-          title: "Packaging material costs rise due to recycled glass surcharges",
-          desc: "Brands facing 8-12% increases in sustainable premium glass containers, squeezing gross margins."
-        },
-        {
-          title: "Consumer spending index shows resilience in premium self-care",
-          desc: "Lipstick effect persists as buyers trade down on luxury apparel but maintain high-end skincare routines."
-        },
-        {
-          title: "Labor rate increases pressure manufacturing facility overheads",
-          desc: "Rising minimum wages across production hubs force brands to investigate further automation."
-        }
-      ],
-      // GDP growth forecasts
-      [
-        {
-          title: "GDP growth projections revised upward in key consumer hubs",
-          desc: "Rising regional employment expected to boost discretionary spending in wellness categories next fiscal."
-        },
-        {
-          title: "Export market slowdown indicators hit shipping volumes",
-          desc: "Slowing trade volumes suggest brand builders should prioritize domestic logistics over cross-border expansion."
-        },
-        {
-          title: "Urban metropolitan consumer confidence index reaches 2-year peak",
-          desc: "Positive economic sentiment drives higher foot traffic and trial rates at high-end experiential boutiques."
-        },
-        {
-          title: "Developing markets forecast 5.2% expansion in personal wellness sector",
-          desc: "Indicates strong target demographic growth in expanding Southeast Asian and Latin American cities."
-        }
-      ]
-    ],
-    signalsCount: 12
-  },
-  {
-    category: "TECH ADOPTION",
-    status: "Cooling",
-    iconType: "down-right",
-    iconColor: "text-zinc-400",
-    contents: [
-      // AI adoption
-      [
-        {
-          title: "Adoption announcements slowed after a strong prior quarter",
-          desc: "Customers are shifting focus from rapid experimentation to optimizing and scaling existing tool deployments."
-        },
-        {
-          title: "Enterprise migration to customized small language models is gaining traction",
-          desc: "Organizations prioritize data privacy and cost efficiency over generalized large models."
-        },
-        {
-          title: "Generative AI skin-tone analysis integrated into retail apps",
-          desc: "Major cosmetics brands deploy real-time color matching with 94% accuracy ratings."
-        },
-        {
-          title: "AI-generated formulation suggestions enter bench testing",
-          desc: "R&D teams use predictive neural nets to screen allergen profiles before raw synthesis."
-        }
-      ],
-      // Cloud migration
-      [
-        {
-          title: "ERP systems shift to cloud for multi-country inventory synch",
-          desc: "Brands moving away from legacy on-prem servers to cut logistics response times from days to hours."
-        },
-        {
-          title: "Customer data platform centralization accelerates",
-          desc: "Unified cloud data warehouse enables micro-segmented regional promotions and real-time behavioral insights."
-        },
-        {
-          title: "Serverless server endpoints chosen for flash holiday sales",
-          desc: "Ensures zero-downtime scalability during high-traffic launch events and celebrity drops."
-        },
-        {
-          title: "API-first microservices replace legacy monolithic backends",
-          desc: "Decoupled structures improve mobile app load speeds and simplify multi-channel checkouts."
-        }
-      ],
-      // Digital transformation programs
-      [
-        {
-          title: "Decreased implementation activity in public Web3 database modules",
-          desc: "Slower integration speeds observed as resources reallocate to analytics pipelines."
-        },
-        {
-          title: "Smart factory upgrade completes at major formulation plant",
-          desc: "IoT sensors on mixing vats improve batch-to-batch consistency by 40% and reduce chemical waste."
-        },
-        {
-          title: "Legacy distribution networks convert to fully digital EDI portals",
-          desc: "Automated replenishment workflows eliminate manual invoice entry and reduce shipping delays."
-        },
-        {
-          title: "NFC smart tags trialed for luxury perfume authentication",
-          desc: "Tap-to-verify chips combat counterfeit secondary markets and build direct customer engagement."
-        }
-      ]
-    ],
-    signalsCount: 12
-  }
-];
+const RICH_SIGNALS: SignalGridItem[] = [];
 
-const SPARSE_SIGNALS: SignalGridItem[] = RICH_SIGNALS;
+const SPARSE_SIGNALS: SignalGridItem[] = [];
 
 const getStatusIcon = (iconType: string, iconColor: string) => {
   const iconClass = `${iconColor} w-4 h-4 shrink-0`;
@@ -840,7 +373,6 @@ export default function MarketDynamicsPane({
   userId
 }: MarketDynamicsPaneProps) {
   const [activeTab, setActiveTab] = useState<string>("insights");
-  const [selectedTrendId, setSelectedTrendId] = useState<string>("embedded-fintech");
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
   const [richSignals, setRichSignals] = useState<SignalGridItem[]>([]);
   const [marketInsights, setMarketInsights] = useState<any[]>([]);
@@ -1080,8 +612,8 @@ export default function MarketDynamicsPane({
   }, [selectedInsightId, marketInsights]);
 
   // Date states (retained for identical design/functionality)
-  const [startDateStr, setStartDateStr] = useState("");
-  const [endDateStr, setEndDateStr] = useState("");
+  const [startDateStr, setStartDateStr] = useState(() => localStorage.getItem("market_dynamics_start_date") || "");
+  const [endDateStr, setEndDateStr] = useState(() => localStorage.getItem("market_dynamics_end_date") || "");
   const [defaultStartDate, setDefaultStartDate] = useState("");
   const [defaultEndDate, setDefaultEndDate] = useState("");
   const [isEditingDates, setIsEditingDates] = useState(false);
@@ -1089,7 +621,10 @@ export default function MarketDynamicsPane({
   // Load fallback dates matching Policy & Risk Monitor defaults
   useEffect(() => {
     const today = new Date();
-    const past = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    // Use 1 month back as requested (e.g. Aug 12 -> July 12)
+    const past = new Date();
+    past.setMonth(today.getMonth() - 1);
+
     const formatDate = (d: Date) => {
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -1098,10 +633,17 @@ export default function MarketDynamicsPane({
     };
     const minStr = formatDate(past);
     const maxStr = formatDate(today);
-    setStartDateStr(minStr);
-    setEndDateStr(maxStr);
+
     setDefaultStartDate(minStr);
     setDefaultEndDate(maxStr);
+
+    // Only set initial state if not already in localStorage
+    if (!localStorage.getItem("market_dynamics_start_date")) {
+      setStartDateStr(minStr);
+    }
+    if (!localStorage.getItem("market_dynamics_end_date")) {
+      setEndDateStr(maxStr);
+    }
   }, []);
 
   const todayStr = useMemo(() => {
@@ -1158,12 +700,12 @@ export default function MarketDynamicsPane({
   }, [richSignals, filteredMarketInsights]);
 
   const activeGridSignals = useMemo(() => {
-    return filteredRichSignals.length > 0 ? filteredRichSignals : RICH_SIGNALS;
+    return filteredRichSignals;
   }, [filteredRichSignals]);
 
   const currentCategoryData = useMemo(() => {
-    const key = selectedCategory.toUpperCase();
-    return activeGridSignals.find(s => s.category === key) || activeGridSignals[0];
+    const key = (selectedCategory || "").toUpperCase();
+    return activeGridSignals.find(s => s.category === key) || activeGridSignals[0] || null;
   }, [activeGridSignals, selectedCategory]);
 
   const currentSubCardTitles = useMemo(() => {
@@ -1236,19 +778,8 @@ export default function MarketDynamicsPane({
   useEffect(() => {
     setIsSourcesExpanded(true);
     setExpandedCards({});
-    if (selectedGridSignal) {
-      // For grid signals, we wait for fetchSignalDetails to set the real selectedSignalId
-      // We can clear it here to avoid showing a mismatch
-      setSelectedSignalId(null);
-    } else {
-      const trend = RADAR_TRENDS.find(t => t.id === selectedTrendId) || RADAR_TRENDS[0];
-      if (trend && trend.sources && trend.sources.length > 0) {
-        setSelectedSignalId(trend.sources[0].id);
-      } else {
-        setSelectedSignalId(null);
-      }
-    }
-  }, [selectedTrendId, selectedGridSignal]);
+    setSelectedSignalId(null);
+  }, [selectedGridSignal]);
 
   // Chatbot states
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -1357,11 +888,6 @@ export default function MarketDynamicsPane({
 
 
 
-  // Selected Trend Item
-  const selectedTrend = useMemo(() => {
-    return RADAR_TRENDS.find(t => t.id === selectedTrendId) || RADAR_TRENDS[0];
-  }, [selectedTrendId]);
-
   const renderedTrend = useMemo(() => {
     if (activeSignalDetail && selectedInsightId && activeSignalDetail.id === selectedInsightId) {
       return activeSignalDetail;
@@ -1409,27 +935,8 @@ export default function MarketDynamicsPane({
         })
       };
     }
-    if (!selectedTrend) return null as any;
-    return {
-      ...selectedTrend,
-      sources: (selectedTrend.sources || []).map(src => {
-        const originalCat = src.category;
-        const mappedCat = mapToEightCategories({
-          source_name: src.source_name,
-          details: src.details,
-          category: originalCat
-        });
-        return {
-          id: src.id,
-          source_name: src.source_name,
-          details: src.details,
-          category: mappedCat as any,
-          originalCategory: originalCat,
-          date: src.date
-        };
-      })
-    };
-  }, [selectedGridSignal, selectedTrend, selectedCategory, activeSignalDetail, selectedInsightId]);
+    return null;
+  }, [selectedGridSignal, selectedCategory, activeSignalDetail, selectedInsightId]);
 
   const isCurrentTrendBookmarked = !!(renderedTrend?.id && isBookmarked[renderedTrend.id]);
 
@@ -1529,8 +1036,8 @@ export default function MarketDynamicsPane({
   };
 
   const formattedPublishDate = useMemo(() => {
-    const dateVal = activeSignalDetail?.last_enriched_at || activeSignalDetail?.created_at || renderedTrend.source_published_date;
-    const d = new Date(dateVal);
+    const dateVal = activeSignalDetail?.last_enriched_at || activeSignalDetail?.created_at || (renderedTrend as any)?.source_published_date || (renderedTrend as any)?.created_at;
+    const d = new Date(dateVal || "2026-07-21");
     if (isNaN(d.getTime())) return "July 21, 2026";
     return d.toLocaleDateString("en-US", {
       month: "long",
@@ -1590,8 +1097,16 @@ export default function MarketDynamicsPane({
                 />
                 <button 
                   onClick={() => {
+                    const finalStart = startDateStr || defaultStartDate;
+                    const finalEnd = endDateStr || defaultEndDate;
+
                     if (!startDateStr) setStartDateStr(defaultStartDate);
                     if (!endDateStr) setEndDateStr(defaultEndDate);
+
+                    // Persist confirmed dates
+                    localStorage.setItem("market_dynamics_start_date", finalStart);
+                    localStorage.setItem("market_dynamics_end_date", finalEnd);
+
                     setIsEditingDates(false);
                   }}
                   className="p-1 bg-[#18181b] hover:bg-black text-white rounded-[4px] transition-colors"
@@ -1617,122 +1132,130 @@ export default function MarketDynamicsPane({
 
         {/* Outer Workspace containing the new Market Dynamics overview at the top */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-[#fafafa]/50">
-               {/* Market Dynamics Category Cards */}
-          <div className="flex flex-col gap-1.5 animate-fade-in select-text">
-            {filteredRichSignals.map((signal) => {
-              const displayName = signal.category.charAt(0).toUpperCase() + signal.category.slice(1).toLowerCase();
-              // Try to find original name for exact match with summaries
-              const rawName = Object.keys(signalSubCardTitles).find(k => k.toUpperCase() === signal.category) || displayName;
-              const isSelected = selectedCategory.toUpperCase() === signal.category;
+           {/* Market Dynamics Category Cards */}
+            {!isLoading && filteredRichSignals.length === 0 ? (
+               <div className="flex-1 flex items-center justify-center text-sm text-zinc-500 font-medium tracking-tight py-20">
+                 No data available
+               </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5 animate-fade-in select-text">
+                  {filteredRichSignals.map((signal) => {
+                    const displayName = signal.category.charAt(0).toUpperCase() + signal.category.slice(1).toLowerCase();
+                    // Try to find original name for exact match with summaries
+                    const rawName = Object.keys(signalSubCardTitles).find(k => k.toUpperCase() === signal.category) || displayName;
+                    const isSelected = selectedCategory.toUpperCase() === signal.category;
 
-              return (
-                <div 
-                  key={signal.category}
-                  onClick={() => setSelectedCategory(rawName)}
-                  className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
-                    isSelected
-                      ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
-                      : "border-zinc-200/85 hover:border-zinc-300"
-                  }`}
-                >
-                  <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
-                    {getStatusIcon(signal.iconType, signal.iconColor)}
-                    <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
-                      {rawName}
+                    return (
+                      <div 
+                        key={signal.category}
+                        onClick={() => setSelectedCategory(rawName)}
+                        className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
+                          isSelected
+                            ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
+                            : "border-zinc-200/85 hover:border-zinc-300"
+                        }`}
+                      >
+                        <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
+                          {getStatusIcon(signal.iconType, signal.iconColor)}
+                          <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
+                            {rawName}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
+                            {getSubmoduleSummary(rawName)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="border-t border-zinc-200/40 my-1.5 select-none"></div>
+
+                {/* Market Signals Grid Section */}
+                <div className="flex-1 flex flex-col min-h-0">
+                  {/* Static Activity title header */}
+                  <div className="pb-2 pt-1 flex items-center justify-between select-none">
+                    <span className="text-[13.5px] font-bold text-zinc-800 font-sans tracking-wide uppercase">
+                      ACTIVITY
                     </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
-                      {getSubmoduleSummary(rawName)}
-                    </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-1 items-start">
+                    {currentCategoryData && currentSubCardTitles.map((title, subIndex) => {
+                      const signalsList = currentCategoryData.contents[subIndex] || [];
+                      return (
+                        <div 
+                          key={subIndex} 
+                          className="bg-white border border-zinc-200 rounded-[4px] flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all hover:border-zinc-300 overflow-hidden"
+                        >
+                          {/* Category Header with arrow next to it */}
+                          <div className="px-4 py-3 border-b border-zinc-100 bg-[#fafafa]/20 flex items-center justify-between select-none">
+                            <span className="text-[10.5px] font-bold tracking-wider text-zinc-800 font-sans uppercase">
+                              {title}
+                            </span>
+                            {getStatusIcon(currentCategoryData.iconType, currentCategoryData.iconColor)}
+                          </div>
+
+                          {/* Content section */}
+                          {signalsList.length > 0 ? (
+                            <div className="flex flex-col">
+                              {signalsList.map((sig, sigIdx) => {
+                                const isSelected = selectedGridSignal?.id && sig.id 
+                                  ? selectedGridSignal.id === sig.id 
+                                  : selectedGridSignal?.title === sig.title;
+                                return (
+                                  <div 
+                                    key={sigIdx} 
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        setSelectedGridSignal(null);
+                                        setSelectedInsightId(null);
+                                        setActiveSignalDetail(null);
+                                      } else {
+                                        setActiveSignalDetail(null);
+                                        setSelectedGridSignal(sig);
+                                        setSelectedInsightId(sig.id || null);
+                                      }
+                                    }}
+                                    className={`px-4 py-3.5 border-b border-zinc-100 last:border-b-0 transition-all text-left cursor-pointer flex flex-col gap-1 ${
+                                      isSelected 
+                                        ? "border-l-[3.5px] border-l-[#7c3aed] bg-[#f5f3ff]/45 shadow-[inset_1px_0_0_rgba(124,58,237,0.05)]" 
+                                        : "border-l-[3.5px] border-l-transparent hover:bg-zinc-50/40"
+                                    }`}
+                                  >
+                                    <h4 className={`text-[12px] font-semibold font-sans leading-snug transition-colors ${
+                                      isSelected ? "text-[#7c3aed]" : "text-zinc-900"
+                                    }`}>
+                                      {sig.title}
+                                    </h4>
+                                    <p className="text-[11px] text-zinc-650 font-normal font-sans leading-relaxed mt-1">
+                                      {sig.short_summary || sig.desc}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="py-12 px-5 flex flex-col items-center justify-center text-center select-none bg-zinc-50/20 border-t border-zinc-100/50 h-full">
+                              <span className="text-[11px] text-zinc-400 font-medium font-sans max-w-[200px] leading-relaxed">
+                                {title === "Mass hiring initiatives" 
+                                  ? "No major corporate mass hiring initiatives detected this period." 
+                                  : `No notable ${title.toLowerCase()} this period.`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="border-t border-zinc-200/40 my-1.5 select-none"></div>
-
-          {/* Market Signals Grid Section */}
-          <div className="flex-1 flex flex-col min-h-0">
-            {/* Static Activity title header */}
-            <div className="pb-2 pt-1 flex items-center justify-between select-none">
-              <span className="text-[13.5px] font-bold text-zinc-800 font-sans tracking-wide uppercase">
-                ACTIVITY
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-1 items-start">
-              {currentSubCardTitles.map((title, subIndex) => {
-                const signalsList = currentCategoryData.contents[subIndex] || [];
-                return (
-                  <div 
-                    key={subIndex} 
-                    className="bg-white border border-zinc-200 rounded-[4px] flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all hover:border-zinc-300 overflow-hidden"
-                  >
-                    {/* Category Header with arrow next to it */}
-                    <div className="px-4 py-3 border-b border-zinc-100 bg-[#fafafa]/20 flex items-center justify-between select-none">
-                      <span className="text-[10.5px] font-bold tracking-wider text-zinc-800 font-sans uppercase">
-                        {title}
-                      </span>
-                      {getStatusIcon(currentCategoryData.iconType, currentCategoryData.iconColor)}
-                    </div>
-
-                    {/* Content section */}
-                    {signalsList.length > 0 ? (
-                      <div className="flex flex-col">
-                        {signalsList.map((sig, sigIdx) => {
-                          const isSelected = selectedGridSignal?.id && sig.id 
-                            ? selectedGridSignal.id === sig.id 
-                            : selectedGridSignal?.title === sig.title;
-                          return (
-                            <div 
-                              key={sigIdx} 
-                              onClick={() => {
-                                if (isSelected) {
-                                  setSelectedGridSignal(null);
-                                  setSelectedInsightId(null);
-                                  setActiveSignalDetail(null);
-                                } else {
-                                  setActiveSignalDetail(null);
-                                  setSelectedGridSignal(sig);
-                                  setSelectedInsightId(sig.id || null);
-                                }
-                              }}
-                              className={`px-4 py-3.5 border-b border-zinc-100 last:border-b-0 transition-all text-left cursor-pointer flex flex-col gap-1 ${
-                                isSelected 
-                                  ? "border-l-[3.5px] border-l-[#7c3aed] bg-[#f5f3ff]/45 shadow-[inset_1px_0_0_rgba(124,58,237,0.05)]" 
-                                  : "border-l-[3.5px] border-l-transparent hover:bg-zinc-50/40"
-                              }`}
-                            >
-                              <h4 className={`text-[12px] font-semibold font-sans leading-snug transition-colors ${
-                                isSelected ? "text-[#7c3aed]" : "text-zinc-900"
-                              }`}>
-                                {sig.title}
-                              </h4>
-                              <p className="text-[11px] text-zinc-650 font-normal font-sans leading-relaxed mt-1">
-                                {sig.short_summary || sig.desc}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="py-12 px-5 flex flex-col items-center justify-center text-center select-none bg-zinc-50/20 border-t border-zinc-100/50 h-full">
-                        <span className="text-[11px] text-zinc-400 font-medium font-sans max-w-[200px] leading-relaxed">
-                          {title === "Mass hiring initiatives" 
-                            ? "No major corporate mass hiring initiatives detected this period." 
-                            : `No notable ${title.toLowerCase()} this period.`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+              </>
+            )}
           </div>
         </div>
-      </div>
 
       {/* RIGHT COLUMN: Outlook details view (Pane 2 - 40% width) */}
       <div id="market-dynamics-content-pane" className="w-[40%] h-full flex flex-col bg-white overflow-hidden relative">
@@ -1786,7 +1309,12 @@ export default function MarketDynamicsPane({
         </div>
 
         {/* Dynamic switcher content */}
-        {/* Dynamic switcher content */}
+        {(activeTab === "insights" || activeTab === "ask_marketgenie") && !renderedTrend && (
+          <div className="flex-1 flex items-center justify-center text-sm text-zinc-500 font-medium tracking-tight">
+            No signal selected
+          </div>
+        )}
+
         {activeTab === "insights" && renderedTrend && (
           <div key={renderedTrend.id} className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-5 animate-fade-in bg-[#fafafa]/30 select-text relative">
             {isDetailLoading && (
@@ -2134,7 +1662,7 @@ export default function MarketDynamicsPane({
           </div>
         )}
 
-        {activeTab === "ask_marketgenie" && (
+        {activeTab === "ask_marketgenie" && renderedTrend && (
           <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col h-full animate-fade-in text-left">
             {/* Message Feed */}
             <div className="flex-1 flex flex-col gap-3 pr-1 pb-4">
@@ -2224,25 +1752,18 @@ export default function MarketDynamicsPane({
             ) : (
               <div className="flex flex-col gap-2 font-sans">
                 {Object.keys(isBookmarked).map(bId => {
-                  const trend = marketInsights.find(mi => mi.id === bId) || RADAR_TRENDS.find(t => t.id === bId);
+                  const trend = marketInsights.find(mi => mi.id === bId);
                   if (!trend) return null;
                   return (
                     <div
                       key={trend.id}
                       onClick={() => {
-                        if ((trend as any).signal_id) {
-                           setSelectedInsightId(trend.id);
-                           setSelectedGridSignal(null);
-                        } else {
-                           setSelectedTrendId(trend.id);
-                           setSelectedGridSignal(null);
-                           setSelectedInsightId(null);
-                           setActiveSignalDetail(null);
-                        }
+                        setSelectedInsightId(trend.id);
+                        setSelectedGridSignal(null);
                         setActiveTab("insights");
                       }}
                       className={`p-3 border rounded-[4px] cursor-pointer transition-all ${
-                        selectedTrendId === trend.id || selectedInsightId === trend.id
+                        selectedInsightId === trend.id
                           ? "bg-amber-50/40 border-[#3b82f6] ring-2 ring-[#3b82f6]/15 shadow-md"
                           : "bg-white border-zinc-200 hover:border-zinc-300 hover:shadow-sm"
                       }`}

@@ -334,34 +334,37 @@ export default function IntelligencePane({
 
   const businessImpactList = selectedAlert?.business_impact || [];
 
-  const [startDateStr, setStartDateStr] = useState("");
-  const [endDateStr, setEndDateStr] = useState("");
+  const [startDateStr, setStartDateStr] = useState(() => localStorage.getItem("policy_risk_start_date") || "");
+  const [endDateStr, setEndDateStr] = useState(() => localStorage.getItem("policy_risk_end_date") || "");
   const [defaultStartDate, setDefaultStartDate] = useState("");
   const [defaultEndDate, setDefaultEndDate] = useState("");
   const [isEditingDates, setIsEditingDates] = useState(false);
 
   useEffect(() => {
-    if (dashboardAlerts.length > 0) {
-      const dates = dashboardAlerts.map(a => new Date(a.source_published_date).getTime()).filter(t => !isNaN(t));
-      if (dates.length > 0) {
-        const minDate = new Date(Math.min(...dates));
-        const maxDate = new Date(Math.max(...dates));
-        
-        const formatDate = (d: Date) => {
-          const year = d.getFullYear();
-          const month = String(d.getMonth() + 1).padStart(2, "0");
-          const day = String(d.getDate()).padStart(2, "0");
-          return `${year}-${month}-${day}`;
-        };
-        
-        const minStr = formatDate(minDate);
-        const maxStr = formatDate(maxDate);
-        
-        setStartDateStr(minStr);
-        setEndDateStr(maxStr);
-        setDefaultStartDate(minStr);
-        setDefaultEndDate(maxStr);
-      }
+    const today = new Date();
+    // Use 1 month back as requested (e.g. Aug 12 -> July 12)
+    const past = new Date();
+    past.setMonth(today.getMonth() - 1);
+    
+    const formatDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+    
+    const minStr = formatDate(past);
+    const maxStr = formatDate(today);
+    
+    setDefaultStartDate(minStr);
+    setDefaultEndDate(maxStr);
+
+    // Only set initial state if not already in localStorage
+    if (!localStorage.getItem("policy_risk_start_date")) {
+      setStartDateStr(minStr);
+    }
+    if (!localStorage.getItem("policy_risk_end_date")) {
+      setEndDateStr(maxStr);
     }
   }, [dashboardAlerts]);
 
@@ -790,8 +793,16 @@ export default function IntelligencePane({
               />
               <button 
                 onClick={() => {
+                  const finalStart = startDateStr || defaultStartDate;
+                  const finalEnd = endDateStr || defaultEndDate;
+
                   if (!startDateStr) setStartDateStr(defaultStartDate);
                   if (!endDateStr) setEndDateStr(defaultEndDate);
+
+                  // Persist confirmed dates
+                  localStorage.setItem("policy_risk_start_date", finalStart);
+                  localStorage.setItem("policy_risk_end_date", finalEnd);
+
                   setIsEditingDates(false);
                 }}
                 className="p-1 bg-[#18181b] hover:bg-black text-white rounded transition-colors"

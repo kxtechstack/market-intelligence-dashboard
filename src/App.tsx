@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { supabase } from "./lib/supabase";
 import LeftMenubar from "./components/LeftMenubar";
@@ -28,6 +28,18 @@ export default function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("policy_risk_monitor");
   const [isRecoveryFlow, setIsRecoveryFlow] = useState(() => window.location.hash.includes('access_token'));
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY" || event === "USER_UPDATED") {
+        setIsRecoveryFlow(true);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 
@@ -146,9 +158,10 @@ export default function App() {
   const renderWorkspaceContent = () => {
     const handleReturn = () => setActiveTab("policy_risk_monitor");
 
-    switch (activeTab) {
-      case "policy_risk_monitor":
-        return (
+    return (
+      <div className="flex-1 h-full relative overflow-hidden flex flex-col">
+        {/* Persistent Analytical Panes */}
+        <div className={activeTab === "policy_risk_monitor" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
           <IntelligencePane
             clientId={clientId || ""}
             industry={industry || ""}
@@ -156,42 +169,33 @@ export default function App() {
             selectedAlert={selectedAlert}
             onSelectAlert={(alert) => setSelectedAlert(alert)}
           />
-        );
+        </div>
 
-      case "latest":
-        return <LatestPane onReturn={handleReturn} />;
-
-      case "market_dynamics":
-        return (
+        <div className={activeTab === "market_dynamics" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
           <MarketDynamicsPane 
             onReturn={handleReturn} 
             clientId={clientId || ""}
             industry={industry || ""}
             userId={userId || ""}
           />
-        );
+        </div>
 
-      case "find_opportunities":
-        return <FindOpportunitiesPane onReturn={handleReturn} />;
-
-      case "competitive_radar":
-        return <CompetitiveRadarPane onReturn={handleReturn} />;
-
-      case "voice_of_customer":
-        return <VoiceOfCustomerPane onReturn={handleReturn} />;
-
-      case "foreward_outlook":
-        return (
+        <div className={activeTab === "foreward_outlook" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
           <ForewardOutlookPane 
             onReturn={handleReturn} 
             clientId={clientId || ""}
             industry={industry || ""}
             userId={userId || ""}
           />
-        );
+        </div>
 
-      case "decision_intelligence":
-        return (
+        {/* Transient / Light Panes */}
+        {activeTab === "latest" && <LatestPane onReturn={handleReturn} />}
+        {activeTab === "find_opportunities" && <FindOpportunitiesPane onReturn={handleReturn} />}
+        {activeTab === "competitive_radar" && <CompetitiveRadarPane onReturn={handleReturn} />}
+        {activeTab === "voice_of_customer" && <VoiceOfCustomerPane onReturn={handleReturn} />}
+        
+        {activeTab === "decision_intelligence" && (
           <DecisionIntelligencePane 
             onReturn={handleReturn}
             onTabChange={setActiveTab}
@@ -199,19 +203,14 @@ export default function App() {
             industry={industry || ""}
             userId={userId || ""}
           />
-        );
+        )}
 
-      case "my_bookmarks":
-        return <MyBookmarksPane onReturn={handleReturn} />;
+        {activeTab === "my_bookmarks" && <MyBookmarksPane onReturn={handleReturn} />}
+        {activeTab === "support" && <SupportPane onReturn={handleReturn} />}
+        {activeTab === "settings" && <SettingsPane onReturn={handleReturn} />}
 
-      case "support":
-        return <SupportPane onReturn={handleReturn} />;
-
-      case "settings":
-        return <SettingsPane onReturn={handleReturn} />;
-
-      default:
-        return (
+        {/* Fallback for unrecognized tabs */}
+        {!["policy_risk_monitor", "market_dynamics", "foreward_outlook", "latest", "find_opportunities", "competitive_radar", "voice_of_customer", "decision_intelligence", "my_bookmarks", "support", "settings"].includes(activeTab) && (
           <div className="flex-1 h-full bg-zinc-50 flex items-center justify-center p-8 select-none">
             <div className="max-w-md w-full bg-white border border-zinc-200 p-6 rounded-[4px] shadow-[0_1px_3px_rgba(0,0,0,0.01)] text-center flex flex-col items-center">
               <h3 className="text-base font-medium text-zinc-900 mb-1">
@@ -228,8 +227,9 @@ export default function App() {
               </button>
             </div>
           </div>
-        );
-    }
+        )}
+      </div>
+    );
   };
   if (isRecoveryFlow) {
     return <SetPasswordPane onDone={() => setIsRecoveryFlow(false)} />;

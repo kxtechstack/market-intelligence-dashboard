@@ -1023,8 +1023,8 @@ export default function ForewardOutlookPane({
   }, [selectedTrendId, trends]);
   
   // Date states (retained for identical design/functionality)
-  const [startDateStr, setStartDateStr] = useState("");
-  const [endDateStr, setEndDateStr] = useState("");
+  const [startDateStr, setStartDateStr] = useState(() => localStorage.getItem("foreward_outlook_start_date") || "");
+  const [endDateStr, setEndDateStr] = useState(() => localStorage.getItem("foreward_outlook_end_date") || "");
   const [defaultStartDate, setDefaultStartDate] = useState("");
   const [defaultEndDate, setDefaultEndDate] = useState("");
   const [isEditingDates, setIsEditingDates] = useState(false);
@@ -1128,19 +1128,30 @@ export default function ForewardOutlookPane({
   // Load fallback dates matching Policy & Risk Monitor defaults
   useEffect(() => {
     const today = new Date();
-    const past = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    // Use 1 month back as requested (e.g. Aug 12 -> July 12)
+    const past = new Date();
+    past.setMonth(today.getMonth() - 1);
+    
     const formatDate = (d: Date) => {
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
+    
     const minStr = formatDate(past);
     const maxStr = formatDate(today);
-    setStartDateStr(minStr);
-    setEndDateStr(maxStr);
+    
     setDefaultStartDate(minStr);
     setDefaultEndDate(maxStr);
+
+    // Only set initial state if not already in localStorage
+    if (!localStorage.getItem("foreward_outlook_start_date")) {
+      setStartDateStr(minStr);
+    }
+    if (!localStorage.getItem("foreward_outlook_end_date")) {
+      setEndDateStr(maxStr);
+    }
   }, []);
 
   const todayStr = useMemo(() => {
@@ -1348,8 +1359,16 @@ export default function ForewardOutlookPane({
               />
               <button 
                 onClick={() => {
+                  const finalStart = startDateStr || defaultStartDate;
+                  const finalEnd = endDateStr || defaultEndDate;
+
                   if (!startDateStr) setStartDateStr(defaultStartDate);
                   if (!endDateStr) setEndDateStr(defaultEndDate);
+
+                  // Persist confirmed dates
+                  localStorage.setItem("foreward_outlook_start_date", finalStart);
+                  localStorage.setItem("foreward_outlook_end_date", finalEnd);
+
                   setIsEditingDates(false);
                 }}
                 className="p-1 bg-[#18181b] hover:bg-black text-white rounded transition-colors"
