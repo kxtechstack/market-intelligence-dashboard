@@ -821,6 +821,28 @@ const formatTerm = (term: string) => {
   return (term || "").replace("-Term", " term").trim();
 };
 
+const SECTOR_ORDER = ["consumer", "technology", "supply chain", "product", "sustainability"];
+const SEMI_START = 5;
+const SEMI_END = 175;
+const TOTAL_SWEEP = SEMI_END - SEMI_START;
+const MIN_FLOOR_PCT = 0.08;
+
+function computeSectorRanges(trendsBySector: Record<string, any[]>) {
+  const counts = SECTOR_ORDER.map(key => trendsBySector[key]?.length || 0);
+  const total = counts.reduce((a, b) => a + b, 0) || 1;
+  const floorWidth = TOTAL_SWEEP * MIN_FLOOR_PCT;
+  const remaining = TOTAL_SWEEP - floorWidth * SECTOR_ORDER.length;
+
+  const ranges: Record<string, { start: number; end: number }> = {};
+  let cursor = SEMI_END;
+  SECTOR_ORDER.forEach((key, i) => {
+    const width = floorWidth + (counts[i] / total) * remaining;
+    ranges[key] = { start: cursor - width, end: cursor };
+    cursor -= width;
+  });
+  return ranges;
+}
+
 const getTagStyles = (tagColor: string) => {
   switch (tagColor) {
     case "rose":
@@ -860,6 +882,13 @@ export default function ForewardOutlookPane({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
+const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number, end: number }>>({
+  "consumer": { start: 144, end: 175 },
+  "technology": { start: 108, end: 144 },
+  "supply chain": { start: 72, end: 108 },
+  "product": { start: 36, end: 72 },
+  "sustainability": { start: 5, end: 36 }
+});
 
   const FORWARD_OUTLOOK_MODULE_ID = "2eb989fd-0ea0-4320-b73a-f7eb8b970473";
 
@@ -885,18 +914,15 @@ export default function ForewardOutlookPane({
             trendsBySector[sector].push(item);
           });
 
-          const sectorRanges: Record<string, { start: number, end: number }> = {
-            "consumer": { start: 144, end: 175 },
-            "technology": { start: 108, end: 144 },
-            "supply chain": { start: 72, end: 108 },
-            "product": { start: 36, end: 72 },
-            "sustainability": { start: 5, end: 36 }
-          };
+          const computedRanges = computeSectorRanges(trendsBySector);
+          console.log("Sector angle ranges (degrees):", computedRanges);
+          console.log("Trend counts per sector:", Object.fromEntries(SECTOR_ORDER.map(k => [k, trendsBySector[k]?.length || 0])));
+          setSectorRanges(computedRanges);
 
           const mappedTrends: TrendItem[] = [];
           
           Object.entries(trendsBySector).forEach(([sectorKey, sectorTrends]) => {
-            const range = sectorRanges[sectorKey] || sectorRanges["consumer"];
+            const range = computedRanges[sectorKey] || computedRanges["consumer"];
             const segmentWidth = range.end - range.start;
             
             sectorTrends.forEach((item, index) => {
@@ -938,12 +964,8 @@ export default function ForewardOutlookPane({
           });
 
           setTrends(mappedTrends);
-          if (mappedTrends.length > 0) {
-            setSelectedTrendId(mappedTrends[0].id);
-          }
         } else {
           setTrends([]);
-          setSelectedTrendId(null);
         }
       } catch (err) {
         console.error("Error fetching trends:", err);
@@ -1192,6 +1214,23 @@ export default function ForewardOutlookPane({
   const selectedTrend = useMemo(() => {
     return filteredTrends.find(t => t.id === selectedTrendId) || null;
   }, [selectedTrendId, filteredTrends]);
+
+  useEffect(() => {
+    if (filteredTrends.length > 0) {
+      const currentExists = filteredTrends.find(t => t.id === selectedTrendId);
+      if (!currentExists) {
+        // Sort filteredTrends by date descending to find the most recent
+        const sorted = [...filteredTrends].sort((a, b) => {
+          const dateA = a.source_published_date ? new Date(a.source_published_date).getTime() : 0;
+          const dateB = b.source_published_date ? new Date(b.source_published_date).getTime() : 0;
+          return dateB - dateA;
+        });
+        setSelectedTrendId(sorted[0].id);
+      }
+    } else {
+      setSelectedTrendId(null);
+    }
+  }, [filteredTrends, selectedTrendId]);
 
   // SVG Radar Coordinates Calculation helper
   const cx = 400;
@@ -1560,7 +1599,7 @@ export default function ForewardOutlookPane({
               />
 
               {/* Radiating dividers (angles 144, 108, 72, 36) */}
-              {[144, 108, 72, 36].map((angle, i) => {
+              {SECTOR_ORDER.slice(0, 4).map(key => sectorRanges[key].start).map((angle, i) => {
                 const innerPt = getCoords(90, angle);
                 const outerPt = getCoords(330, angle);
                 return (
@@ -1588,13 +1627,15 @@ export default function ForewardOutlookPane({
 
               {/* Sector Labels curved along the outer arch */}
               {[
-                { label: "Consumer", angle: 162 },
-                { label: "Technology", angle: 126 },
-                { label: "Supply chain", angle: 90 },
-                { label: "Product", angle: 54 },
-                { label: "Sustainability", angle: 18 }
+                { label: "Consumer", key: "consumer" },
+                { label: "Technology", key: "technology" },
+                { label: "Supply chain", key: "supply chain" },
+                { label: "Product", key: "product" },
+                { label: "Sustainability", key: "sustainability" }
               ].map((sector, idx) => {
-                const labelPt = getCoords(345, sector.angle);
+                const range = sectorRanges[sector.key];
+                const midAngle = (range.start + range.end) / 2;
+                const labelPt = getCoords(345, midAngle);
                 return (
                   <text
                     key={idx}
@@ -1602,7 +1643,7 @@ export default function ForewardOutlookPane({
                     y={labelPt.y}
                     textAnchor="middle"
                     className="font-sans text-[11px] font-semibold text-zinc-600 fill-zinc-600 tracking-wider"
-                    transform={`rotate(${90 - sector.angle}, ${labelPt.x}, ${labelPt.y})`}
+                    transform={`rotate(${90 - midAngle}, ${labelPt.x}, ${labelPt.y})`}
                   >
                     {sector.label}
                   </text>
@@ -1674,9 +1715,9 @@ export default function ForewardOutlookPane({
                       />
                       {/* Text labels adjacent to node */}
                       <text
-                        x={pt.x + trend.dx - 8}
-                        y={pt.y + trend.dy}
-                        textAnchor={trend.textAnchor}
+                        x={pt.x + (trend.angle > 90 ? -12 : trend.angle < 90 ? 12 : 0)}
+                        y={pt.y + (trend.angle > 85 && trend.angle < 95 ? -14 : 4)}
+                        textAnchor={trend.angle > 90 ? "end" : trend.angle < 90 ? "start" : "middle"}
                         onClick={() => setSelectedTrendId(trend.id)}
                         className={`font-sans text-[10px] cursor-pointer font-medium select-none tracking-tight transition-colors duration-150 ${
                           isSelected || isHovered
