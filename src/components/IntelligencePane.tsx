@@ -36,6 +36,7 @@ export default function IntelligencePane({
   const [hiddenIds, setHiddenIds] = useState<Record<string, boolean>>({});
   const [lastHiddenAlert, setLastHiddenAlert] = useState<AlertItem | null>(null);
   const [dailyHighlight, setDailyHighlight] = useState<string | null>(null);
+  const [highlightDate, setHighlightDate] = useState<string | null>(null);
   const [externalSimilarArticles, setExternalSimilarArticles] = useState<{ title: string; url: string; signal_id?: string }[]>([]);
   const [isFetchingSimilar, setIsFetchingSimilar] = useState(false);
 
@@ -122,12 +123,15 @@ export default function IntelligencePane({
       } else if (data && data.length > 0) {
         const text = data[0].highlight_text || data[0].highlight || null;
         setDailyHighlight(text);
+        setHighlightDate(data[0].highlight_date || data[0].created_at || null);
       } else {
         setDailyHighlight(null);
+        setHighlightDate(null);
       }
     } catch (err) {
       console.error("Error fetching daily highlight:", err);
       setDailyHighlight(null);
+      setHighlightDate(null);
     }
   };
 
@@ -341,6 +345,50 @@ export default function IntelligencePane({
   const [isEditingDates, setIsEditingDates] = useState(false);
 
   useEffect(() => {
+    if (selectedAlert?.id) {
+      setTimeout(() => {
+        const el = document.getElementById(`alert-card-${selectedAlert.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 150);
+    }
+  }, [selectedAlert, startDateStr, endDateStr]);
+
+  const autoExpandProcessedRef = React.useRef<string | null>(null);
+
+  // Auto-expand date filter if the user clicks a similar article that falls outside current range
+  useEffect(() => {
+    if (selectedAlert && selectedAlert.source_published_date && startDateStr && endDateStr) {
+      if (autoExpandProcessedRef.current === selectedAlert.id) {
+        return;
+      }
+      autoExpandProcessedRef.current = selectedAlert.id;
+      
+      const pubDateStr = selectedAlert.source_published_date.split('T')[0];
+      let updatedStart = startDateStr;
+      let updatedEnd = endDateStr;
+      let changed = false;
+
+      if (pubDateStr < startDateStr) {
+        updatedStart = pubDateStr;
+        changed = true;
+      }
+      if (pubDateStr > endDateStr) {
+        updatedEnd = pubDateStr;
+        changed = true;
+      }
+
+      if (changed) {
+        setStartDateStr(updatedStart);
+        setEndDateStr(updatedEnd);
+        localStorage.setItem("policy_risk_start_date", updatedStart);
+        localStorage.setItem("policy_risk_end_date", updatedEnd);
+      }
+    }
+  }, [selectedAlert, startDateStr, endDateStr]);
+
+  useEffect(() => {
     const today = new Date();
     // Use 1 month back as requested (e.g. Aug 12 -> July 12)
     const past = new Date();
@@ -411,9 +459,9 @@ export default function IntelligencePane({
   }, [searchQuery, dashboardAlerts, startDateStr, endDateStr]);
 
   // Helper to format date with UPPERCASE month: '18 JULY 2026' and ordinal suffix
-  const formatAlertGroupDate = (alert: AlertItem): string => {
-    if (!alert.source_published_date) return "Unknown Date";
-    const d = new Date(alert.source_published_date);
+  const formatDateToHeader = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return "Unknown Date";
+    const d = new Date(dateStr);
     
     // Prevent timezone shifting
     const utcDate = new Date(d.getTime() + d.getTimezoneOffset() * 60000);
@@ -440,7 +488,7 @@ export default function IntelligencePane({
 
     // Filtered already sorted since API returns order('source_published_date', { ascending: false })
     filteredAlerts.forEach((alert) => {
-      const dateKey = formatAlertGroupDate(alert);
+      const dateKey = formatDateToHeader(alert.source_published_date);
       if (!groups[dateKey]) {
         groups[dateKey] = [];
         dates.push(dateKey);
@@ -450,6 +498,18 @@ export default function IntelligencePane({
 
     return { groupedAlerts: groups, orderedGroupDates: dates };
   }, [filteredAlerts]);
+
+  const absoluteRecentDate = useMemo(() => {
+    if (dashboardAlerts.length === 0) return "";
+    return formatDateToHeader(dashboardAlerts[0].source_published_date);
+  }, [dashboardAlerts, formatDateToHeader]);
+
+  const shouldShowHighlight = useMemo(() => {
+    if (!dailyHighlight || !highlightDate) return false;
+    if (!startDateStr || !endDateStr) return true;
+    const hDateStr = highlightDate.split('T')[0];
+    return hDateStr >= startDateStr && hDateStr <= endDateStr;
+  }, [dailyHighlight, highlightDate, startDateStr, endDateStr]);
 
   const getTagStyles = (tagColor: string) => {
     switch (tagColor) {
@@ -841,12 +901,34 @@ export default function IntelligencePane({
                 <div className="flex-1 flex items-center justify-center text-sm text-zinc-500 font-medium tracking-tight">
                   No data available
                 </div>
-              ) : filteredAlerts.length === 0 ? (
-                <div className="p-8 text-center text-zinc-400 text-xs">
-                  No matching alerts for your filter parameters.
-                </div>
               ) : (
-                orderedGroupDates.map((dateGroup, gIdx) => {
+                <>
+                  {/* Absolute Recent Daily Highlights (Static Header) */}
+                  {dailyHighlight && (
+                    <div className="flex flex-col gap-2 mb-2">
+                      <h3 className="text-[10px] font-bold text-zinc-600 tracking-wider mb-1.5 select-none uppercase">
+                        {absoluteRecentDate}
+                      </h3>
+                      <div className="mb-4 pl-4 border-l-2 border-violet-500/80 flex flex-col gap-1.5 animate-fade-in pr-1">
+                        <div className="flex items-center gap-1.5 text-zinc-900">
+                          <Sparkles className="w-4 h-4 text-violet-600 animate-pulse" />
+                          <h4 className="text-[13.5px] font-bold tracking-tight text-zinc-900">
+                            Your highlights for the day
+                          </h4>
+                        </div>
+                        <p className="text-[13px] text-zinc-700 leading-relaxed font-normal">
+                          {dailyHighlight}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredAlerts.length === 0 ? (
+                    <div className="p-8 text-center text-zinc-400 text-xs">
+                      No matching alerts for your filter parameters.
+                    </div>
+                  ) : (
+                    orderedGroupDates.map((dateGroup, gIdx) => {
                   const alertsInGroup = groupedAlerts[dateGroup] || [];
                   const is11thJuly = dateGroup.toUpperCase().includes("11TH JULY 2026") || dateGroup.toUpperCase().includes("11 JULY 2026");
                   
@@ -967,25 +1049,10 @@ export default function IntelligencePane({
                         </div>
                       )}
 
-                      {/* Date Header */}
+                      {/* Date Header for Signals (Always present) */}
                       <h3 className="text-[10px] font-bold text-zinc-600 tracking-wider mb-1.5 select-none uppercase">
                         {dateGroup}
                       </h3>
-
-                      {/* Highlights (Only block under first date group) */}
-                      {gIdx === 0 && dailyHighlight && (
-                        <div className="mb-4 pl-4 border-l-2 border-violet-500/80 flex flex-col gap-1.5 animate-fade-in pr-1">
-                          <div className="flex items-center gap-1.5 text-zinc-900">
-                            <Sparkles className="w-4 h-4 text-violet-600 animate-pulse" />
-                            <h4 className="text-[13.5px] font-bold tracking-tight text-zinc-900">
-                              Your highlights for the day
-                            </h4>
-                          </div>
-                          <p className="text-[13px] text-zinc-700 leading-relaxed font-normal">
-                            {dailyHighlight}
-                          </p>
-                        </div>
-                      )}
 
                       {/* List of cards in this date group */}
                   <div className="flex flex-col gap-2">
@@ -1067,8 +1134,10 @@ export default function IntelligencePane({
                   </div>
 
                 </div>
-              );
-            })
+                  );
+                })
+              )}
+            </>
           )}
         </>
       )}

@@ -381,6 +381,7 @@ export default function MarketDynamicsPane({
   
   const [selectedGridSignal, setSelectedGridSignal] = useState<SignalContent | null>(null);
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
+
   const [isBookmarked, setIsBookmarked] = useState<Record<string, boolean>>({});
   const [hiddenIds, setHiddenIds] = useState<Record<string, boolean>>({});
   const [lastHiddenInsight, setLastHiddenInsight] = useState<any | null>(null);
@@ -618,6 +619,64 @@ export default function MarketDynamicsPane({
   const [defaultEndDate, setDefaultEndDate] = useState("");
   const [isEditingDates, setIsEditingDates] = useState(false);
 
+  useEffect(() => {
+    if (selectedInsightId) {
+      const targetCategoryData = richSignals.find(s => 
+        s.contents.flat().some(content => content.id === selectedInsightId)
+      );
+      if (targetCategoryData) {
+        const rawName = Object.keys(signalSubCardTitles).find(k => k.toUpperCase() === targetCategoryData.category) || targetCategoryData.category;
+        setSelectedCategory(prev => prev.toUpperCase() !== rawName.toUpperCase() ? rawName : prev);
+      }
+      
+      setTimeout(() => {
+        const el = document.getElementById(`signal-card-${selectedInsightId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 150);
+    }
+  }, [selectedInsightId, richSignals, signalSubCardTitles, startDateStr, endDateStr]);
+
+  const autoExpandProcessedRef = useRef<string | null>(null);
+
+  // Auto-expand date filter if the user clicks a similar article that falls outside current range
+  useEffect(() => {
+    if (selectedInsightId && marketInsights.length > 0 && startDateStr && endDateStr) {
+      if (autoExpandProcessedRef.current === selectedInsightId) {
+        return;
+      }
+      autoExpandProcessedRef.current = selectedInsightId;
+
+      const insight = marketInsights.find(mi => mi.id === selectedInsightId);
+      if (insight) {
+        const effectiveDate = insight.last_enriched_at || insight.created_at;
+        if (effectiveDate) {
+          const pubDateStr = effectiveDate.split('T')[0];
+          let updatedStart = startDateStr;
+          let updatedEnd = endDateStr;
+          let changed = false;
+
+          if (pubDateStr < startDateStr) {
+            updatedStart = pubDateStr;
+            changed = true;
+          }
+          if (pubDateStr > endDateStr) {
+            updatedEnd = pubDateStr;
+            changed = true;
+          }
+
+          if (changed) {
+            setStartDateStr(updatedStart);
+            setEndDateStr(updatedEnd);
+            localStorage.setItem("market_dynamics_start_date", updatedStart);
+            localStorage.setItem("market_dynamics_end_date", updatedEnd);
+          }
+        }
+      }
+    }
+  }, [selectedInsightId, marketInsights, startDateStr, endDateStr]);
+
   // Load fallback dates matching Policy & Risk Monitor defaults
   useEffect(() => {
     const today = new Date();
@@ -759,7 +818,13 @@ export default function MarketDynamicsPane({
         })
       );
 
-      if (!selectedGridSignal || !isCurrentSignalInCategory) {
+      // Check against the FULL unfiltered signals so we don't jump away from an insight that is currently hidden by date
+      const fullCatData = richSignals.find(s => s.category === key);
+      const isCurrentInsightInFullCategory = selectedInsightId && fullCatData && fullCatData.contents.some(list =>
+        list.some(sig => sig.id === selectedInsightId)
+      );
+
+      if (!isCurrentSignalInCategory && !isCurrentInsightInFullCategory) {
         let firstSignal: SignalContent | null = null;
         for (const list of catData.contents) {
           if (list && list.length > 0) {
@@ -773,7 +838,7 @@ export default function MarketDynamicsPane({
         }
       }
     }
-  }, [selectedCategory, activeGridSignals]);
+  }, [selectedCategory, activeGridSignals, richSignals]);
   
   useEffect(() => {
     setIsSourcesExpanded(true);
@@ -1203,12 +1268,15 @@ export default function MarketDynamicsPane({
                           {signalsList.length > 0 ? (
                             <div className="flex flex-col">
                               {signalsList.map((sig, sigIdx) => {
-                                const isSelected = selectedGridSignal?.id && sig.id 
-                                  ? selectedGridSignal.id === sig.id 
-                                  : selectedGridSignal?.title === sig.title;
+                                const isSelected = selectedInsightId
+                                  ? selectedInsightId === sig.id
+                                  : selectedGridSignal?.id && sig.id
+                                    ? selectedGridSignal.id === sig.id
+                                    : selectedGridSignal?.title === sig.title;
                                 return (
                                   <div 
                                     key={sigIdx} 
+                                    id={sig.id ? `signal-card-${sig.id}` : undefined}
                                     onClick={() => {
                                       if (isSelected) {
                                         setSelectedGridSignal(null);
