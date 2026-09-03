@@ -39,6 +39,8 @@ export interface TrendItem {
   dy: number;
   confidence: "High" | "Medium" | "Low";
   signalsCount: number;
+  newInLastWeek?: number;
+  dotSize?: number;
   trendStatus: "Trending up" | "Stable" | "Emerging";
   statValue1: string;
   statValue2: string;
@@ -729,13 +731,12 @@ export const RADAR_TRENDS: TrendItem[] = [
 ];
 
 const getNodeRadius = (trend: TrendItem, isSelected: boolean, isHovered: boolean) => {
-  let baseRadius = 5.5;
-  if (trend.confidence === "High") {
+  const dotSize = trend.dotSize ?? 0;
+  let baseRadius = 4;
+  if (dotSize > 7) {
     baseRadius = 8.5;
-  } else if (trend.confidence === "Medium") {
+  } else if (dotSize > 4) {
     baseRadius = 6;
-  } else if (trend.confidence === "Low") {
-    baseRadius = 4;
   }
   
   if (isSelected) {
@@ -898,7 +899,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
       try {
         const { data, error } = await supabase
           .from("trend_snapshots_latest")
-          .select("*")
+          .select("*, trend_clusters(confidence_score)")
           .eq("module_id", FORWARD_OUTLOOK_MODULE_ID)
           .eq("client_id", clientId);
 
@@ -935,6 +936,8 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
               if (item.ring === "mid_term") r = 215;
               if (item.ring === "long_term") r = 295;
 
+              const confScore = (Array.isArray(item.trend_clusters) ? item.trend_clusters[0]?.confidence_score : item.trend_clusters?.confidence_score) ?? item.confidence_score ?? 0;
+
               mappedTrends.push({
                 id: item.trend_id,
                 title: item.name,
@@ -951,8 +954,9 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 textAnchor: angle > 90 ? "end" : angle < 90 ? "start" : "middle",
                 dx: angle > 100 ? -22 : angle < 80 ? 22 : 0,
                 dy: angle > 80 && angle < 100 ? -15 : 4,
-                confidence: item.dot_size > 7 ? "High" : item.dot_size > 4 ? "Medium" : "Low",
+                confidence: confScore > 7 ? "High" : confScore > 4 ? "Medium" : "Low",
                 signalsCount: item.dot_size || 0, // Fallback to dot_size until signals are fetched
+                dotSize: item.dot_size || 0,
                 trendStatus: "Stable",
                 statValue1: "",
                 statValue2: "",
@@ -985,7 +989,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
       try {
         const { data: membershipData, error: membershipError } = await supabase
           .from("trend_membership")
-          .select("signal_id")
+          .select("signal_id, joined_at")
           .eq("trend_id", selectedTrendId);
 
         if (membershipError) throw membershipError;
@@ -993,8 +997,14 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
         if (membershipData && membershipData.length > 0) {
           const signalIds = membershipData.map(m => m.signal_id);
 
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+          const newInLastWeek = membershipData.filter(
+            m => m.joined_at && new Date(m.joined_at) >= oneWeekAgo
+          ).length;
+
           const { data: signalsData, error: signalsError } = await supabase
-            .from("policy_signals")
+            .from("trend_signals")
             .select("*")
             .in("id", signalIds);
 
@@ -1013,7 +1023,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
 
             setTrends(prev => prev.map(t => 
               t.id === selectedTrendId 
-                ? { ...t, sources: mappedSignals, signalsCount: mappedSignals.length } 
+                ? { ...t, sources: mappedSignals, signalsCount: mappedSignals.length, newInLastWeek } 
                 : t
             ));
           }
@@ -1838,7 +1848,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                         </svg>
                       </span>
                       <span className="text-zinc-500">
-                        +{Math.max(1, Math.floor(selectedTrend.signalsCount / 8)) || 2} in last week
+                        +{selectedTrend.newInLastWeek ?? 0} in last week
                       </span>
                     </span>
                   </span>
