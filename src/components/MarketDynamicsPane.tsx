@@ -613,8 +613,8 @@ export default function MarketDynamicsPane({
   }, [selectedInsightId, marketInsights]);
 
   // Date states (retained for identical design/functionality)
-  const [startDateStr, setStartDateStr] = useState(() => localStorage.getItem("market_dynamics_start_date") || "");
-  const [endDateStr, setEndDateStr] = useState(() => localStorage.getItem("market_dynamics_end_date") || "");
+  const [startDateStr, setStartDateStr] = useState(() => sessionStorage.getItem("market_dynamics_start_date") || "");
+  const [endDateStr, setEndDateStr] = useState(() => sessionStorage.getItem("market_dynamics_end_date") || "");
   const [defaultStartDate, setDefaultStartDate] = useState("");
   const [defaultEndDate, setDefaultEndDate] = useState("");
   const [isEditingDates, setIsEditingDates] = useState(false);
@@ -669,8 +669,8 @@ export default function MarketDynamicsPane({
           if (changed) {
             setStartDateStr(updatedStart);
             setEndDateStr(updatedEnd);
-            localStorage.setItem("market_dynamics_start_date", updatedStart);
-            localStorage.setItem("market_dynamics_end_date", updatedEnd);
+            sessionStorage.setItem("market_dynamics_start_date", updatedStart);
+            sessionStorage.setItem("market_dynamics_end_date", updatedEnd);
           }
         }
       }
@@ -680,30 +680,43 @@ export default function MarketDynamicsPane({
   // Load fallback dates matching Policy & Risk Monitor defaults
   useEffect(() => {
     const today = new Date();
-    // Use 1 month back as requested (e.g. Aug 12 -> July 12)
-    const past = new Date();
-    past.setMonth(today.getMonth() - 1);
-
+    
     const formatDate = (d: Date) => {
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, "0");
       const day = String(d.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
-    const minStr = formatDate(past);
+
+    let minStr = "";
+    if (marketInsights && marketInsights.length > 0) {
+      const earliest = marketInsights.reduce((min, insight) => {
+        const effectiveDate = insight.last_enriched_at || insight.created_at || insight.source_published_date;
+        if (!effectiveDate) return min;
+        const d = new Date(effectiveDate);
+        if (isNaN(d.getTime())) return min;
+        return d < min ? d : min;
+      }, new Date());
+      minStr = formatDate(earliest);
+    } else {
+      const past = new Date();
+      past.setFullYear(today.getFullYear() - 5); // 5 years back fallback
+      minStr = formatDate(past);
+    }
+    
     const maxStr = formatDate(today);
 
     setDefaultStartDate(minStr);
     setDefaultEndDate(maxStr);
 
-    // Only set initial state if not already in localStorage
-    if (!localStorage.getItem("market_dynamics_start_date")) {
+    // Only set initial state if not already in sessionStorage
+    if (!sessionStorage.getItem("market_dynamics_start_date")) {
       setStartDateStr(minStr);
     }
-    if (!localStorage.getItem("market_dynamics_end_date")) {
+    if (!sessionStorage.getItem("market_dynamics_end_date")) {
       setEndDateStr(maxStr);
     }
-  }, []);
+  }, [marketInsights]);
 
   const todayStr = useMemo(() => {
     const d = new Date();
@@ -1169,8 +1182,8 @@ export default function MarketDynamicsPane({
                     if (!endDateStr) setEndDateStr(defaultEndDate);
 
                     // Persist confirmed dates
-                    localStorage.setItem("market_dynamics_start_date", finalStart);
-                    localStorage.setItem("market_dynamics_end_date", finalEnd);
+                    sessionStorage.setItem("market_dynamics_start_date", finalStart);
+                    sessionStorage.setItem("market_dynamics_end_date", finalEnd);
 
                     setIsEditingDates(false);
                   }}

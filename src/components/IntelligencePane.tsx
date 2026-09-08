@@ -338,8 +338,8 @@ export default function IntelligencePane({
 
   const businessImpactList = selectedAlert?.business_impact || [];
 
-  const [startDateStr, setStartDateStr] = useState(() => localStorage.getItem("policy_risk_start_date") || "");
-  const [endDateStr, setEndDateStr] = useState(() => localStorage.getItem("policy_risk_end_date") || "");
+  const [startDateStr, setStartDateStr] = useState(() => sessionStorage.getItem("policy_risk_start_date") || "");
+  const [endDateStr, setEndDateStr] = useState(() => sessionStorage.getItem("policy_risk_end_date") || "");
   const [defaultStartDate, setDefaultStartDate] = useState("");
   const [defaultEndDate, setDefaultEndDate] = useState("");
   const [isEditingDates, setIsEditingDates] = useState(false);
@@ -382,17 +382,14 @@ export default function IntelligencePane({
       if (changed) {
         setStartDateStr(updatedStart);
         setEndDateStr(updatedEnd);
-        localStorage.setItem("policy_risk_start_date", updatedStart);
-        localStorage.setItem("policy_risk_end_date", updatedEnd);
+        sessionStorage.setItem("policy_risk_start_date", updatedStart);
+        sessionStorage.setItem("policy_risk_end_date", updatedEnd);
       }
     }
   }, [selectedAlert, startDateStr, endDateStr]);
 
   useEffect(() => {
     const today = new Date();
-    // Use 1 month back as requested (e.g. Aug 12 -> July 12)
-    const past = new Date();
-    past.setMonth(today.getMonth() - 1);
     
     const formatDate = (d: Date) => {
       const year = d.getFullYear();
@@ -400,18 +397,32 @@ export default function IntelligencePane({
       const day = String(d.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
+
+    let minStr = "";
+    if (dashboardAlerts && dashboardAlerts.length > 0) {
+      const earliest = dashboardAlerts.reduce((min, alert) => {
+        if (!alert.source_published_date) return min;
+        const d = new Date(alert.source_published_date);
+        if (isNaN(d.getTime())) return min;
+        return d < min ? d : min;
+      }, new Date());
+      minStr = formatDate(earliest);
+    } else {
+      const past = new Date();
+      past.setFullYear(today.getFullYear() - 5); // 5 years back fallback
+      minStr = formatDate(past);
+    }
     
-    const minStr = formatDate(past);
     const maxStr = formatDate(today);
     
     setDefaultStartDate(minStr);
     setDefaultEndDate(maxStr);
 
-    // Only set initial state if not already in localStorage
-    if (!localStorage.getItem("policy_risk_start_date")) {
+    // Only set initial state if not already in sessionStorage
+    if (!sessionStorage.getItem("policy_risk_start_date")) {
       setStartDateStr(minStr);
     }
-    if (!localStorage.getItem("policy_risk_end_date")) {
+    if (!sessionStorage.getItem("policy_risk_end_date")) {
       setEndDateStr(maxStr);
     }
   }, [dashboardAlerts]);
@@ -860,8 +871,8 @@ export default function IntelligencePane({
                   if (!endDateStr) setEndDateStr(defaultEndDate);
 
                   // Persist confirmed dates
-                  localStorage.setItem("policy_risk_start_date", finalStart);
-                  localStorage.setItem("policy_risk_end_date", finalEnd);
+                  sessionStorage.setItem("policy_risk_start_date", finalStart);
+                  sessionStorage.setItem("policy_risk_end_date", finalEnd);
 
                   setIsEditingDates(false);
                 }}

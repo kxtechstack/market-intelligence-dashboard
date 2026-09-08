@@ -48,6 +48,13 @@ export default function App() {
     setLoginError(null);
     setIsAuthenticating(true);
 
+    sessionStorage.removeItem("policy_risk_start_date");
+    sessionStorage.removeItem("policy_risk_end_date");
+    sessionStorage.removeItem("market_dynamics_start_date");
+    sessionStorage.removeItem("market_dynamics_end_date");
+    sessionStorage.removeItem("foreward_outlook_start_date");
+    sessionStorage.removeItem("foreward_outlook_end_date");
+
     try {
       // 1. Authenticate with Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -152,6 +159,26 @@ export default function App() {
       };
       setChatHistory(prev => [...prev, errMsg]);
     }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+    sessionStorage.removeItem("policy_risk_start_date");
+    sessionStorage.removeItem("policy_risk_end_date");
+    sessionStorage.removeItem("market_dynamics_start_date");
+    sessionStorage.removeItem("market_dynamics_end_date");
+    sessionStorage.removeItem("foreward_outlook_start_date");
+    sessionStorage.removeItem("foreward_outlook_end_date");
+    setIsLoggedIn(false);
+    setUserId(null);
+    setClientId(null);
+    setIndustry(null);
+    setEmail("");
+    setPassword("");
   };
 
   // Switch between workspaces based on active tab
@@ -309,7 +336,7 @@ export default function App() {
           className="w-screen h-screen flex overflow-hidden bg-zinc-100 select-text"
         >
           {/* 1. Left Vertical Sidebar Rail */}
-          <LeftMenubar activeTab={activeTab} onTabChange={setActiveTab} onLogout={() => setIsLoggedIn(false)} />
+          <LeftMenubar activeTab={activeTab} onTabChange={setActiveTab} onLogout={handleLogout} />
 
           {/* 2. Content Region: Document Intelligence and Integrated AI Chat in 2-Pane Split */}
           <div id="central-split-viewport" className="flex-1 h-full flex overflow-hidden">
