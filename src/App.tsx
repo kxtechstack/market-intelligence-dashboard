@@ -27,6 +27,7 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("policy_risk_monitor");
+  const [navigatedItemId, setNavigatedItemId] = useState<string | null>(null);
   const [isRecoveryFlow, setIsRecoveryFlow] = useState(() => window.location.hash.includes('access_token'));
 
   useEffect(() => {
@@ -179,11 +180,16 @@ export default function App() {
     setIndustry(null);
     setEmail("");
     setPassword("");
+    setNavigatedItemId(null);
   };
 
   // Switch between workspaces based on active tab
   const renderWorkspaceContent = () => {
     const handleReturn = () => setActiveTab("policy_risk_monitor");
+    const handleNavigate = (module: string, id: string) => {
+      setNavigatedItemId(id);
+      setActiveTab(module);
+    };
 
     return (
       <div className="flex-1 h-full relative overflow-hidden flex flex-col">
@@ -195,6 +201,8 @@ export default function App() {
             userId={userId || ""}
             selectedAlert={selectedAlert}
             onSelectAlert={(alert) => setSelectedAlert(alert)}
+            navigatedItemId={navigatedItemId}
+            onClearNavigatedItem={() => setNavigatedItemId(null)}
           />
         </div>
 
@@ -204,6 +212,8 @@ export default function App() {
             clientId={clientId || ""}
             industry={industry || ""}
             userId={userId || ""}
+            navigatedItemId={navigatedItemId}
+            onClearNavigatedItem={() => setNavigatedItemId(null)}
           />
         </div>
 
@@ -213,6 +223,8 @@ export default function App() {
             clientId={clientId || ""}
             industry={industry || ""}
             userId={userId || ""}
+            navigatedItemId={navigatedItemId}
+            onClearNavigatedItem={() => setNavigatedItemId(null)}
           />
         </div>
 
@@ -232,7 +244,13 @@ export default function App() {
           />
         )}
 
-        {activeTab === "my_bookmarks" && <MyBookmarksPane onReturn={handleReturn} />}
+        {activeTab === "my_bookmarks" && (
+          <MyBookmarksPane 
+            clientId={clientId || ""}
+            userId={userId || ""}
+            onNavigate={handleNavigate}
+          />
+        )}
         {activeTab === "support" && <SupportPane onReturn={handleReturn} />}
         {activeTab === "settings" && <SettingsPane onReturn={handleReturn} />}
 
