@@ -14,6 +14,7 @@ import MyBookmarksPane from "./components/MyBookmarksPane";
 import SettingsPane from "./components/SettingsPane";
 import SupportPane from "./components/SupportPane";
 import SetPasswordPane from "./components/SetPasswordPane";
+import WorkspaceConfigPane from "./components/WorkspaceConfigPane";
 import { AlertItem, ChatMessage } from "./types";
 import { ShieldAlert, Loader2 } from "lucide-react";
 
@@ -28,6 +29,11 @@ export default function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("policy_risk_monitor");
   const [navigatedItemId, setNavigatedItemId] = useState<string | null>(null);
+
+  const handleNavigateFromBookmarks = (module: string, id: string) => {
+    setActiveTab(module);
+    setNavigatedItemId(id);
+  };
   const [isRecoveryFlow, setIsRecoveryFlow] = useState(() => window.location.hash.includes('access_token'));
 
   useEffect(() => {
@@ -180,16 +186,11 @@ export default function App() {
     setIndustry(null);
     setEmail("");
     setPassword("");
-    setNavigatedItemId(null);
   };
 
   // Switch between workspaces based on active tab
   const renderWorkspaceContent = () => {
     const handleReturn = () => setActiveTab("policy_risk_monitor");
-    const handleNavigate = (module: string, id: string) => {
-      setNavigatedItemId(id);
-      setActiveTab(module);
-    };
 
     return (
       <div className="flex-1 h-full relative overflow-hidden flex flex-col">
@@ -244,15 +245,15 @@ export default function App() {
           />
         )}
 
-        {activeTab === "my_bookmarks" && (
-          <MyBookmarksPane 
-            clientId={clientId || ""}
-            userId={userId || ""}
-            onNavigate={handleNavigate}
-          />
-        )}
+        <div className={activeTab === "my_bookmarks" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
+          <MyBookmarksPane clientId={clientId || ""} userId={userId || ""} onNavigate={handleNavigateFromBookmarks} />
+        </div>
+
         {activeTab === "support" && <SupportPane onReturn={handleReturn} />}
-        {activeTab === "settings" && <SettingsPane onReturn={handleReturn} />}
+
+        <div className={activeTab === "settings" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
+          <WorkspaceConfigPane onReturn={handleReturn} clientId={clientId || ""} />
+        </div>
 
         {/* Fallback for unrecognized tabs */}
         {!["policy_risk_monitor", "market_dynamics", "foreward_outlook", "latest", "find_opportunities", "competitive_radar", "voice_of_customer", "decision_intelligence", "my_bookmarks", "support", "settings"].includes(activeTab) && (
