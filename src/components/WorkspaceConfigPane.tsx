@@ -17,6 +17,7 @@ import {
   Lock,
   ExternalLink
 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 interface WorkspaceConfigPaneProps {
   onReturn: () => void;
@@ -65,18 +66,57 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
 
   useEffect(() => {
     async function fetchData() {
+      if (!clientId) return;
       try {
         setLoading(true);
-        const response = await fetch(`/api/workspace-config?clientId=${clientId}`);
-        const result = await response.json();
-        if (response.ok) {
-          setData({
-            client: result.client,
-            icp: result.icp,
-            users: result.users,
-            enabledModules: result.enabledModules || []
-          });
+        
+        // Fetch client, ICP, and users in parallel using client-side SDK
+        const [clientRes, icpRes, usersRes] = await Promise.all([
+          supabase
+            .schema('admin')
+            .from('clients')
+            .select('company_name, industry, location, client_description, enabled_modules')
+            .eq('id', clientId)
+            .single(),
+          supabase
+            .schema('admin')
+            .from('client_icp')
+            .select('context_json')
+            .eq('client_id', clientId)
+            .maybeSingle(),
+          supabase
+            .schema('admin')
+            .from('client_users')
+            .select('first_name, last_name, email, designation, is_active, last_active')
+            .eq('client_id', clientId)
+        ]);
+
+        if (clientRes.error) throw clientRes.error;
+        const clientData = clientRes.data;
+
+        // Fetch actual module names if enabled_modules exist
+        let enabledModulesData: { id: string; module_name: string }[] = [];
+        if (clientData.enabled_modules && Array.isArray(clientData.enabled_modules) && clientData.enabled_modules.length > 0) {
+          const { data: modules, error: modulesError } = await supabase
+            .schema('admin')
+            .from('modules')
+            .select('id, module_name')
+            .in('id', clientData.enabled_modules);
+          
+          if (!modulesError && modules) {
+            enabledModulesData = modules;
+          }
         }
+
+        const context = icpRes.data?.context_json || {};
+        const userData = usersRes.data || [];
+
+        setData({
+          client: clientData,
+          icp: context,
+          users: userData,
+          enabledModules: enabledModulesData
+        });
       } catch (error) {
         console.error("Failed to fetch workspace config:", error);
       } finally {
@@ -84,9 +124,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
       }
     }
 
-    if (clientId) {
-      fetchData();
-    }
+    fetchData();
   }, [clientId]);
 
   const menuItems = [

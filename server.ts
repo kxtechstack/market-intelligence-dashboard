@@ -26,69 +26,6 @@ function getSupabase() {
   return supabaseClient;
 }
 
-// API endpoint for Workspace Configuration
-app.get("/api/workspace-config", async (req, res) => {
-  try {
-    const clientId = req.query.clientId as string;
-    if (!clientId) {
-      return res.status(400).json({ error: "clientId is required" });
-    }
-
-    const supabase = getSupabase();
-
-    // Fetch client, ICP, and users in parallel
-    const [clientRes, icpRes, usersRes] = await Promise.all([
-      supabase
-        .schema('admin')
-        .from('clients')
-        .select('company_name, industry, location, client_description, enabled_modules')
-        .eq('id', clientId)
-        .single(),
-      supabase
-        .schema('admin')
-        .from('client_icp')
-        .select('context_json')
-        .eq('client_id', clientId)
-        .single(),
-      supabase
-        .schema('admin')
-        .from('client_users')
-        .select('first_name, last_name, email, designation, is_active, last_active')
-        .eq('client_id', clientId)
-    ]);
-
-    if (clientRes.error) throw clientRes.error;
-    const clientData = clientRes.data;
-
-    // Fetch actual module names if enabled_modules exist
-    let enabledModulesData = [];
-    if (clientData.enabled_modules && clientData.enabled_modules.length > 0) {
-      const { data: modules, error: modulesError } = await supabase
-        .schema('admin')
-        .from('modules')
-        .select('id, module_name')
-        .in('id', clientData.enabled_modules);
-      
-      if (!modulesError) {
-        enabledModulesData = modules;
-      }
-    }
-
-    const context = icpRes.data?.context_json || {};
-    const userData = usersRes.data || [];
-
-    res.json({
-      client: clientData,
-      icp: context,
-      users: userData,
-      enabledModules: enabledModulesData
-    });
-  } catch (error: any) {
-    console.error("Workspace config error:", error);
-    res.status(500).json({ error: error.message || "Failed to fetch workspace configuration" });
-  }
-});
-
 // Lazy-initialization helper to prevent booting crashes if key is omitted
 let aiClient: GoogleGenAI | null = null;
 function getAI(): GoogleGenAI {
