@@ -10,6 +10,8 @@ interface MarketDynamicsPaneProps {
   clientId: string;
   industry: string;
   userId: string;
+  navigatedItemId?: string | null;
+  onClearNavigatedItem?: () => void;
 }
 
 interface ChatMessage {
@@ -370,12 +372,22 @@ export default function MarketDynamicsPane({
   onReturn,
   clientId,
   industry,
-  userId
+  userId,
+  navigatedItemId,
+  onClearNavigatedItem
 }: MarketDynamicsPaneProps) {
   const [activeTab, setActiveTab] = useState<string>("insights");
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
+  const [isReferencesExpanded, setIsReferencesExpanded] = useState<boolean>(false);
   const [richSignals, setRichSignals] = useState<SignalGridItem[]>([]);
   const [marketInsights, setMarketInsights] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (navigatedItemId && marketInsights.length > 0) {
+      setSelectedInsightId(navigatedItemId);
+      if (onClearNavigatedItem) onClearNavigatedItem();
+    }
+  }, [navigatedItemId, marketInsights]);
   const [isLoading, setIsLoading] = useState(true);
   const [signalSubCardTitles, setSignalSubCardTitles] = useState<Record<string, string[]>>({});
   
@@ -855,6 +867,7 @@ export default function MarketDynamicsPane({
   
   useEffect(() => {
     setIsSourcesExpanded(true);
+    setIsReferencesExpanded(false);
     setExpandedCards({});
     setSelectedSignalId(null);
   }, [selectedGridSignal]);
@@ -1533,11 +1546,41 @@ export default function MarketDynamicsPane({
             <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-zinc-600 font-sans select-text">
               <p>{renderedTrend.summary}</p>
               
-              <div className="flex items-center gap-1.5 select-none text-[11px] text-zinc-400 mt-1">
-                <span className="font-normal text-zinc-400">Reference:</span>
-                <span className="inline-flex items-center justify-center w-[18px] h-[18px] bg-zinc-100 border border-zinc-200 rounded-[4px] text-[10.5px] font-bold text-zinc-500 cursor-help select-none" title="MarketGenie Horizon Analysis">
-                  1
-                </span>
+              <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-400 mt-1">
+                <span className="font-normal text-zinc-400 mt-[3px]">Reference:</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {(isReferencesExpanded ? renderedTrend.sources : renderedTrend.sources.slice(0, 5)).map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setIsSourcesExpanded(true);
+                        setTimeout(() => {
+                          const el = document.getElementById(`signal-card-${idx}`);
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            el.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'transition-all', 'duration-500');
+                            setTimeout(() => {
+                              el.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50');
+                            }, 1500);
+                          }
+                        }, 100);
+                      }}
+                      className="group inline-flex items-center justify-center gap-0.5 px-1.5 h-[18px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[4px] text-[10.5px] font-bold text-zinc-500 transition-colors cursor-pointer select-none"
+                      title={`Jump to signal ${idx + 1}`}
+                    >
+                      {idx + 1}
+                      <ArrowDown className="w-2.5 h-2.5 opacity-0 -ml-0.5 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                  {!isReferencesExpanded && renderedTrend.sources.length > 5 && (
+                    <button
+                      onClick={() => setIsReferencesExpanded(true)}
+                      className="inline-flex items-center justify-center px-1.5 h-[18px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[4px] text-[10.5px] font-bold text-zinc-500 transition-colors cursor-pointer select-none"
+                    >
+                      +{renderedTrend.sources.length - 5} more
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1585,7 +1628,7 @@ export default function MarketDynamicsPane({
 
               {isSourcesExpanded && (
                 <div className="flex flex-col gap-2 mt-1 animate-fade-in">
-                  {renderedTrend.sources.map(src => {
+                  {renderedTrend.sources.map((src, index) => {
                     const isSelected = selectedSignalId === src.id;
                     const cat = ((src as any).originalCategory || src.category || "").toLowerCase();
                     
@@ -1607,6 +1650,7 @@ export default function MarketDynamicsPane({
                     return (
                       <div 
                         key={src.id} 
+                        id={`signal-card-${index}`}
                         onClick={() => setSelectedSignalId(isSelected ? null : src.id)}
                         className={`rounded-[4px] px-3 transition-all text-left cursor-pointer border ${bgClass} ${borderClass} ${isSelected ? 'py-4' : 'py-1.5'}`}
                       >

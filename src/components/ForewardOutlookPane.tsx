@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft } from "lucide-react";
+import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft, ArrowDown } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { ChatSources } from "./ChatSources";
 import { FORWARD_OUTLOOK_MODULE_ID, API_URL } from "../constants";
@@ -9,6 +9,8 @@ interface ForewardOutlookPaneProps {
   clientId: string;
   industry: string;
   userId: string;
+  navigatedItemId?: string | null;
+  onClearNavigatedItem?: () => void;
 }
 
 export interface SourceItem {
@@ -40,6 +42,7 @@ export interface TrendItem {
   confidence: "High" | "Medium" | "Low";
   signalsCount: number;
   newInLastWeek?: number;
+  created_at?: string;
   dotSize?: number;
   trendStatus: "Trending up" | "Stable" | "Emerging";
   statValue1: string;
@@ -873,15 +876,25 @@ export default function ForewardOutlookPane({
   onReturn,
   clientId,
   industry,
-  userId
+  userId,
+  navigatedItemId,
+  onClearNavigatedItem
 }: ForewardOutlookPaneProps) {
   const [trends, setTrends] = useState<TrendItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSignalsLoading, setIsSignalsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("insights");
   const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (navigatedItemId && trends.length > 0) {
+      setSelectedTrendId(navigatedItemId);
+      if (onClearNavigatedItem) onClearNavigatedItem();
+    }
+  }, [navigatedItemId, trends]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
+  const [isReferencesExpanded, setIsReferencesExpanded] = useState<boolean>(false);
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
 const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number, end: number }>>({
   "consumer": { start: 144, end: 175 },
@@ -1046,6 +1059,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
   
   useEffect(() => {
     setIsSourcesExpanded(true);
+    setIsReferencesExpanded(false);
     const trend = trends.find(t => t.id === selectedTrendId);
     if (trend && trend.sources && trend.sources.length > 0) {
       setSelectedSignalId(trend.sources[0].id);
@@ -1332,17 +1346,22 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
   const renderImpactBars = (impact: string) => {
     const barCount = 4;
     let filledCount = 2;
-    let barColor = "bg-amber-500";
+    let barColor = "bg-yellow-400";
 
-    if (impact === "High") {
+    const normalizedImp = (impact || "").toLowerCase();
+
+    if (normalizedImp === "critical" || normalizedImp === "high") {
       filledCount = 4;
-      barColor = "bg-violet-600";
-    } else if (impact === "Medium") {
-      filledCount = 3;
-      barColor = "bg-violet-400";
-    } else {
+      barColor = normalizedImp === "critical" ? "bg-red-600" : "bg-orange-500";
+    } else if (normalizedImp === "medium") {
+      filledCount = 2;
+      barColor = "bg-yellow-400";
+    } else if (normalizedImp === "low") {
       filledCount = 1;
-      barColor = "bg-zinc-300";
+      barColor = "bg-emerald-400";
+    } else {
+      filledCount = 0;
+      barColor = "bg-zinc-200";
     }
 
     return (
@@ -1989,11 +2008,41 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
               <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-zinc-600 font-sans select-text">
                 <p>{selectedTrend.summary}</p>
                 
-                <div className="flex items-center gap-1.5 select-none text-[11px] text-zinc-400 mt-1">
-                  <span className="font-normal text-zinc-400">Reference:</span>
-                  <span className="inline-flex items-center justify-center w-[18px] h-[18px] bg-zinc-100 border border-zinc-200 rounded text-[10.5px] font-bold text-zinc-500 cursor-help select-none" title="MarketGenie Horizon Analysis">
-                    1
-                  </span>
+                <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-400 mt-1">
+                  <span className="font-normal text-zinc-400 mt-[3px]">Reference:</span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {(isReferencesExpanded ? selectedTrend.sources : selectedTrend.sources.slice(0, 5)).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setIsSourcesExpanded(true);
+                          setTimeout(() => {
+                            const el = document.getElementById(`outlook-signal-card-${idx}`);
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              el.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'transition-all', 'duration-500');
+                              setTimeout(() => {
+                                el.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50');
+                              }, 1500);
+                            }
+                          }, 100);
+                        }}
+                        className="group inline-flex items-center justify-center gap-0.5 px-1.5 h-[18px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[4px] text-[10.5px] font-bold text-zinc-500 transition-colors cursor-pointer select-none"
+                        title={`Jump to signal ${idx + 1}`}
+                      >
+                        {idx + 1}
+                        <ArrowDown className="w-2.5 h-2.5 opacity-0 -ml-0.5 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    ))}
+                    {!isReferencesExpanded && selectedTrend.sources.length > 5 && (
+                      <button
+                        onClick={() => setIsReferencesExpanded(true)}
+                        className="inline-flex items-center justify-center px-1.5 h-[18px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[4px] text-[10.5px] font-bold text-zinc-500 transition-colors cursor-pointer select-none"
+                      >
+                        +{selectedTrend.sources.length - 5} more
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2051,7 +2100,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                         No signals associated with this horizon trend.
                       </div>
                     ) : (
-                      selectedTrend.sources.map(src => {
+                      selectedTrend.sources.map((src, index) => {
                       const isSelected = selectedSignalId === src.id;
                       const cat = (src.category || "").toLowerCase();
                       
@@ -2073,7 +2122,8 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
 
                       return (
                         <div 
-                          key={src.id} 
+                          key={src.id}
+                          id={`outlook-signal-card-${index}`}
                           onClick={() => setSelectedSignalId(isSelected ? null : src.id)}
                           className={`rounded-[4px] px-3 transition-all text-left cursor-pointer border ${bgClass} ${borderClass} ${isSelected ? 'py-4' : 'py-1.5'}`}
                         >

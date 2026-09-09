@@ -16,6 +16,8 @@ interface IntelligencePaneProps {
   userId: string;
   selectedAlert: AlertItem | null;
   onSelectAlert: (alert: AlertItem) => void;
+  navigatedItemId?: string | null;
+  onClearNavigatedItem?: () => void;
 }
 
 export default function IntelligencePane({ 
@@ -23,11 +25,23 @@ export default function IntelligencePane({
   industry,
   userId,
   selectedAlert, 
-  onSelectAlert
+  onSelectAlert,
+  navigatedItemId,
+  onClearNavigatedItem
 }: IntelligencePaneProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+
+  useEffect(() => {
+    if (navigatedItemId && alerts.length > 0) {
+      const found = alerts.find(a => a.id === navigatedItemId);
+      if (found) {
+        onSelectAlert(found);
+        if (onClearNavigatedItem) onClearNavigatedItem();
+      }
+    }
+  }, [navigatedItemId, alerts]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
