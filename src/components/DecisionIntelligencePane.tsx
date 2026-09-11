@@ -1815,8 +1815,18 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
       let chartMeta: any = null;
       let report: any = null;
       let reportSources: any[] = [];
+      let noDataSuggestions: string[] = [];
 
-      if (data.type === "list") {
+      if (data.greeting && data.message) {
+        // Trivial greeting / non-question: backend short-circuited before LLM.
+        modelText = data.message;
+        listItems = undefined;
+      } else if (data.no_data && data.message) {
+        // No relevant data: backend suggests alternative questions.
+        modelText = data.message;
+        listItems = undefined;
+        noDataSuggestions = data.suggestions || [];
+      } else if (data.type === "list") {
         modelText = `Here is the requested intelligence list for "${query}":`;
         listItems = (data.items || []).map((it: any, idx: number) => ({
           id: it.id || `item-${idx}`,
@@ -1858,8 +1868,9 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
         chartMeta,
         report,
         reportSources,
+        noDataSuggestions,
         timestamp: new Date(),
-      };
+      } as any;
 
       setMessages((prev) => [...prev.filter((m) => m.id !== modelId), initialModelMessage]);
 
@@ -1933,6 +1944,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
           ...payload,
           chartBase64: payload.chart || payload.chartBase64 || null,
           chartMeta: payload.chartMeta || null,
+          noDataSuggestions: payload.noDataSuggestions || payload.suggestions || [],
           report: payload.report || null,
           reportSources: payload.reportSources || payload.sources || [],
           listItems: rawItems.map((it: any, idx: number) => ({
@@ -2289,6 +2301,22 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                             </React.Fragment>
                           );
                         })}
+                      </div>
+                    )}
+
+                    {(msg as any).noDataSuggestions && (msg as any).noDataSuggestions.length > 0 && (
+                      <div className="mt-3 flex flex-col gap-2">
+                        {((msg as any).noDataSuggestions as string[]).map((suggestion, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleSend(suggestion)}
+                            className="text-left w-full bg-white border border-[#7c3aed]/60 rounded-[4px] p-2.5 hover:border-[#7c3aed] hover:bg-purple-50/20 transition-all cursor-pointer group/card"
+                          >
+                            <p className="text-[12px] font-sans text-zinc-800 font-medium group-hover/card:text-[#7c3aed] leading-snug">
+                              {suggestion}
+                            </p>
+                          </button>
+                        ))}
                       </div>
                     )}
 
