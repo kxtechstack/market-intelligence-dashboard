@@ -1,6 +1,14 @@
 import React from "react";
 import { ExternalLink, BarChart2 } from "lucide-react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { DecisionReportPayload, InferenceReportPayload, ReportSource } from "../types";
+
+const MODULE_FALLBACK: Record<string, string> = {
+  '777a2b2e-8bb2-44ef-a4f2-1c0c1e03b960': 'Policy & Risk',
+  '55c5ee19-bfca-468b-81b3-b89ca4f303c8': 'Market Dynamics',
+  '2eb989fd-0ea0-4320-b73a-f7eb8b970473': 'Forward Outlook',
+};
 
 interface ReportViewProps {
   report: DecisionReportPayload | InferenceReportPayload;
@@ -61,7 +69,9 @@ export default function ReportView({
               ? "shrink-0 rounded-[3px] px-1.5 py-0.5 text-[9.5px] uppercase tracking-wider font-medium font-sans bg-amber-50 border border-amber-200/80 text-amber-800"
               : "shrink-0 rounded-[3px] px-1.5 py-0.5 text-[9.5px] uppercase tracking-wider font-medium font-sans bg-blue-50 border border-blue-200/80 text-blue-800";
 
-            const pillLabel = isSec ? "10-K" : source.module || "Client";
+            const pillLabel = isSec
+              ? "10-K"
+              : (source.module && MODULE_FALLBACK[source.module]) || source.module || "Client";
 
             const secSuffixParts: string[] = [];
             if (isSec) {
@@ -118,21 +128,70 @@ export default function ReportView({
     );
   };
 
-  // 1. Fallback path: If report.bodyText is a non-empty string, render only that text
+  // 1. Fallback path: If report.bodyText is a non-empty string, render it
+  // as markdown -- this is the framework report shape (SWOT, PESTLE, Five
+  // Forces, Risk Analysis) which comes back from the LLM as text with
+  // **bold headers** and - bullet lists.
   if (report.bodyText && report.bodyText.trim()) {
-    const paragraphs = report.bodyText
-      .split("\n\n")
-      .filter((p) => p.trim().length > 0);
-
+    const hasChartInFallback = Boolean(chart && chart.trim());
     return (
       <div className="w-full">
-        <div className="text-[13px] leading-relaxed text-zinc-800 whitespace-pre-wrap">
-          {paragraphs.map((para, idx) => (
-            <p key={idx} className="mb-2">
-              {para}
-            </p>
-          ))}
+        <div className="markdown-body text-[13px] leading-relaxed font-sans text-zinc-800 space-y-3">
+          <Markdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h3: ({ children }) => (
+                <h3 className="text-[15px] font-bold text-zinc-900 mt-4 mb-2 font-sans border-b border-zinc-200/80 pb-1.5">
+                  {children}
+                </h3>
+              ),
+              h4: ({ children }) => (
+                <h4 className="text-[13.5px] font-bold text-zinc-900 mt-3.5 mb-1.5 font-sans">
+                  {children}
+                </h4>
+              ),
+              p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
+              ul: ({ children }) => (
+                <ul className="list-disc pl-5 my-2 space-y-1 text-zinc-700">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="list-decimal pl-5 my-2 space-y-1 text-zinc-700">{children}</ol>
+              ),
+              li: ({ children }) => (
+                <li className="leading-normal text-[12.5px] py-0.5 text-zinc-700">
+                  {children}
+                </li>
+              ),
+              strong: ({ children }) => (
+                <strong className="font-semibold text-zinc-900">{children}</strong>
+              ),
+              em: ({ children }) => <em className="italic text-zinc-600">{children}</em>,
+            }}
+          >
+            {report.bodyText}
+          </Markdown>
         </div>
+
+        {hasChartInFallback && (
+          <div className="mt-4 pt-3 border-t border-zinc-200/60">
+            <div className="text-[11.5px] font-semibold text-zinc-700 mb-2 flex items-center gap-1.5">
+              <BarChart2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+              <span>
+                {chartMeta?.chartType
+                  ? chartMeta.chartType.charAt(0).toUpperCase() +
+                    chartMeta.chartType.slice(1) +
+                    " Chart"
+                  : "Chart"}
+              </span>
+            </div>
+            <img
+              src={"data:image/png;base64," + chart}
+              alt="Data visualization"
+              className="w-full max-w-md rounded-[4px] border border-zinc-200 bg-white"
+            />
+          </div>
+        )}
+
         {renderSourcesSection()}
       </div>
     );
@@ -238,7 +297,7 @@ export default function ReportView({
           <img
             src={"data:image/png;base64," + chart}
             alt="Data visualization"
-            className="w-full max-w-lg rounded-[4px] border border-zinc-200 bg-white"
+            className="w-full max-w-md rounded-[4px] border border-zinc-200 bg-white"
           />
         </div>
       )}
