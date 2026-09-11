@@ -968,12 +968,21 @@ export default function MarketDynamicsPane({
   useEffect(() => {
     fetchBookmarks();
     fetchHiddenArticles();
+
+    // Listen for bookmark updates from other components
+    const handleUpdate = () => {
+      fetchBookmarks();
+    };
+    window.addEventListener("bookmarks-updated", handleUpdate);
+
     // Debug schema
     async function checkSchema() {
       const { data, error } = await supabase.from("bookmarks").select("*").limit(1);
       console.log("Bookmarks schema check (MarketDynamics):", { data, error });
     }
     checkSchema();
+
+    return () => window.removeEventListener("bookmarks-updated", handleUpdate);
   }, [clientId, userId]);
 
 
@@ -1493,6 +1502,8 @@ export default function MarketDynamicsPane({
                         }
                         // Refresh bookmarks
                         await fetchBookmarks();
+                        // Notify other components
+                        window.dispatchEvent(new CustomEvent("bookmarks-updated"));
                       } catch (err: any) {
                         console.error("Error toggling bookmark:", err);
                         triggerToast(`Failed to update bookmark: ${err.message || "Unknown error"}`);

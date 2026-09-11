@@ -75,370 +75,26 @@ interface QuestionLibraryItem {
   description?: string;
 }
 
-const QUESTION_LIBRARY: QuestionLibraryItem[] = [
-  // --- Decision Intelligence ---
-  { id: "di-1", category: "Decision Intelligence", title: "Expansion Strategy", question: "How should I plan to expand in next one year?" },
-  { id: "di-2", category: "Decision Intelligence", title: "R&D Reallocation", question: "Should we reallocate R&D towards scalp-health serums in the GCC market?" },
-  { id: "di-3", category: "Decision Intelligence", title: "Packaging Transition", question: "Should we switch to refillable aluminum packaging to meet 2027 ESG goals?" },
-  { id: "di-4", category: "Decision Intelligence", title: "Market Defense Strategy", question: "How should we strategically defend market share against emerging indie barrier-repair brands in APAC?" },
-  { id: "di-5", category: "Decision Intelligence", title: "Channel Mix Selection", question: "Should we prioritize specialty retail partnerships over direct eCommerce in LATAM expansion?" },
-  { id: "di-6", category: "Decision Intelligence", title: "Marketing Spend Optimization", question: "Should we shift 40% of digital marketing budget from search ads to dermatologist micro-influencers?" },
-  { id: "di-7", category: "Decision Intelligence", title: "M&A Acquisition Target", question: "Is acquiring a local KSA manufacturing facility viable for Halal certification acceleration?" },
-  { id: "di-8", category: "Decision Intelligence", title: "Supply Chain Hedging", question: "How should we structure long-term forward contracts for biotech peptide complexes under price volatility?" },
-  { id: "di-9", category: "Decision Intelligence", title: "Pricing Tier Alignment", question: "Should we introduce a luxury clinical line priced 25% above current premium tier?" },
-  { id: "di-10", category: "Decision Intelligence", title: "Joint Venture Partner", question: "How should we structure joint venture terms with Japanese department store distributors?" },
-  { id: "di-11", category: "Decision Intelligence", title: "In-Store AI Rollout", question: "Should we deploy skin diagnostic AI kiosks across all 150 flagship retail stores?" },
-  { id: "di-12", category: "Decision Intelligence", title: "Portfolio Rationalization", question: "Which low-performing legacy SKU lines should be phased out in Q4 to optimize working capital?" },
-  { id: "di-13", category: "Decision Intelligence", title: "Localization Strategy", question: "How should we reformulate core moisturizers to adapt to humid Southeast Asian climates?" },
+const ICON_MAP: Record<string, any> = {
+  Microscope, ShieldCheck, TrendingUp, Globe, Sparkles, Package,
+  Users, Scale, Briefcase, Cpu, FileText, BarChart2, LineChart,
+  PieChart, Layers, Target, Zap, Compass,
+};
 
-  // --- Inference ---
-  { id: "inf-1", category: "Inference", title: "Competitor Price Shift", question: "How has the competitors pricing changed in last week?" },
-  { id: "inf-2", category: "Inference", title: "Consumer Sentiment Vector", question: "How has consumer sentiment shifted regarding synthetic vs. bio-fermented hyaluronic acid?" },
-  { id: "inf-3", category: "Inference", title: "Supply Chain Bottlenecks", question: "How are regional port delays in the Strait of Hormuz impacting shipping lead times for raw botanical extracts?" },
-  { id: "inf-4", category: "Inference", title: "In-Store AI Diagnostics ROI", question: "What correlation exists between in-store AI skin analysis engagement and average basket size?" },
-  { id: "inf-5", category: "Inference", title: "Efficacy Claim Sensitivity", question: "How are European consumers responding to 7-day vs 30-day clinical efficacy marketing claims?" },
-  { id: "inf-6", category: "Inference", title: "Competitor Discounting Patterns", question: "What inferred promotional patterns are premium skincare brands running on Amazon US this quarter?" },
-  { id: "inf-7", category: "Inference", title: "Search Intent Volume", question: "How has organic search volume for 'barrier repair cream' grown relative to 'serum' in GCC?" },
-  { id: "inf-8", category: "Inference", title: "Raw Material Price Impact", question: "How will inferred price spikes in palm kernel oil affect gross margins for emulsifiers next quarter?" },
-  { id: "inf-9", category: "Inference", title: "Patent Expiry Risks", question: "What implications arise from major competitor patent expiries in peptide encapsulation technology?" },
-  { id: "inf-10", category: "Inference", title: "Social Commerce Conversion", question: "How does TikTok Shop conversion rate in the UK compare against traditional brand storefronts?" },
-  { id: "inf-11", category: "Inference", title: "Dermatologist Endorsement Impact", question: "What inferred sales lift correlates with board-certified dermatologist social media endorsements?" },
-  { id: "inf-12", category: "Inference", title: "Retail Footfall Correlation", question: "How has high-street footfall recovery in UK shopping districts impacted brick-and-mortar cosmetic sales?" },
-  { id: "inf-13", category: "Inference", title: "Sustainable Packaging Elasticity", question: "What price premium elasticity do consumers display when purchasing ocean-bound plastic certified products?" },
+const CATEGORY_TO_TAB: Record<string, "Decision Intelligence" | "Inference" | "List"> = {
+  "decision": "Decision Intelligence",
+  "inference": "Inference",
+  "list": "List",
+};
 
-  // --- List ---
-  { id: "lst-1", category: "List", title: "Weekly Regulatory Changes", question: "What are the major policy changes in last one week?" },
-  { id: "lst-2", category: "List", title: "Banned Ingredients Update", question: "What ingredients were newly added to the EU Cosmetic Regulation restricted list this month?" },
-  { id: "lst-3", category: "List", title: "Top GCC Distributors", question: "List the top 10 prestige beauty distributors operating in KSA and UAE." },
-  { id: "lst-4", category: "List", title: "Competitor Product Launches", question: "What are the new product launches in anti-aging skincare recorded in APAC during Q2?" },
-  { id: "lst-5", category: "List", title: "SFDA Product Approval Steps", question: "What are the required documentation steps for SFDA cosmetic product registration in Saudi Arabia?" },
-  { id: "lst-6", category: "List", title: "Microbiome Patents Filed", question: "List all recent patent filings related to postbiotic ferment stabilization in 2025-2026." },
-  { id: "lst-7", category: "List", title: "Active Trade Tariff Adjustments", question: "What are the current import tariff rates for personal care items across ASEAN member states?" },
-  { id: "lst-8", category: "List", title: "Eco-Label Certifications", question: "List the globally recognized third-party sustainability certifications for cosmetic packaging." },
-  { id: "lst-9", category: "List", title: "Top Indie Competitors in KSA", question: "Which fast-growing indie skincare brands gained market share in Riyadh last year?" },
-  { id: "lst-10", category: "List", title: "Active Clinical Trial Protocols", question: "What clinical trial protocols are mandated for hypoallergenic dermatologist safety claims?" },
-  { id: "lst-11", category: "List", title: "Key Industry Trade Expos", question: "List the major international cosmetics and supply chain expos scheduled for H2 2026." },
-  { id: "lst-12", category: "List", title: "Key Biotech Supplier Contacts", question: "What are the leading certified suppliers of ferment-derived vegan hyaluronic acid globally?" },
-  { id: "lst-13", category: "List", title: "Scope 3 Emission Benchmark Metrics", question: "What key ESG metrics are required for Scope 3 supply chain disclosure reporting?" },
-];
+interface HomePrompt {
+  icon_name?: string | null;
+  title: string;
+  description?: string | null;
+  question: string;
+}
 
-const INITIAL_PREVIOUS_SESSIONS: ChatSession[] = [
-  {
-    id: "session-1",
-    title: "Evaluating R&D reallocation towards scalp-care formulation in GCC",
-    date: "Today",
-    displayTime: "36 minutes ago",
-    dayGroup: "Today",
-    messages: [
-      {
-        id: "m1",
-        role: "user",
-        text: "Evaluating R&D reallocation towards scalp-care formulation in GCC",
-        timestamp: new Date(Date.now() - 36 * 60 * 1000),
-      },
-      {
-        id: "m2",
-        role: "model",
-        text: "Strategic evaluation for reallocating R&D towards premium scalp-care formulations:\n\n1. **Market Growth**: Scalp care in the GCC is growing at a 14.2% CAGR driven by climate factors and consumer focus on clinical haircare.\n2. **Regulatory Positioning**: SFDA and UAE MoHaP compliance checks require 3-6 months lead time for active ingredient registrations.\n3. **Recommendation**: Pilot a soft launch in UAE/KSA luxury retail before full factory line transition.",
-        timestamp: new Date(Date.now() - 35 * 60 * 1000),
-      },
-    ],
-  },
-  {
-    id: "session-2",
-    title: "Impact of EU Cosmetic Regulation (EC 1223/2009) amendments on active ingredients",
-    date: "Today",
-    displayTime: "5 hours ago",
-    dayGroup: "Today",
-    messages: [
-      {
-        id: "m3",
-        role: "user",
-        text: "Impact of EU Cosmetic Regulation (EC 1223/2009) amendments on active ingredients",
-        timestamp: new Date(Date.now() - 5 * 3600 * 1000),
-      },
-      {
-        id: "m4",
-        role: "model",
-        text: "EU Cosmetics Regulation compliance synthesis:\n\n- Revised concentration limits for specific UV filters and preservatives.\n- Supplier audit required for EU import entry clearance.",
-        timestamp: new Date(Date.now() - 5 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-3",
-    title: "Competitive risk assessment: M&A consolidation in APAC prestige beauty",
-    date: "Today",
-    displayTime: "5 hours ago",
-    dayGroup: "Today",
-    messages: [
-      {
-        id: "m5",
-        role: "user",
-        text: "Competitive risk assessment: M&A consolidation in APAC prestige beauty",
-        timestamp: new Date(Date.now() - 5 * 3600 * 1000),
-      },
-      {
-        id: "m6",
-        role: "model",
-        text: "M&A landscape evaluation for APAC skincare conglomerates focusing on direct-to-consumer premium brands.",
-        timestamp: new Date(Date.now() - 5 * 3600 * 1000 + 120000),
-      },
-    ],
-  },
-  {
-    id: "session-4",
-    title: "Supply chain resilience strategy for sustainable palm oil sourcing in Southeast Asia",
-    date: "Today",
-    displayTime: "11 hours ago",
-    dayGroup: "Today",
-    messages: [
-      {
-        id: "m7",
-        role: "user",
-        text: "Supply chain resilience strategy for sustainable palm oil sourcing in Southeast Asia",
-        timestamp: new Date(Date.now() - 11 * 3600 * 1000),
-      },
-      {
-        id: "m8",
-        role: "model",
-        text: "RSPO certification tracking and dual-sourcing framework to mitigate regional harvest disruption risks.",
-        timestamp: new Date(Date.now() - 11 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-5",
-    title: "Pricing elasticity model for eco-conscious personal care lines in North America",
-    date: "Today",
-    displayTime: "12 hours ago",
-    dayGroup: "Today",
-    messages: [
-      {
-        id: "m9",
-        role: "user",
-        text: "Pricing elasticity model for eco-conscious personal care lines in North America",
-        timestamp: new Date(Date.now() - 12 * 3600 * 1000),
-      },
-      {
-        id: "m10",
-        role: "model",
-        text: "Consumer willingness-to-pay analysis indicates a 12-15% premium threshold for certified ocean-safe packaging.",
-        timestamp: new Date(Date.now() - 12 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-6",
-    title: "Regulatory compliance roadmap for Halal-certified anti-aging serum entry in KSA",
-    date: "Yesterday",
-    displayTime: "yesterday",
-    dayGroup: "Yesterday",
-    messages: [
-      {
-        id: "m11",
-        role: "user",
-        text: "Regulatory compliance roadmap for Halal-certified anti-aging serum entry in KSA",
-        timestamp: new Date(Date.now() - 24 * 3600 * 1000),
-      },
-      {
-        id: "m12",
-        role: "model",
-        text: "SFDA registration process breakdown and Halal certification authority alignment for Saudi retail expansion.",
-        timestamp: new Date(Date.now() - 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-7",
-    title: "Consumer sentiment shifts regarding synthetic vs. bio-fermented hyaluronic acid",
-    date: "2 days ago",
-    displayTime: "2 days ago",
-    dayGroup: "2 days ago",
-    messages: [
-      {
-        id: "m13",
-        role: "user",
-        text: "Consumer sentiment shifts regarding synthetic vs. bio-fermented hyaluronic acid",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m14",
-        role: "model",
-        text: "Analysis of 45,000 online review mentions showing a 28% increase in demand for zero-carbon bio-fermented actives.",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-8",
-    title: "Omnichannel retail expansion strategy: Specialty beauty stores vs. direct eCommerce in LATAM",
-    date: "2 days ago",
-    displayTime: "2 days ago",
-    dayGroup: "2 days ago",
-    messages: [
-      {
-        id: "m15",
-        role: "user",
-        text: "Omnichannel retail expansion strategy: Specialty beauty stores vs. direct eCommerce in LATAM",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m16",
-        role: "model",
-        text: "Channel mix recommendation: Hybrid retail partnership with Sephora Brazil combined with localized MercadoLibre storefronts.",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-9",
-    title: "Evaluating micro-influencer ROI vs. traditional digital advertising in Western Europe",
-    date: "2 days ago",
-    displayTime: "2 days ago",
-    dayGroup: "2 days ago",
-    messages: [
-      {
-        id: "m17",
-        role: "user",
-        text: "Evaluating micro-influencer ROI vs. traditional digital advertising in Western Europe",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m18",
-        role: "model",
-        text: "Comparative attribution study demonstrating 3.2x higher conversion rates for micro-dermatologist partnerships in UK & Germany.",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-10",
-    title: "Strategic positioning against emerging indie barrier-repair brands in Asia-Pacific",
-    date: "2 days ago",
-    displayTime: "2 days ago",
-    dayGroup: "2 days ago",
-    messages: [
-      {
-        id: "m19",
-        role: "user",
-        text: "Strategic positioning against emerging indie barrier-repair brands in Asia-Pacific",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m20",
-        role: "model",
-        text: "Market defense matrix focusing on clinical efficacy messaging and dermatologist endorsement campaigns.",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-11",
-    title: "Sustainable packaging transition timeline: PCR plastic vs. refillable aluminum cartridges",
-    date: "2 days ago",
-    displayTime: "2 days ago",
-    dayGroup: "2 days ago",
-    messages: [
-      {
-        id: "m21",
-        role: "user",
-        text: "Sustainable packaging transition timeline: PCR plastic vs. refillable aluminum cartridges",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m22",
-        role: "model",
-        text: "Lifecycle assessment (LCA) analysis and cost-benefit trade-offs for ESG target fulfillment.",
-        timestamp: new Date(Date.now() - 2 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-12",
-    title: "Scenario assessment: Raw material price volatility in peptide active complexes",
-    date: "3 days ago",
-    displayTime: "3 days ago",
-    dayGroup: "3 days ago",
-    messages: [
-      {
-        id: "m23",
-        role: "user",
-        text: "Scenario assessment: Raw material price volatility in peptide active complexes",
-        timestamp: new Date(Date.now() - 3 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m24",
-        role: "model",
-        text: "Hedging strategies and forward contract commitments for key biotech peptide suppliers.",
-        timestamp: new Date(Date.now() - 3 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-13",
-    title: "Evaluating joint venture opportunities for clean beauty distribution in Japan",
-    date: "3 days ago",
-    displayTime: "3 days ago",
-    dayGroup: "3 days ago",
-    messages: [
-      {
-        id: "m25",
-        role: "user",
-        text: "Evaluating joint venture opportunities for clean beauty distribution in Japan",
-        timestamp: new Date(Date.now() - 3 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m26",
-        role: "model",
-        text: "PMDA registration overview and local department store partnership models in Tokyo & Osaka.",
-        timestamp: new Date(Date.now() - 3 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-14",
-    title: "Consumer adoption drivers for personalized AI skincare diagnostics in retail stores",
-    date: "3 days ago",
-    displayTime: "3 days ago",
-    dayGroup: "3 days ago",
-    messages: [
-      {
-        id: "m27",
-        role: "user",
-        text: "Consumer adoption drivers for personalized AI skincare diagnostics in retail stores",
-        timestamp: new Date(Date.now() - 3 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m28",
-        role: "model",
-        text: "In-store conversion uplift data showing a 34% higher basket size following AI skin analysis interaction.",
-        timestamp: new Date(Date.now() - 3 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-  {
-    id: "session-15",
-    title: "Competitive intelligence report: Patent filing trends in microbiome skincare 2024-2026",
-    date: "4 days ago",
-    displayTime: "4 days ago",
-    dayGroup: "4 days ago",
-    messages: [
-      {
-        id: "m29",
-        role: "user",
-        text: "Competitive intelligence report: Patent filing trends in microbiome skincare 2024-2026",
-        timestamp: new Date(Date.now() - 4 * 24 * 3600 * 1000),
-      },
-      {
-        id: "m30",
-        role: "model",
-        text: "Patent landscape mapping revealing accelerated filings in postbiotic ferment stabilization technologies.",
-        timestamp: new Date(Date.now() - 4 * 24 * 3600 * 1000 + 60000),
-      },
-    ],
-  },
-];
+const QUESTION_LIBRARY: QuestionLibraryItem[] = [];
 
 const DUMMY_LIST_RESPONSES: Record<string, Array<{ id: string; title: string; category: string; date: string; summary: string; impact?: string }>> = {
   "lst-1": [
@@ -939,46 +595,28 @@ interface DecisionIntelligencePaneProps {
   userId?: string;
 }
 
-const getTargetTabInfo = (item: { title: string; category?: string; summary?: string }) => {
-  const cat = (item.category || "").toLowerCase();
-  const title = (item.title || "").toLowerCase();
+const MODULE_TO_TAB: Record<string, { tabId: string; tabLabel: string }> = {
+  "Policy & Risk": { tabId: "policy_risk_monitor", tabLabel: "Policy & Risk Monitor" },
+  "Market Dynamics": { tabId: "market_dynamics", tabLabel: "Market Dynamics" },
+  "Forward Outlook": { tabId: "foreward_outlook", tabLabel: "Forward Outlook" },
+  "Competitive Radar": { tabId: "competitive_radar", tabLabel: "Competitive Radar" },
+  "Voice of Customer": { tabId: "voice_of_customer", tabLabel: "Voice of Customer" },
+};
 
-  if (
-    cat.includes("policy") || cat.includes("regulatory") || cat.includes("restriction") ||
-    cat.includes("directive") || cat.includes("ban") || cat.includes("tariff") ||
-    cat.includes("compliance") || cat.includes("protocol") || cat.includes("sfda") ||
-    cat.includes("esg") || cat.includes("audit") || cat.includes("standard") || cat.includes("trade") ||
-    title.includes("sfda") || title.includes("regulation") || title.includes("directive") || title.includes("ban")
-  ) {
+const getTargetTabInfo = (item: { title?: string; category?: string; module?: string }) => {
+  if (item.module && MODULE_TO_TAB[item.module]) {
+    return MODULE_TO_TAB[item.module];
+  }
+  const cat = (item.category || "").toLowerCase();
+  if (cat.includes("policy") || cat.includes("regulatory") || cat.includes("compliance")) {
     return { tabId: "policy_risk_monitor", tabLabel: "Policy & Risk Monitor" };
   }
-
-  if (
-    cat.includes("market") || cat.includes("retail") || cat.includes("growth") ||
-    cat.includes("sales") || cat.includes("lead") || cat.includes("ksa") || cat.includes("brand") ||
-    cat.includes("franchise") || title.includes("market") || title.includes("retail") || title.includes("growth")
-  ) {
+  if (cat.includes("market") || cat.includes("industry structure")) {
     return { tabId: "market_dynamics", tabLabel: "Market Dynamics" };
   }
-
-  if (
-    cat.includes("patent") || cat.includes("biotech") || cat.includes("launch") ||
-    cat.includes("outlook") || cat.includes("event") || cat.includes("expo") ||
-    cat.includes("supplier") || cat.includes("fermentation") || cat.includes("prestige") ||
-    cat.includes("innovation") || cat.includes("emission") || cat.includes("circular") ||
-    title.includes("patent") || title.includes("launch") || title.includes("expo")
-  ) {
+  if (cat.includes("technology") || cat.includes("product") || cat.includes("sustainability") || cat.includes("horizon")) {
     return { tabId: "foreward_outlook", tabLabel: "Forward Outlook" };
   }
-
-  if (cat.includes("competitive") || cat.includes("radar")) {
-    return { tabId: "competitive_radar", tabLabel: "Competitive Radar" };
-  }
-
-  if (cat.includes("consumer") || cat.includes("voice") || cat.includes("sentiment")) {
-    return { tabId: "voice_of_customer", tabLabel: "Voice of Customer" };
-  }
-
   return { tabId: "policy_risk_monitor", tabLabel: "Policy & Risk Monitor" };
 };
 
@@ -1177,6 +815,8 @@ export default function DecisionIntelligencePane({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [savedMessageIds, setSavedMessageIds] = useState<Record<string, boolean>>({});
   const [sharedMessageIds, setSharedMessageIds] = useState<Record<string, boolean>>({});
+  const [homeQuestions, setHomeQuestions] = useState<HomePrompt[]>([]);
+  const [libraryQuestions, setLibraryQuestions] = useState<QuestionLibraryItem[]>([]);
 
   const handleSaveMessage = (id: string) => {
     setSavedMessageIds((prev) => {
@@ -1440,18 +1080,9 @@ export default function DecisionIntelligencePane({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
-  const [previousSessions, setPreviousSessions] = useState<ChatSession[]>(() => {
-    try {
-      const saved = localStorage.getItem("decision_intelligence_sessions_v5");
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_PREVIOUS_SESSIONS;
-  });
-  const [activeSessionId, setActiveSessionId] = useState<string | null>("session-1");
+  const [previousSessions, setPreviousSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [showPreviousChatsModal, setShowPreviousChatsModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
@@ -1471,12 +1102,93 @@ export default function DecisionIntelligencePane({
   }, [messages, loading]);
 
   useEffect(() => {
+    if (!clientId) return;
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          clientId,
+          industry: industry || "",
+        });
+
+        const [homeRes, libRes] = await Promise.all([
+          fetch(`${API_URL}/decision-intelligence/suggested-questions?${params.toString()}&surface=home`),
+          fetch(`${API_URL}/decision-intelligence/suggested-questions?${params.toString()}&surface=library`),
+        ]);
+
+        if (homeRes.ok) {
+          const { questions } = await homeRes.json();
+          if (Array.isArray(questions)) setHomeQuestions(questions);
+        }
+
+        if (libRes.ok) {
+          const { questions } = await libRes.json();
+          if (Array.isArray(questions)) {
+            setLibraryQuestions(
+              questions.map((q: any) => ({
+                id: q.id,
+                category: CATEGORY_TO_TAB[q.category] ?? "Decision Intelligence",
+                title: q.title,
+                question: q.question,
+                description: q.description ?? undefined,
+              }))
+            );
+          }
+        }
+      } catch (e) {
+        console.error("[DI] Failed to load suggested questions", e);
+      }
+    })();
+  }, [clientId, industry]);
+
+  const loadConversations = async () => {
+    if (!userId) return;
     try {
-      localStorage.setItem("decision_intelligence_sessions_v5", JSON.stringify(previousSessions));
+      const res = await fetch(
+        `${API_URL}/decision-intelligence/conversations?userId=${encodeURIComponent(userId)}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { conversations } = await res.json();
+      const mapped: ChatSession[] = (conversations || []).map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        date: "",
+        displayTime: relativeTime(c.updated_at),
+        dayGroup: groupDay(c.updated_at),
+        messages: [],
+      }));
+      setPreviousSessions(mapped);
     } catch (e) {
-      console.error(e);
+      console.error("[DI] Failed to load conversations", e);
     }
-  }, [previousSessions]);
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    loadConversations();
+  }, [userId]);
+
+  function relativeTime(iso: string): string {
+    if (!iso) return "";
+    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    if (diff < 172800) return "yesterday";
+    return `${Math.floor(diff / 86400)} days ago`;
+  }
+
+  function groupDay(iso: string): string {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const today = new Date();
+    const diff = Math.floor(
+      (Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+        - Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000
+    );
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    return "Earlier";
+  }
 
   const generateItemDetailExplanation = (item: {
     title: string;
@@ -2056,289 +1768,185 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
       timestamp: new Date(),
     };
 
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
 
-    const qLower = query.toLowerCase();
-    const isListQuestion =
-      categoryHint === "List" ||
-      QUESTION_LIBRARY.some(
-        (q) =>
-          q.category === "List" &&
-          (q.question.toLowerCase() === qLower ||
-            q.title.toLowerCase() === qLower ||
-            q.id === textToSend)
-      ) ||
-      qLower.startsWith("what are the major policy changes") ||
-      qLower.startsWith("list") ||
-      (qLower.includes("list") && !qLower.includes("checklist"));
-
-    // Helper function to stream message text progressively
-    const streamMessageText = (
-      modelId: string,
-      fullText: string,
-      sourcesList: any[] = [],
-      linkInfoVal?: any,
-      listItemsVal?: any[]
-    ) => {
-      const words = fullText.split(/(\s+)/);
-      let currentIndex = 0;
-      let streamedText = "";
-
-      // Add the initial message with empty text
-      const initialModelMessage: ChatMessage = {
-        id: modelId,
-        role: "model",
-        text: "",
-        sources: sourcesList,
-        linkInfo: linkInfoVal,
-        listItems: listItemsVal,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => {
-        const filtered = prev.filter((m) => m.id !== modelId);
-        return [...filtered, initialModelMessage];
-      });
-
-      // Stream words
-      const wordsPerTick = 12; // buttery fast streaming speed
-      const intervalTime = 25; // ms per tick
-
-      const timer = setInterval(() => {
-        if (currentIndex >= words.length) {
-          clearInterval(timer);
-          setLoading(false);
-          // Update the session in localStorage after stream completes
-          setMessages((prev) => {
-            const finalMsgs = prev.map((msg) =>
-              msg.id === modelId ? { ...msg, text: fullText } : msg
-            );
-            updateOrAddSession(query, finalMsgs);
-            return finalMsgs;
-          });
-          return;
-        }
-
-        // Add next chunk of words
-        const nextWords = words.slice(currentIndex, currentIndex + wordsPerTick).join("");
-        currentIndex += wordsPerTick;
-        streamedText += nextWords;
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === modelId ? { ...msg, text: streamedText } : msg
-          )
-        );
-      }, intervalTime);
+    const typeMap: Record<string, string> = {
+      "List": "list",
+      "Inference": "inference",
+      "Decision Intelligence": "decision",
     };
-
-    if (isListQuestion) {
-      setTimeout(() => {
-        const listItems = getDummyListItems(query);
-        const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-        streamMessageText(
-          modelId,
-          `Here is the requested intelligence list for "${query}":`,
-          [],
-          undefined,
-          listItems
-        );
-      }, 400);
-      return;
-    }
+    const explicitType = categoryHint ? typeMap[categoryHint] : undefined;
 
     try {
-      // First try local backend endpoint /api/ask
-      const response = await fetch("/api/ask", {
+      const response = await fetch(`${API_URL}/decision-intelligence/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: query,
           clientId: clientId,
           industry: industry,
-          moduleId: "decision_intelligence",
+          userId: userId,
+          conversationId: currentConversationId || undefined,
+          ...(explicitType ? { type: explicitType } : {}),
         }),
       });
 
-      const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      if (response.ok) {
-        const data = await response.json();
-        let answerText = data.answer || data.text || "";
-        
-        // If response is missing structure (or error), use structured inference generator
-        if (!answerText || answerText.length < 50 || answerText.includes("Failed to connect")) {
-          answerText = getStructuredInferenceResponse(query);
-        }
+      const data = await response.json();
 
-        streamMessageText(
-          modelId,
-          answerText,
-          data.sources || [],
-          undefined,
-          undefined
-        );
-      } else {
-        throw new Error("Failed response from server");
+      if (data.conversationId && !currentConversationId) {
+        setCurrentConversationId(data.conversationId);
+        setActiveSessionId(data.conversationId);
       }
-    } catch (error) {
-      const fallbackText = getStructuredInferenceResponse(query);
+
+      // Refresh conversations list immediately so the new chat history item is visible without a page refresh
+      loadConversations();
+
       const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-      streamMessageText(
-        modelId,
-        fallbackText,
-        [],
-        undefined,
-        undefined
-      );
-    }
-  };
 
-  const updateOrAddSession = (firstQuery: string, currentMsgs: ChatMessage[]) => {
-    if (activeSessionId) {
-      setPreviousSessions((prev) =>
-        prev.map((s) => (s.id === activeSessionId ? { ...s, messages: currentMsgs } : s))
-      );
-    } else {
-      const newId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-      const newSession: ChatSession = {
-        id: newId,
-        title: firstQuery,
-        date: "Today",
-        displayTime: "Just now",
-        dayGroup: "Today",
-        messages: currentMsgs,
+      let modelText = "";
+      let listItems: any[] | undefined = undefined;
+      let sources: any[] = [];
+      let chartBase64: string | null = null;
+      let chartMeta: any = null;
+
+      if (data.type === "list") {
+        modelText = `Here is the requested intelligence list for "${query}":`;
+        listItems = (data.items || []).map((it: any, idx: number) => ({
+          id: it.id || `item-${idx}`,
+          title: it.title || "",
+          category: it.category || "",
+          summary: it.summary || "",
+          impact: it.impact || undefined,
+          module: it.module || undefined,
+          parentLabel: it.parentLabel || undefined,
+        }));
+      } else if (data.type === "inference") {
+        modelText = data.answer || "";
+        sources = data.sources || [];
+      } else if (data.type === "decision") {
+        modelText = data.answer || "";
+        sources = data.sources || [];
+        chartBase64 = data.chart || null;
+        chartMeta = data.chartMeta || null;
+      } else {
+        modelText = data.answer || data.text || "";
+      }
+
+      const words = modelText.split(/(\s+)/);
+      let currentIndex = 0;
+      let streamedText = "";
+
+      const initialModelMessage: ChatMessage = {
+        id: modelId,
+        role: "model",
+        text: "",
+        sources,
+        listItems,
+        chartBase64,
+        chartMeta,
+        timestamp: new Date(),
       };
-      setPreviousSessions((prev) => [newSession, ...prev]);
-      setActiveSessionId(newId);
+
+      setMessages((prev) => [...prev.filter((m) => m.id !== modelId), initialModelMessage]);
+
+      const wordsPerTick = 12;
+      const intervalTime = 25;
+
+      const timer = setInterval(() => {
+        if (currentIndex >= words.length) {
+          clearInterval(timer);
+          setLoading(false);
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === modelId ? { ...msg, text: modelText } : msg))
+          );
+          loadConversations();
+          return;
+        }
+        const nextWords = words.slice(currentIndex, currentIndex + wordsPerTick).join("");
+        currentIndex += wordsPerTick;
+        streamedText += nextWords;
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === modelId ? { ...msg, text: streamedText } : msg))
+        );
+      }, intervalTime);
+    } catch (err) {
+      console.error("[DI] handleSend failed", err);
+      setLoading(false);
+
+      const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: modelId,
+          role: "model",
+          text: "Sorry, I couldn't reach the intelligence service. Please try again.",
+          timestamp: new Date(),
+        },
+      ]);
     }
   };
 
-  const handleSelectSession = (session: ChatSession) => {
-    setMessages(session.messages || []);
-    setActiveSessionId(session.id);
+  const updateOrAddSession = (_firstQuery: string, _currentMsgs: ChatMessage[]) => {
+    // No-op — backend already saved both messages during handleSend.
+  };
+
+  const handleSelectSession = async (session: ChatSession) => {
     setShowPreviousChatsModal(false);
+    setActiveSessionId(session.id);
+    setCurrentConversationId(session.id);
+    try {
+      const res = await fetch(
+        `${API_URL}/decision-intelligence/conversations/${session.id}?userId=${encodeURIComponent(userId)}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const hydrated: ChatMessage[] = (data.messages || []).map((m: any) => {
+        if (m.role === "user") {
+          return {
+            id: m.id,
+            role: "user",
+            text: m.content || "",
+            timestamp: new Date(m.created_at),
+          };
+        }
+        const payload = m.payload || {};
+        const rawItems = payload.items || payload.listItems || [];
+        return {
+          id: m.id,
+          role: "model",
+          text: m.content || "",
+          timestamp: new Date(m.created_at),
+          ...payload,
+          chartBase64: payload.chart || payload.chartBase64 || null,
+          chartMeta: payload.chartMeta || null,
+          listItems: rawItems.map((it: any, idx: number) => ({
+            id: it.id || `item-${idx}`,
+            title: it.title || "",
+            category: it.category || "",
+            summary: it.summary || "",
+            impact: it.impact || undefined,
+            module: it.module || undefined,
+            parentLabel: it.parentLabel || undefined,
+          })),
+        };
+      });
+      setMessages(hydrated);
+    } catch (e) {
+      console.error("[DI] Failed to load conversation", e);
+      setMessages([]);
+    }
   };
 
   const handleNewChat = () => {
     setMessages([]);
     setActiveSessionId(null);
+    setCurrentConversationId(null);
     setShowPreviousChatsModal(false);
   };
-
-  const samplePrompts = [
-    {
-      icon: Microscope,
-      title: "Scalp Health R&D Reallocation",
-      description: "Evaluate shifting 15% of formula budget towards clinical scalp-care actives in GCC.",
-      question: "Should we reallocate R&D towards scalp-health serums in the GCC market?",
-    },
-    {
-      icon: ShieldCheck,
-      title: "EU Compliance & Sourcing",
-      description: "Assess EC 1223/2009 regulation updates on active ingredients and import clearance.",
-      question: "Evaluate EU compliance impact on supply chain sourcing and ingredient registration.",
-    },
-    {
-      icon: TrendingUp,
-      title: "APAC Competitor M&A Threats",
-      description: "Analyze market consolidation risk among indie skincare acquisitions in Asia-Pacific.",
-      question: "Assess competitor M&A threats in Near-Term horizon in the APAC prestige beauty sector.",
-    },
-    {
-      icon: Globe,
-      title: "KSA Halal Anti-Aging Entry",
-      description: "Review SFDA regulatory roadmap and Halal certification requirements for Saudi retail expansion.",
-      question: "What is the regulatory compliance roadmap for Halal anti-aging serum entry in KSA?",
-    },
-    {
-      icon: Sparkles,
-      title: "Bio-Fermented Actives Sentiment",
-      description: "Measure consumer sentiment shifts regarding zero-carbon bio-fermented actives vs synthetics.",
-      question: "Analyze consumer sentiment shifts regarding synthetic vs bio-fermented hyaluronic acid.",
-    },
-    {
-      icon: Package,
-      title: "Sustainable Packaging LCA",
-      description: "Compare PCR plastic vs refillable aluminum cartridges for 2027 ESG target fulfillment.",
-      question: "Compare PCR plastic vs refillable aluminum cartridges for sustainable packaging transition.",
-    },
-    {
-      icon: Users,
-      title: "Micro-Influencer vs Ads ROI",
-      description: "Evaluate conversion rates and CAC across micro-dermatologist partnerships in Western Europe.",
-      question: "Evaluate micro-influencer ROI vs traditional digital advertising in Western Europe.",
-    },
-    {
-      icon: Scale,
-      title: "Peptide Raw Material Volatility",
-      description: "Model forward contract strategies and risk hedging for key biotech peptide complex suppliers.",
-      question: "Perform a scenario assessment on raw material price volatility in peptide active complexes.",
-    },
-    {
-      icon: Briefcase,
-      title: "Japan Clean Beauty JV",
-      description: "Evaluate PMDA registration and department store joint venture models in Tokyo & Osaka.",
-      question: "Evaluate joint venture opportunities for clean beauty distribution in Japan.",
-    },
-    {
-      icon: Cpu,
-      title: "In-Store AI Skincare Diagnostics",
-      description: "Measure basket-size uplift and adoption metrics for in-store personalized AI skin analysis.",
-      question: "What are the consumer adoption drivers for personalized AI skincare diagnostics in stores?",
-    },
-    {
-      icon: FileText,
-      title: "Microbiome Patent Landscape",
-      description: "Map patent filing acceleration in postbiotic ferment stabilization technologies 2024-2026.",
-      question: "Generate a competitive intelligence report on patent filing trends in microbiome skincare.",
-    },
-    {
-      icon: BarChart2,
-      title: "LATAM Omnichannel Mix",
-      description: "Compare specialty beauty retail partnerships vs localized MercadoLibre storefronts.",
-      question: "Evaluate LATAM omnichannel retail expansion: Specialty beauty vs direct eCommerce.",
-    },
-    {
-      icon: LineChart,
-      title: "GCC Scalp Care CAGR Analysis",
-      description: "Forecast market growth drivers and climate factors fueling 14.2% CAGR in Saudi & UAE.",
-      question: "Forecast market growth drivers and climate factors fueling scalp care growth in GCC.",
-    },
-    {
-      icon: PieChart,
-      title: "DTC Price Elasticity Model",
-      description: "Determine willingness-to-pay premium thresholds for ocean-safe certified packaging.",
-      question: "Model pricing elasticity for eco-conscious personal care lines in North America.",
-    },
-    {
-      icon: Layers,
-      title: "Supply Chain Dual-Sourcing",
-      description: "Implement RSPO certification tracking to mitigate regional harvest disruption risks.",
-      question: "How do we build supply chain resilience for sustainable palm oil sourcing in Southeast Asia?",
-    },
-    {
-      icon: Target,
-      title: "Defense Against Indie Brands",
-      description: "Formulate clinical efficacy messaging to counter barrier-repair indie brand growth.",
-      question: "Develop a market defense matrix against emerging barrier-repair indie brands in APAC.",
-    },
-    {
-      icon: Zap,
-      title: "Dermatologist Campaign Uplift",
-      description: "Assess sales impact of clinical endorsement campaigns across premium skincare channels.",
-      question: "What is the projected revenue uplift from clinical dermatologist endorsement campaigns?",
-    },
-    {
-      icon: Compass,
-      title: "Scope 3 ESG Footprint Audit",
-      description: "Analyze supply chain emissions and benchmark against global beauty sustainability standards.",
-      question: "Benchmark Scope 3 supply chain emissions against global beauty ESG standards.",
-    },
-  ];
 
   // Group previous chats by dayGroup and insert line separators between days
   const filteredSessions = previousSessions.filter((s) => {
@@ -2372,8 +1980,12 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
               {/* Horizontal Scrollable Prompt Cards */}
               <div className="w-full max-w-5xl mt-6 relative">
                 <div className="flex items-stretch gap-3 overflow-x-auto pb-3 pt-1 px-1 scrollbar-thin scroll-smooth w-full">
-                  {samplePrompts.map((item, idx) => {
-                    return (
+                  {homeQuestions.length === 0 ? (
+                    <div className="text-center py-6 text-[11px] text-zinc-400 font-sans">
+                      Loading suggested questions…
+                    </div>
+                  ) : (
+                    homeQuestions.map((item, idx) => (
                       <button
                         key={idx}
                         onClick={() => handleSend(item.question)}
@@ -2388,8 +2000,8 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                           </p>
                         </div>
                       </button>
-                    );
-                  })}
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -2634,6 +2246,11 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                       {item.category}
                                     </span>
                                   )}
+                                  {item.parentLabel && (
+                                    <span className="self-start px-2 py-0.5 text-[10px] font-sans font-medium bg-zinc-100 border border-zinc-200 text-zinc-600 rounded-[3px]">
+                                      {item.parentLabel}
+                                    </span>
+                                  )}
                                 </div>
 
                                 <div className="flex items-center gap-3 shrink-0">
@@ -2653,6 +2270,24 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                             </React.Fragment>
                           );
                         })}
+                      </div>
+                    )}
+
+                    {msg.role === "model" && msg.chartBase64 && (
+                      <div className="mt-3 pt-3 border-t border-zinc-200/60">
+                        <div className="text-[11.5px] font-semibold text-zinc-700 mb-2 flex items-center gap-1.5">
+                          <BarChart2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+                          <span>
+                            {msg.chartMeta?.chartType
+                              ? `${msg.chartMeta.chartType.charAt(0).toUpperCase() + msg.chartMeta.chartType.slice(1)} Chart`
+                              : "Chart"}
+                          </span>
+                        </div>
+                        <img
+                          src={`data:image/png;base64,${msg.chartBase64}`}
+                          alt="Data visualization"
+                          className="w-full max-w-lg rounded-[4px] border border-zinc-200 bg-white"
+                        />
                       </div>
                     )}
 
@@ -2743,6 +2378,15 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
         <div className="w-full max-w-5xl mx-auto px-4 pb-6 pt-2 shrink-0">
           {/* Action links outside top right of text area */}
           <div className="flex justify-end items-center gap-4 mb-2">
+            {messages.length > 0 && (
+              <button
+                onClick={handleNewChat}
+                className="inline-flex items-center gap-1.5 text-[11.5px] text-[#7c3aed] hover:text-[#5b21b6] transition-colors font-sans cursor-pointer font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Chat</span>
+              </button>
+            )}
             <button
               onClick={() => setShowQuestionLibraryModal(true)}
               className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-600 hover:text-zinc-900 transition-colors font-sans cursor-pointer"
@@ -2751,7 +2395,10 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
               <span>Suggested Questions</span>
             </button>
             <button
-              onClick={() => setShowPreviousChatsModal(true)}
+              onClick={() => {
+                loadConversations();
+                setShowPreviousChatsModal(true);
+              }}
               className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-600 hover:text-zinc-900 transition-colors font-sans cursor-pointer"
             >
               <Clock className="w-3.5 h-3.5 text-zinc-500" />
@@ -2956,7 +2603,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
             <div className="px-6 border-b border-zinc-100 bg-zinc-50/50 flex items-center gap-2 shrink-0 pt-2">
               {(["Decision Intelligence", "Inference", "List"] as const).map((tab) => {
                 const isActive = selectedLibraryTab === tab;
-                const count = QUESTION_LIBRARY.filter((q) => q.category === tab).length;
+                const count = libraryQuestions.filter((q) => q.category === tab).length;
                 return (
                   <button
                     key={tab}
@@ -2979,7 +2626,15 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
             {/* Modal Body / Questions List */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {(() => {
-                const filtered = QUESTION_LIBRARY.filter((q) => {
+                if (libraryQuestions.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-zinc-400 text-[11px] font-sans">
+                      Loading questions…
+                    </div>
+                  );
+                }
+
+                const filtered = libraryQuestions.filter((q) => {
                   const matchesTab = q.category === selectedLibraryTab;
                   const matchesSearch =
                     q.question.toLowerCase().includes(librarySearchQuery.toLowerCase()) ||

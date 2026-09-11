@@ -242,6 +242,13 @@ export default function IntelligencePane({
     fetchBookmarks();
     fetchDailyHighlight();
     fetchHiddenArticles();
+
+    // Listen for bookmark updates from other components
+    const handleUpdate = () => {
+      fetchBookmarks();
+    };
+    window.addEventListener("bookmarks-updated", handleUpdate);
+    return () => window.removeEventListener("bookmarks-updated", handleUpdate);
   }, [clientId, userId]);
 
   useEffect(() => {
@@ -1308,6 +1315,8 @@ export default function IntelligencePane({
                         }
                         // Refresh bookmarks
                         await fetchBookmarks();
+                        // Notify other components
+                        window.dispatchEvent(new CustomEvent("bookmarks-updated"));
                       } catch (err) {
                         console.error("Error toggling bookmark:", err);
                         triggerToast("Failed to update bookmark");

@@ -61,9 +61,9 @@ export default function MyBookmarksPane({ clientId, userId, onNavigate }: MyBook
     setSortBy("recent");
   };
 
-  const fetchBookmarks = async () => {
+  const fetchBookmarks = async (silent = false) => {
     if (!clientId || !userId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     
     try {
       const { data: bData, error } = await supabase
@@ -72,7 +72,10 @@ export default function MyBookmarksPane({ clientId, userId, onNavigate }: MyBook
           created_at,
           policy_signal_id,
           market_insight_id,
-          trend_cluster_id
+          trend_cluster_id,
+          policy_signals (*),
+          market_insights:market_insights_live (*),
+          trend_clusters (*)
         `)
         .eq("client_id", clientId)
         .eq("user_id", userId)
@@ -82,45 +85,46 @@ export default function MyBookmarksPane({ clientId, userId, onNavigate }: MyBook
 
       const policyRisk: any[] = [];
       const marketDynamics: any[] = [];
-      const forwardOutlook: any[] = [];
+      let forwardOutlook: any[] = [];
 
-      const policySignalIds = (bData || []).map(b => b.policy_signal_id).filter(Boolean);
-      const marketInsightIds = (bData || []).map(b => b.market_insight_id).filter(Boolean);
-      const trendClusterIds = (bData || []).map(b => b.trend_cluster_id).filter(Boolean);
-
-      // Run independent queries in parallel to allow PostgreSQL to push IN conditions into views
-      const [
-        { data: policyData },
-        { data: marketData },
-        { data: trendClusterData },
-        { data: snapshotData }
-      ] = await Promise.all([
-        policySignalIds.length > 0 ? supabase.from("policy_signals").select("*").in("id", policySignalIds) : Promise.resolve({ data: [] }),
-        marketInsightIds.length > 0 ? supabase.from("market_insights_live").select("*").in("id", marketInsightIds) : Promise.resolve({ data: [] }),
-        trendClusterIds.length > 0 ? supabase.from("trend_clusters").select("*").in("id", trendClusterIds) : Promise.resolve({ data: [] }),
-        trendClusterIds.length > 0 ? supabase.from("trend_snapshots_latest").select("*").in("trend_id", trendClusterIds) : Promise.resolve({ data: [] })
-      ]);
-
-      const policyMap = new Map((policyData || []).map((p: any) => [p.id, p]));
-      const marketMap = new Map((marketData || []).map((m: any) => [m.id, m]));
-      const trendClusterMap = new Map((trendClusterData || []).map((t: any) => [t.id, t]));
-      const snapshotMap = new Map((snapshotData || []).map((s: any) => [s.trend_id, s]));
+      const trendClusterIds: string[] = [];
 
       (bData || []).forEach((b: any) => {
         const commonData = {
           bookmark_created_at: b.created_at,
           _bookmarkId: b.policy_signal_id || b.market_insight_id || b.trend_cluster_id
         };
-        if (b.policy_signal_id && policyMap.has(b.policy_signal_id)) {
-          policyRisk.push({ ...policyMap.get(b.policy_signal_id), ...commonData, _bookmarkType: "policy_risk" });
-        } else if (b.market_insight_id && marketMap.has(b.market_insight_id)) {
-          marketDynamics.push({ ...marketMap.get(b.market_insight_id), ...commonData, _bookmarkType: "market_dynamics" });
-        } else if (b.trend_cluster_id && trendClusterMap.has(b.trend_cluster_id)) {
-          const cluster = trendClusterMap.get(b.trend_cluster_id);
-          const snap = snapshotMap.get(b.trend_cluster_id) || {};
-          forwardOutlook.push({ ...cluster, ...snap, ...commonData, _bookmarkType: "forward_outlook" });
+        if (b.policy_signal_id && b.policy_signals) {
+          policyRisk.push({ ...b.policy_signals, ...commonData, _bookmarkType: "policy_risk" });
+        } else if (b.market_insight_id && b.market_insights) {
+          marketDynamics.push({ ...b.market_insights, ...commonData, _bookmarkType: "market_dynamics" });
+        } else if (b.trend_cluster_id && b.trend_clusters) {
+          trendClusterIds.push(b.trend_cluster_id);
+          forwardOutlook.push({ ...b.trend_clusters, ...commonData, _bookmarkType: "forward_outlook" });
         }
       });
+
+      // Enhance forward outlook items with snapshot data for accurate impact_level and summary
+      if (trendClusterIds.length > 0) {
+        try {
+          const { data: snapshotData, error: snapshotError } = await supabase
+            .from("trend_snapshots_latest")
+            .select("*")
+            .in("trend_id", trendClusterIds);
+            
+          if (!snapshotError && snapshotData) {
+            forwardOutlook = forwardOutlook.map(item => {
+              const snap = snapshotData.find(s => s.trend_id === item._bookmarkId);
+              if (snap) {
+                return { ...item, ...snap };
+              }
+              return item;
+            });
+          }
+        } catch (snapErr) {
+          console.error("Error fetching trend snapshots:", snapErr);
+        }
+      }
 
       setBookmarks({
         policyRisk,
@@ -137,6 +141,13 @@ export default function MyBookmarksPane({ clientId, userId, onNavigate }: MyBook
 
   useEffect(() => {
     fetchBookmarks();
+    
+    // Listen for bookmark updates from other components
+    const handleUpdate = () => {
+      fetchBookmarks(true);
+    };
+    window.addEventListener("bookmarks-updated", handleUpdate);
+    return () => window.removeEventListener("bookmarks-updated", handleUpdate);
   }, [clientId, userId]);
 
   const handleUnbookmark = async (type: string, id: string, e: React.MouseEvent) => {
@@ -169,6 +180,9 @@ export default function MyBookmarksPane({ clientId, userId, onNavigate }: MyBook
         .eq(col, id);
 
       if (error) throw error;
+      
+      // Notify other components
+      window.dispatchEvent(new CustomEvent("bookmarks-updated"));
     } catch (err) {
       console.error("Error unbookmarking:", err);
       // Revert on error

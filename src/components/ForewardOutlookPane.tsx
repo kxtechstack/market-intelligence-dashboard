@@ -1163,12 +1163,21 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
   useEffect(() => {
     fetchBookmarks();
     fetchHiddenArticles();
+
+    // Listen for bookmark updates from other components
+    const handleUpdate = () => {
+      fetchBookmarks();
+    };
+    window.addEventListener("bookmarks-updated", handleUpdate);
+
     // Debug schema
     async function checkSchema() {
       const { data, error } = await supabase.from("bookmarks").select("*").limit(1);
       console.log("Bookmarks schema check:", { data, error });
     }
     checkSchema();
+
+    return () => window.removeEventListener("bookmarks-updated", handleUpdate);
   }, [clientId, userId]);
 
   // Load fallback dates matching Policy & Risk Monitor defaults
@@ -1951,6 +1960,8 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                           }
                           // Refresh bookmarks
                           await fetchBookmarks();
+                          // Notify other components
+                          window.dispatchEvent(new CustomEvent("bookmarks-updated"));
                         } catch (err: any) {
                           console.error("Error toggling bookmark:", err);
                           triggerToast(`Failed to update bookmark: ${err.message || "Unknown error"}`);

@@ -345,23 +345,23 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                 />
                 
                 <div className="border border-zinc-200 rounded-[8px] overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse table-fixed">
                     <thead>
                       <tr className="bg-[#fbfbfb] border-b border-zinc-100">
-                        <th className="px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Name</th>
-                        <th className="px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Designation</th>
-                        <th className="px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Email</th>
-                        <th className="px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right">Status</th>
+                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest !text-left">Name</th>
+                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest !text-left">Designation</th>
+                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest !text-left">Email</th>
+                        <th className="w-[10%] px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
                       {users.length > 0 ? (
                         users.map((user, idx) => (
                           <tr key={idx} className="hover:bg-zinc-50/30 transition-colors">
-                            <td className="px-3.5 py-2.5 text-[13px] text-zinc-900 font-bold">{user.first_name} {user.last_name}</td>
-                            <td className="px-3.5 py-2.5 text-[12.5px] text-zinc-600 font-medium">{user.designation}</td>
-                            <td className="px-3.5 py-2.5 text-[12.5px] text-zinc-500">{user.email}</td>
-                            <td className="px-3.5 py-2.5 text-right">
+                            <td className="px-3.5 py-2.5 text-[13px] text-zinc-900 font-bold truncate text-left">{user.first_name} {user.last_name}</td>
+                            <td className="px-3.5 py-2.5 text-[12.5px] text-zinc-600 font-medium truncate text-left">{user.designation}</td>
+                            <td className="px-3.5 py-2.5 text-[12.5px] text-zinc-500 truncate text-left">{user.email}</td>
+                            <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
                               <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${user.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-zinc-100 text-zinc-500 border border-zinc-200"}`}>
                                 {user.is_active ? "Active" : "Inactive"}
                               </span>
@@ -370,7 +370,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-6 text-center text-zinc-400 text-[13px] italic">
+                          <td colSpan={4} className="px-4 py-6 text-center text-zinc-400 text-[13px] italic">
                             No team members found for this client.
                           </td>
                         </tr>

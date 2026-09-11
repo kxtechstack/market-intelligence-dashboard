@@ -35,11 +35,15 @@ export interface ChatMessage {
     date?: string;
     summary: string;
     impact?: string;
+    module?: string;
+    parentLabel?: string;
   }>;
   linkInfo?: {
     tabId: string;
     tabLabel: string;
   };
+  chartBase64?: string | null;
+  chartMeta?: { chartType?: string } | null;
 }
 
 export interface SidebarItem {
