@@ -55,6 +55,7 @@ import {
 import { jsPDF } from "jspdf";
 import { ChatMessage } from "../types";
 import { ChatSources } from "./ChatSources";
+import ReportView from "./ReportView";
 import { API_URL } from "../constants";
 
 interface ChatSession {
@@ -1812,6 +1813,8 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
       let sources: any[] = [];
       let chartBase64: string | null = null;
       let chartMeta: any = null;
+      let report: any = null;
+      let reportSources: any[] = [];
 
       if (data.type === "list") {
         modelText = `Here is the requested intelligence list for "${query}":`;
@@ -1825,11 +1828,16 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
           parentLabel: it.parentLabel || undefined,
         }));
       } else if (data.type === "inference") {
+        // NEW: structured report + sources
+        report = data.report || null;
+        reportSources = data.reportSources || data.sources || [];
+        // Fallback text for old-style responses (should not happen with new backend)
         modelText = data.answer || "";
-        sources = data.sources || [];
       } else if (data.type === "decision") {
+        // NEW: structured report + sources + optional chart
+        report = data.report || null;
+        reportSources = data.reportSources || data.sources || [];
         modelText = data.answer || "";
-        sources = data.sources || [];
         chartBase64 = data.chart || null;
         chartMeta = data.chartMeta || null;
       } else {
@@ -1848,6 +1856,8 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
         listItems,
         chartBase64,
         chartMeta,
+        report,
+        reportSources,
         timestamp: new Date(),
       };
 
@@ -1923,6 +1933,8 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
           ...payload,
           chartBase64: payload.chart || payload.chartBase64 || null,
           chartMeta: payload.chartMeta || null,
+          report: payload.report || null,
+          reportSources: payload.reportSources || payload.sources || [],
           listItems: rawItems.map((it: any, idx: number) => ({
             id: it.id || `item-${idx}`,
             title: it.title || "",
@@ -2035,6 +2047,13 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
 
                     {msg.role === "user" ? (
                       <div className="whitespace-pre-wrap">{msg.text}</div>
+                    ) : msg.report ? (
+                      <ReportView
+                        report={msg.report as any}
+                        sources={msg.reportSources}
+                        chart={msg.chartBase64}
+                        chartMeta={msg.chartMeta}
+                      />
                     ) : (
                       <div className="markdown-body text-[13px] leading-relaxed font-sans text-zinc-800 space-y-3">
                         <Markdown
@@ -2273,7 +2292,10 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                       </div>
                     )}
 
-                    {msg.role === "model" && msg.chartBase64 && (
+                    {/* Chart and sources are now rendered inside ReportView when a report is present.
+                        The blocks below only run for non-report model messages (e.g. legacy rows
+                        or the List item-detail flow), preserving backward compatibility. */}
+                    {msg.role === "model" && !msg.report && msg.chartBase64 && (
                       <div className="mt-3 pt-3 border-t border-zinc-200/60">
                         <div className="text-[11.5px] font-semibold text-zinc-700 mb-2 flex items-center gap-1.5">
                           <BarChart2 className="w-3.5 h-3.5 text-[#7c3aed]" />
@@ -2291,7 +2313,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                       </div>
                     )}
 
-                    {msg.role === "model" && msg.sources && msg.sources.length > 0 && (
+                    {msg.role === "model" && !msg.report && msg.sources && msg.sources.length > 0 && (
                       <div className="mt-3 pt-2.5 border-t border-zinc-200/60">
                         <ChatSources sources={msg.sources} />
                       </div>
