@@ -886,11 +886,51 @@ export default function ForewardOutlookPane({
   const [activeTab, setActiveTab] = useState<string>("insights");
   const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
 
+  // When a specific SIGNAL id is navigated to, find its parent trend,
+  // select the trend, and remember which signal to focus once the
+  // trend's signals are loaded.
+  const pendingFocusSignalIdRef = useRef<string | null>(null);
+  const [focusTrigger, setFocusTrigger] = useState(0);
+
   useEffect(() => {
-    if (navigatedItemId && trends.length > 0) {
+    console.log("[FO nav] effect fired", { navigatedItemId, trendsCount: trends.length });
+    if (!navigatedItemId || trends.length === 0) return;
+
+    // Is it a trend id? (existing behavior)
+    const isTrendId = trends.some(t => t.id === navigatedItemId);
+    if (isTrendId) {
       setSelectedTrendId(navigatedItemId);
+      pendingFocusSignalIdRef.current = null;
       if (onClearNavigatedItem) onClearNavigatedItem();
+      return;
     }
+
+    // Otherwise treat it as a signal id. Look it up in Supabase to
+    // find which trend it belongs to.
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("trend_membership")
+          .select("trend_id")
+          .eq("signal_id", navigatedItemId)
+          .limit(1)
+          .maybeSingle();
+
+        console.log("[FO nav] lookup result", { signalId: navigatedItemId, data, error: error?.message });
+
+        if (error) throw error;
+        if (data?.trend_id) {
+          pendingFocusSignalIdRef.current = navigatedItemId;
+          console.log("[FO nav] setting pending ref to", navigatedItemId);
+          setSelectedTrendId(data.trend_id);
+          setFocusTrigger((n) => n + 1);
+        }
+      } catch (err) {
+        console.error("Failed to resolve signal -> trend:", err);
+      } finally {
+        if (onClearNavigatedItem) onClearNavigatedItem();
+      }
+    })();
   }, [navigatedItemId, trends]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
@@ -1039,6 +1079,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 ? { ...t, sources: mappedSignals, signalsCount: mappedSignals.length, newInLastWeek } 
                 : t
             ));
+            console.log("[FO fetchSignals] setTrends called with", mappedSignals.length, "signals for trend", selectedTrendId);
           }
         } else {
           setTrends(prev => prev.map(t => 
@@ -1058,15 +1099,51 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
   }, [selectedTrendId]);
   
   useEffect(() => {
+    console.log("[FO focus] effect fired", {
+      selectedTrendId,
+      pendingRef: pendingFocusSignalIdRef.current,
+      trend: trends.find(t => t.id === selectedTrendId)?.title,
+      sourcesLen: trends.find(t => t.id === selectedTrendId)?.sources.length
+    });
     setIsSourcesExpanded(true);
     setIsReferencesExpanded(false);
     const trend = trends.find(t => t.id === selectedTrendId);
-    if (trend && trend.sources && trend.sources.length > 0) {
-      setSelectedSignalId(trend.sources[0].id);
-    } else {
+    if (!trend || !trend.sources || trend.sources.length === 0) {
       setSelectedSignalId(null);
+      return;
     }
-  }, [selectedTrendId, trends]);
+
+    // If we're navigating to a specific signal, honor it once the
+    // trend's signals are actually loaded.
+    if (pendingFocusSignalIdRef.current) {
+      console.log("[FO focus] searching for", pendingFocusSignalIdRef.current,
+        "in", trend.sources.map(s => s.id));
+      const target = trend.sources.find((s: any) => s.id === pendingFocusSignalIdRef.current);
+      console.log("[FO focus] target result", { found: !!target, targetId: target?.id });
+      if (target) {
+        setSelectedSignalId(target.id);
+        pendingFocusSignalIdRef.current = null;
+        // Scroll on the next animation frame -- React will have flushed
+        // the expand render by then.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const el = document.getElementById(`outlook-signal-card-${trend.sources.findIndex((s: any) => s.id === target.id)}`);
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              el.classList.add("ring-2", "ring-[#7c3aed]", "ring-offset-2");
+              setTimeout(() => {
+                el.classList.remove("ring-2", "ring-[#7c3aed]", "ring-offset-2");
+              }, 2000);
+            }
+          });
+        });
+        return;
+      }
+    }
+
+    // Default behavior: first signal.
+    setSelectedSignalId(trend.sources[0].id);
+  }, [selectedTrendId, trends, focusTrigger]);
   
   // Date states (retained for identical design/functionality)
   const [startDateStr, setStartDateStr] = useState(() => sessionStorage.getItem("foreward_outlook_start_date") || "");

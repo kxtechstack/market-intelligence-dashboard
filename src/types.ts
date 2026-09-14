@@ -41,6 +41,7 @@ export interface ChatMessage {
   linkInfo?: {
     tabId: string;
     tabLabel: string;
+    signalId?: string;
   };
   chartBase64?: string | null;
   chartMeta?: { chartType?: string } | null;

@@ -381,18 +381,13 @@ export default function MarketDynamicsPane({
   const [isReferencesExpanded, setIsReferencesExpanded] = useState<boolean>(false);
   const [richSignals, setRichSignals] = useState<SignalGridItem[]>([]);
   const [marketInsights, setMarketInsights] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (navigatedItemId && marketInsights.length > 0) {
-      setSelectedInsightId(navigatedItemId);
-      if (onClearNavigatedItem) onClearNavigatedItem();
-    }
-  }, [navigatedItemId, marketInsights]);
   const [isLoading, setIsLoading] = useState(true);
   const [signalSubCardTitles, setSignalSubCardTitles] = useState<Record<string, string[]>>({});
-  
+
   const [selectedGridSignal, setSelectedGridSignal] = useState<SignalContent | null>(null);
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
+  const pendingFocusSignalIdRef = useRef<string | null>(null);
+  const [pendingFocusSignalId, setPendingFocusSignalId] = useState<string | null>(null);
 
   const [isBookmarked, setIsBookmarked] = useState<Record<string, boolean>>({});
   const [hiddenIds, setHiddenIds] = useState<Record<string, boolean>>({});
@@ -405,6 +400,42 @@ export default function MarketDynamicsPane({
 
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+
+  useEffect(() => {
+    if (!navigatedItemId || marketInsights.length === 0) return;
+
+    // If navigatedItemId already matches an insight id, treat it as before.
+    const isInsightId = marketInsights.some(mi => mi.id === navigatedItemId);
+    if (isInsightId) {
+      setSelectedInsightId(navigatedItemId);
+      setPendingFocusSignalId(null);
+      if (onClearNavigatedItem) onClearNavigatedItem();
+      return;
+    }
+
+    // Otherwise treat it as a signal id and look up its parent insight.
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("market_dynamics_signals")
+          .select("insight_id")
+          .eq("id", navigatedItemId)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (data?.insight_id) {
+          pendingFocusSignalIdRef.current = navigatedItemId;
+          setPendingFocusSignalId(navigatedItemId);
+          setSelectedInsightId(data.insight_id);
+        }
+      } catch (err) {
+        console.error("Failed to resolve MD signal -> insight:", err);
+      } finally {
+        if (onClearNavigatedItem) onClearNavigatedItem();
+      }
+    })();
+  }, [navigatedItemId, marketInsights]);
 
   useEffect(() => {
     async function fetchMarketDynamics() {
@@ -603,7 +634,30 @@ export default function MarketDynamicsPane({
 
         if (cancelled) return;
         setActiveSignalDetail(detail);
+
         if (mappedSources.length > 0) {
+          const focusId = pendingFocusSignalIdRef.current;
+          if (focusId) {
+            const target = mappedSources.find(s => s.id === focusId);
+            if (target) {
+              setSelectedSignalId(target.id);
+              pendingFocusSignalIdRef.current = null;
+              setPendingFocusSignalId(null);
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  const el = document.getElementById(`signal-card-${target.id}`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    el.classList.add("ring-2", "ring-[#7c3aed]", "ring-offset-2");
+                    setTimeout(() => {
+                      el.classList.remove("ring-2", "ring-[#7c3aed]", "ring-offset-2");
+                    }, 2000);
+                  }
+                });
+              });
+              return;
+            }
+          }
           setSelectedSignalId(mappedSources[0].id);
         }
       } catch (err) {
@@ -869,7 +923,9 @@ export default function MarketDynamicsPane({
     setIsSourcesExpanded(true);
     setIsReferencesExpanded(false);
     setExpandedCards({});
-    setSelectedSignalId(null);
+    if (!pendingFocusSignalIdRef.current) {
+      setSelectedSignalId(null);
+    }
   }, [selectedGridSignal]);
 
   // Chatbot states
@@ -1661,7 +1717,7 @@ export default function MarketDynamicsPane({
                     return (
                       <div 
                         key={src.id} 
-                        id={`signal-card-${index}`}
+                        id={`signal-card-${src.id}`}
                         onClick={() => setSelectedSignalId(isSelected ? null : src.id)}
                         className={`rounded-[4px] px-3 transition-all text-left cursor-pointer border ${bgClass} ${borderClass} ${isSelected ? 'py-4' : 'py-1.5'}`}
                       >

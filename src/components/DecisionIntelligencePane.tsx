@@ -51,6 +51,7 @@ import {
   Bookmark,
   Share2,
   FileDown,
+  Trash2,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { ChatMessage } from "../types";
@@ -590,7 +591,7 @@ const getDummyListItems = (query: string) => {
 
 interface DecisionIntelligencePaneProps {
   onReturn?: () => void;
-  onTabChange?: (tabId: string) => void;
+  onTabChange?: (tabId: string, signalId?: string) => void;
   clientId?: string;
   industry?: string;
   userId?: string;
@@ -1085,6 +1086,7 @@ export default function DecisionIntelligencePane({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [showPreviousChatsModal, setShowPreviousChatsModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -1237,6 +1239,7 @@ export default function DecisionIntelligencePane({
       linkInfo: {
         tabId: targetTab.tabId,
         tabLabel: targetTab.tabLabel,
+        signalId: item.id,
       },
     };
 
@@ -1965,6 +1968,29 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
     }
   };
 
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/decision-intelligence/conversations/${sessionId}?userId=${encodeURIComponent(userId)}`,
+        { method: 'DELETE' }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      // Remove from local state
+      setPreviousSessions(prev => prev.filter(s => s.id !== sessionId));
+
+      // If the currently open chat is being deleted, clear it
+      if (activeSessionId === sessionId || currentConversationId === sessionId) {
+        setMessages([]);
+        setActiveSessionId(null);
+        setCurrentConversationId(null);
+      }
+    } catch (err) {
+      console.error('[DI] delete session failed', err);
+      alert('Could not delete this chat. Please try again.');
+    }
+  };
+
   const handleNewChat = () => {
     setMessages([]);
     setActiveSessionId(null);
@@ -2243,7 +2269,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                           type="button"
                           onClick={() => {
                             if (onTabChange) {
-                              onTabChange(msg.linkInfo!.tabId);
+                              (onTabChange as any)(msg.linkInfo!.tabId, (msg.linkInfo as any).signalId);
                             } else if (onReturn) {
                               onReturn();
                             }
@@ -2579,23 +2605,69 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                           return (
                             <div
                               key={chat.id}
-                              onClick={() => handleSelectSession(chat)}
-                              className="group relative flex items-center justify-between px-3 h-8 rounded-[4px] hover:bg-zinc-50 transition-all cursor-pointer text-zinc-800"
+                              className={`group relative flex items-center justify-between px-3 h-9 rounded-[4px] transition-all my-0.5 ${
+                                pendingDeleteId === chat.id
+                                  ? "bg-red-50/70 border border-red-200/80 shadow-xs"
+                                  : "hover:bg-zinc-50 border border-transparent"
+                              }`}
                             >
-                              <div className="flex items-center gap-3 min-w-0 pr-6">
-                                <span className="text-[11px] md:text-[12px] text-zinc-800 group-hover:text-black font-sans font-normal leading-none truncate">
+                              <button
+                                onClick={() => handleSelectSession(chat)}
+                                className="flex-1 text-left flex items-center min-w-0 pr-3 h-full cursor-pointer"
+                              >
+                                <span
+                                  className={`text-[11px] md:text-[12px] font-sans truncate ${
+                                    pendingDeleteId === chat.id
+                                      ? "text-red-950 font-medium"
+                                      : "text-zinc-800 group-hover:text-black font-normal"
+                                  }`}
+                                >
                                   {chat.title}
                                 </span>
-                              </div>
+                              </button>
 
-                              <div className="flex items-center gap-4 shrink-0">
-                                <span className="text-[10px] text-zinc-400 font-sans whitespace-nowrap min-w-[75px] text-right leading-none">
-                                  {chat.displayTime}
-                                </span>
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-zinc-400 hover:text-zinc-800 flex items-center">
-                                  <MoreVertical className="w-3.5 h-3.5" />
+                              {pendingDeleteId === chat.id ? (
+                                <div className="flex items-center gap-2 shrink-0 pl-2">
+                                  <span className="text-[11px] font-medium text-red-700 font-sans hidden sm:inline">
+                                    Delete chat?
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteSession(chat.id);
+                                      setPendingDeleteId(null);
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-semibold font-sans bg-red-600 text-white rounded-[4px] hover:bg-red-700 transition-colors shadow-xs cursor-pointer leading-none"
+                                  >
+                                    Delete
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPendingDeleteId(null);
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-medium font-sans bg-white text-zinc-700 border border-zinc-200 rounded-[4px] hover:bg-zinc-100 hover:text-zinc-900 transition-colors cursor-pointer leading-none"
+                                  >
+                                    Cancel
+                                  </button>
                                 </div>
-                              </div>
+                              ) : (
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-[10px] text-zinc-400 font-sans whitespace-nowrap text-right">
+                                    {chat.displayTime}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPendingDeleteId(chat.id);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-[4px] transition-all cursor-pointer flex items-center justify-center"
+                                    title="Delete chat"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })}

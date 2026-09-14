@@ -27,7 +27,7 @@ export default function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>("policy_risk_monitor");
+  const [activeTab, setActiveTab] = useState<string>("decision_intelligence");
   const [navigatedItemId, setNavigatedItemId] = useState<string | null>(null);
 
   const handleNavigateFromBookmarks = (module: string, id: string) => {
@@ -103,6 +103,7 @@ export default function App() {
       setUserId(userData.id);
       setClientId(userData.client_id);
       setIndustry(clientData?.industry || "Retail");
+      setActiveTab("decision_intelligence");
       setIsLoggedIn(true);
     } catch (err: any) {
       setLoginError(err.message || "An unexpected error occurred during login.");
@@ -181,6 +182,7 @@ export default function App() {
     sessionStorage.removeItem("foreward_outlook_start_date");
     sessionStorage.removeItem("foreward_outlook_end_date");
     setIsLoggedIn(false);
+    setActiveTab("decision_intelligence");
     setUserId(null);
     setClientId(null);
     setIndustry(null);
@@ -238,7 +240,12 @@ export default function App() {
         {activeTab === "decision_intelligence" && (
           <DecisionIntelligencePane 
             onReturn={handleReturn}
-            onTabChange={setActiveTab}
+            onTabChange={(tabId, signalId) => {
+              setActiveTab(tabId);
+              if (signalId) {
+                setNavigatedItemId(signalId);
+              }
+            }}
             clientId={clientId || ""}
             industry={industry || ""}
             userId={userId || ""}
