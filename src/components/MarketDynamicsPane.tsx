@@ -346,6 +346,26 @@ const RICH_SIGNALS: SignalGridItem[] = [];
 
 const SPARSE_SIGNALS: SignalGridItem[] = [];
 
+const getSnapshotChipClass = (color: string) => {
+  switch (color) {
+    case "green": return "bg-emerald-50 border border-emerald-200 text-emerald-700";
+    case "amber": return "bg-amber-50 border border-amber-200 text-amber-700";
+    case "red":   return "bg-rose-50 border border-rose-200 text-rose-700";
+    case "blue":  return "bg-blue-50 border border-blue-200 text-blue-700";
+    default:      return "bg-zinc-50 border border-zinc-200 text-zinc-600";
+  }
+};
+
+const getSnapshotIconClass = (color: string) => {
+  switch (color) {
+    case "green": return "text-emerald-600 bg-emerald-50";
+    case "amber": return "text-amber-600 bg-amber-50";
+    case "red":   return "text-rose-600 bg-rose-50";
+    case "blue":  return "text-blue-600 bg-blue-50";
+    default:      return "text-zinc-500 bg-zinc-50";
+  }
+};
+
 const getStatusIcon = (iconType: string, iconColor: string) => {
   const iconClass = `${iconColor} w-4 h-4 shrink-0`;
   switch (iconType) {
@@ -376,6 +396,34 @@ export default function MarketDynamicsPane({
   navigatedItemId,
   onClearNavigatedItem
 }: MarketDynamicsPaneProps) {
+  const [snapshot, setSnapshot] = useState<any>(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadSnapshot() {
+      if (!clientId) return;
+      setSnapshotLoading(true);
+      try {
+        let res = await fetch(`${API_URL}/daily-snapshot/${clientId}?moduleId=${MARKET_DYNAMICS_MODULE_ID}`);
+        let data = await res.json();
+        let snap = (data.snapshots || [])[0];
+
+        if (!snap) {
+          res = await fetch(`${API_URL}/daily-snapshot-latest/${clientId}?moduleId=${MARKET_DYNAMICS_MODULE_ID}`);
+          data = await res.json();
+          snap = (data.snapshots || [])[0];
+        }
+        setSnapshot(snap || null);
+      } catch (err) {
+        console.error("Failed to load daily snapshot:", err);
+        setSnapshot(null);
+      } finally {
+        setSnapshotLoading(false);
+      }
+    }
+    loadSnapshot();
+  }, [clientId]);
+
   const [activeTab, setActiveTab] = useState<string>("insights");
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
   const [isReferencesExpanded, setIsReferencesExpanded] = useState<boolean>(false);
@@ -1288,131 +1336,171 @@ export default function MarketDynamicsPane({
 
         {/* Outer Workspace containing the new Market Dynamics overview at the top */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-[#fafafa]/50">
-           {/* Market Dynamics Category Cards */}
-            {!isLoading && filteredRichSignals.length === 0 ? (
-               <div className="flex-1 flex items-center justify-center text-sm text-zinc-500 font-medium tracking-tight py-20">
-                 No data available
+           {/* Daily Snapshot Card */}
+           {snapshotLoading ? (
+             <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] flex items-center gap-2">
+               <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
+               <span className="text-[12px] text-zinc-500">Loading snapshot...</span>
+             </div>
+           ) : snapshot ? (
+             <div className="mb-3 border border-zinc-200 bg-white rounded-[8px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in">
+               <div className="px-4 py-2.5 border-b border-zinc-100 flex items-center justify-between">
+                 <h3 className="text-[13px] font-semibold text-zinc-900 font-sans">
+                   {snapshot.module_title}
+                 </h3>
+                 <span className="text-[11px] font-medium text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded-[4px]">
+                   {new Date(snapshot.snapshot_date).toLocaleDateString("en-US", {
+                     weekday: "short", day: "numeric", month: "short", year: "numeric"
+                   })}
+                 </span>
                </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1.5 animate-fade-in select-text">
-                  {filteredRichSignals.map((signal) => {
-                    const displayName = signal.category.charAt(0).toUpperCase() + signal.category.slice(1).toLowerCase();
-                    // Try to find original name for exact match with summaries
-                    const rawName = Object.keys(signalSubCardTitles).find(k => k.toUpperCase() === signal.category) || displayName;
-                    const isSelected = selectedCategory.toUpperCase() === signal.category;
 
-                    return (
-                      <div 
-                        key={signal.category}
-                        onClick={() => setSelectedCategory(rawName)}
-                        className={`bg-white border rounded-[4px] px-4 py-2 flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all cursor-pointer ${
-                          isSelected
-                            ? "border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/[0.01]"
-                            : "border-zinc-200/85 hover:border-zinc-300"
-                        }`}
-                      >
-                        <div className="w-[180px] shrink-0 flex items-center gap-2.5 select-none">
-                          {getStatusIcon(signal.iconType, signal.iconColor)}
-                          <span className="text-[13px] font-semibold text-zinc-900 font-sans leading-none">
-                            {rawName}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12.5px] text-zinc-600 font-normal font-sans leading-snug">
-                            {getSubmoduleSummary(rawName)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+               <div>
+                 {(snapshot.rows || []).map((row: any, idx: number) => (
+                   <div
+                     key={row.submodule_id || idx}
+                     onClick={() => {
+                       // Match the snapshot row label against an existing richSignal category
+                       // (case-insensitive) so we can set selectedCategory to the correct key.
+                       const match = richSignals.find(s =>
+                         s.category.toUpperCase() === row.label.toUpperCase() ||
+                         s.category.toUpperCase().includes(row.label.toUpperCase()) ||
+                         row.label.toUpperCase().includes(s.category.toUpperCase())
+                       );
+                       const submoduleName = match
+                         ? Object.keys(signalSubCardTitles).find(k => k.toUpperCase() === match.category)
+                           || Object.keys(signalSubCardTitles).find(k => k.toUpperCase().includes(row.label.toUpperCase()))
+                         : row.label;
+                       if (submoduleName) setSelectedCategory(submoduleName);
+                     }}
+                     className={`grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0 cursor-pointer transition-colors ${
+                       selectedCategory.toUpperCase().includes(row.label.toUpperCase()) ||
+                       row.label.toUpperCase().includes(selectedCategory.toUpperCase())
+                         ? "bg-[#f5f3ff]/40"
+                         : "hover:bg-zinc-50/40"
+                     }`}
+                   >
+                     <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass(row.color)}`}>
+                       {row.icon}
+                     </div>
 
-                <div className="border-t border-zinc-200/40 my-1.5 select-none"></div>
+                     <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
+                       {row.label}
+                     </div>
 
-                {/* Market Signals Grid Section */}
-                <div className="flex-1 flex flex-col min-h-0">
-                  {/* Static Activity title header */}
-                  <div className="pb-2 pt-1 flex items-center justify-between select-none">
-                    <span className="text-[13.5px] font-bold text-zinc-800 font-sans tracking-wide uppercase">
-                      ACTIVITY
-                    </span>
-                  </div>
+                     <div className="min-w-0">
+                       <div className="text-[12.5px] text-zinc-600 leading-snug">
+                         {row.body}
+                       </div>
+                       {row.so_what && (
+                         <div className="text-[11.5px] text-zinc-400 leading-snug mt-0.5">
+                           {row.so_what}
+                         </div>
+                       )}
+                     </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-1 items-start">
-                    {currentCategoryData && currentSubCardTitles.map((title, subIndex) => {
-                      const signalsList = currentCategoryData.contents[subIndex] || [];
-                      return (
-                        <div 
-                          key={subIndex} 
-                          className="bg-white border border-zinc-200 rounded-[4px] flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all hover:border-zinc-300 overflow-hidden"
-                        >
-                          {/* Category Header with arrow next to it */}
-                          <div className="px-4 py-3 border-b border-zinc-100 bg-[#fafafa]/20 flex items-center justify-between select-none">
-                            <span className="text-[10.5px] font-bold tracking-wider text-zinc-800 font-sans uppercase">
-                              {title}
-                            </span>
-                            {getStatusIcon(currentCategoryData.iconType, currentCategoryData.iconColor)}
-                          </div>
+                     <div className="flex flex-col items-end gap-0.5">
+                       <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${getSnapshotChipClass(row.color)}`}>
+                         {row.status}
+                       </span>
+                       <span className="text-[10.5px] text-zinc-400 font-medium">
+                         {row.delta_label}
+                       </span>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           ) : (
+             <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] text-center">
+               <p className="text-[12.5px] text-zinc-500">No snapshot available yet for this module.</p>
+             </div>
+           )}
 
-                          {/* Content section */}
-                          {signalsList.length > 0 ? (
-                            <div className="flex flex-col">
-                              {signalsList.map((sig, sigIdx) => {
-                                const isSelected = selectedInsightId
-                                  ? selectedInsightId === sig.id
-                                  : selectedGridSignal?.id && sig.id
-                                    ? selectedGridSignal.id === sig.id
-                                    : selectedGridSignal?.title === sig.title;
-                                return (
-                                  <div 
-                                    key={sigIdx} 
-                                    id={sig.id ? `signal-card-${sig.id}` : undefined}
-                                    onClick={() => {
-                                      if (isSelected) {
-                                        setSelectedGridSignal(null);
-                                        setSelectedInsightId(null);
-                                        setActiveSignalDetail(null);
-                                      } else {
-                                        setActiveSignalDetail(null);
-                                        setSelectedGridSignal(sig);
-                                        setSelectedInsightId(sig.id || null);
-                                      }
-                                    }}
-                                    className={`px-4 py-3.5 border-b border-zinc-100 last:border-b-0 transition-all text-left cursor-pointer flex flex-col gap-1 ${
-                                      isSelected 
-                                        ? "border-l-[3.5px] border-l-[#7c3aed] bg-[#f5f3ff]/45 shadow-[inset_1px_0_0_rgba(124,58,237,0.05)]" 
-                                        : "border-l-[3.5px] border-l-transparent hover:bg-zinc-50/40"
-                                    }`}
-                                  >
-                                    <h4 className={`text-[12px] font-semibold font-sans leading-snug transition-colors ${
-                                      isSelected ? "text-[#7c3aed]" : "text-zinc-900"
-                                    }`}>
-                                      {sig.title}
-                                    </h4>
-                                    <p className="text-[11px] text-zinc-650 font-normal font-sans leading-relaxed mt-1">
-                                      {sig.short_summary || sig.desc}
-                                    </p>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="py-12 px-5 flex flex-col items-center justify-center text-center select-none bg-zinc-50/20 border-t border-zinc-100/50 h-full">
-                              <span className="text-[11px] text-zinc-400 font-medium font-sans max-w-[200px] leading-relaxed">
-                                {title === "Mass hiring initiatives" 
-                                  ? "No major corporate mass hiring initiatives detected this period." 
-                                  : `No notable ${title.toLowerCase()} this period.`}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
+           {/* Divider */}
+           <div className="border-t border-zinc-200/40 my-1.5 select-none"></div>
+
+           {/* Market Signals Grid Section */}
+           <div className="flex-1 flex flex-col min-h-0">
+             {/* Static Activity title header */}
+             <div className="pb-2 pt-1 flex items-center justify-between select-none">
+               <span className="text-[13.5px] font-bold text-zinc-800 font-sans tracking-wide uppercase">
+                 ACTIVITY
+               </span>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-1 items-start">
+               {currentCategoryData && currentSubCardTitles.map((title, subIndex) => {
+                 const signalsList = currentCategoryData.contents[subIndex] || [];
+                 return (
+                   <div 
+                     key={subIndex} 
+                     className="bg-white border border-zinc-200 rounded-[4px] flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all hover:border-zinc-300 overflow-hidden"
+                   >
+                     {/* Category Header with arrow next to it */}
+                     <div className="px-4 py-3 border-b border-zinc-100 bg-[#fafafa]/20 flex items-center justify-between select-none">
+                       <span className="text-[10.5px] font-bold tracking-wider text-zinc-800 font-sans uppercase">
+                         {title}
+                       </span>
+                       {getStatusIcon(currentCategoryData.iconType, currentCategoryData.iconColor)}
+                     </div>
+
+                     {/* Content section */}
+                     {signalsList.length > 0 ? (
+                       <div className="flex flex-col">
+                         {signalsList.map((sig, sigIdx) => {
+                           const isSelected = selectedInsightId
+                             ? selectedInsightId === sig.id
+                             : selectedGridSignal?.id && sig.id
+                               ? selectedGridSignal.id === sig.id
+                               : selectedGridSignal?.title === sig.title;
+                           return (
+                             <div 
+                               key={sigIdx} 
+                               id={sig.id ? `signal-card-${sig.id}` : undefined}
+                               onClick={() => {
+                                 if (isSelected) {
+                                   setSelectedGridSignal(null);
+                                   setSelectedInsightId(null);
+                                   setActiveSignalDetail(null);
+                                 } else {
+                                   setActiveSignalDetail(null);
+                                   setSelectedGridSignal(sig);
+                                   setSelectedInsightId(sig.id || null);
+                                 }
+                               }}
+                               className={`px-4 py-3.5 border-b border-zinc-100 last:border-b-0 transition-all text-left cursor-pointer flex flex-col gap-1 ${
+                                 isSelected 
+                                   ? "border-l-[3.5px] border-l-[#7c3aed] bg-[#f5f3ff]/45 shadow-[inset_1px_0_0_rgba(124,58,237,0.05)]" 
+                                   : "border-l-[3.5px] border-l-transparent hover:bg-zinc-50/40"
+                               }`}
+                             >
+                               <h4 className={`text-[12px] font-semibold font-sans leading-snug transition-colors ${
+                                 isSelected ? "text-[#7c3aed]" : "text-zinc-900"
+                               }`}>
+                                 {sig.title}
+                               </h4>
+                               <p className="text-[11px] text-zinc-650 font-normal font-sans leading-relaxed mt-1">
+                                 {sig.short_summary || sig.desc}
+                               </p>
+                             </div>
+                           );
+                         })}
+                       </div>
+                     ) : (
+                       <div className="py-12 px-5 flex flex-col items-center justify-center text-center select-none bg-zinc-50/20 border-t border-zinc-100/50 h-full">
+                         <span className="text-[11px] text-zinc-400 font-medium font-sans max-w-[200px] leading-relaxed">
+                           {title === "Mass hiring initiatives" 
+                             ? "No major corporate mass hiring initiatives detected this period." 
+                             : `No notable ${title.toLowerCase()} this period.`}
+                         </span>
+                       </div>
+                     )}
+                   </div>
+                 );
+               })}
+             </div>
+           </div>
           </div>
         </div>
 
