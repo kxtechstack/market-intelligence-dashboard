@@ -733,6 +733,26 @@ export const RADAR_TRENDS: TrendItem[] = [
   }
 ];
 
+const getSnapshotChipClass = (color: string) => {
+  switch (color) {
+    case "green": return "bg-emerald-50 border border-emerald-200 text-emerald-700";
+    case "amber": return "bg-amber-50 border border-amber-200 text-amber-700";
+    case "red":   return "bg-rose-50 border border-rose-200 text-rose-700";
+    case "blue":  return "bg-blue-50 border border-blue-200 text-blue-700";
+    default:      return "bg-zinc-50 border border-zinc-200 text-zinc-600";
+  }
+};
+
+const getSnapshotIconClass = (color: string) => {
+  switch (color) {
+    case "green": return "text-emerald-600 bg-emerald-50";
+    case "amber": return "text-amber-600 bg-amber-50";
+    case "red":   return "text-rose-600 bg-rose-50";
+    case "blue":  return "text-blue-600 bg-blue-50";
+    default:      return "text-zinc-500 bg-zinc-50";
+  }
+};
+
 const getNodeRadius = (trend: TrendItem, isSelected: boolean, isHovered: boolean) => {
   const dotSize = trend.dotSize ?? 0;
   let baseRadius = 4;
@@ -880,6 +900,82 @@ export default function ForewardOutlookPane({
   navigatedItemId,
   onClearNavigatedItem
 }: ForewardOutlookPaneProps) {
+  const [snapshot, setSnapshot] = useState<any>(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(true);
+  const [enabledSubmoduleIds, setEnabledSubmoduleIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    async function loadEnabledSubmodules() {
+      if (!clientId) return;
+      try {
+        const { data, error } = await supabase
+          .schema("admin")
+          .from("client_signals")
+          .select(`
+            is_enabled,
+            signals!inner (
+              submodule_id,
+              module_id
+            )
+          `)
+          .eq("client_id", clientId)
+          .eq("is_enabled", true)
+          .eq("signals.module_id", FORWARD_OUTLOOK_MODULE_ID);
+
+        if (error) throw error;
+
+        const ids = new Set<string>();
+        (data || []).forEach((row: any) => {
+          const subId = row.signals?.submodule_id;
+          if (subId) ids.add(subId);
+        });
+        setEnabledSubmoduleIds(ids);
+      } catch (err) {
+        console.error("Failed to load enabled submodules:", err);
+        setEnabledSubmoduleIds(new Set());
+      }
+    }
+    loadEnabledSubmodules();
+  }, [clientId]);
+
+  useEffect(() => {
+    async function loadSnapshot() {
+      if (!clientId) return;
+      setSnapshotLoading(true);
+      try {
+        let res = await fetch(`${API_URL}/daily-snapshot/${clientId}?moduleId=${FORWARD_OUTLOOK_MODULE_ID}`);
+        let data = await res.json();
+        let snap = (data.snapshots || [])[0];
+
+        if (!snap) {
+          res = await fetch(`${API_URL}/daily-snapshot-latest/${clientId}?moduleId=${FORWARD_OUTLOOK_MODULE_ID}`);
+          data = await res.json();
+          snap = (data.snapshots || [])[0];
+        }
+
+        // If multiple snapshots returned, select the one with the latest date / most complete rows
+        if (data.snapshots && data.snapshots.length > 1) {
+          const sorted = [...data.snapshots].sort((a: any, b: any) => {
+            const dateA = new Date(a.snapshot_date || 0).getTime();
+            const dateB = new Date(b.snapshot_date || 0).getTime();
+            if (dateB !== dateA) return dateB - dateA;
+            return (b.rows?.length || 0) - (a.rows?.length || 0);
+          });
+          snap = sorted[0];
+        }
+
+        setSnapshot(snap || null);
+        console.log("FO SNAPSHOT ROWS:", snap?.rows?.length, snap?.rows?.map((r: any) => r.label));
+      } catch (err) {
+        console.error("Failed to load daily snapshot:", err);
+        setSnapshot(null);
+      } finally {
+        setSnapshotLoading(false);
+      }
+    }
+    loadSnapshot();
+  }, [clientId]);
+
   const [trends, setTrends] = useState<TrendItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSignalsLoading, setIsSignalsLoading] = useState(false);
@@ -943,8 +1039,6 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
   "product": { start: 36, end: 72 },
   "sustainability": { start: 5, end: 36 }
 });
-
-  const FORWARD_OUTLOOK_MODULE_ID = "2eb989fd-0ea0-4320-b73a-f7eb8b970473";
 
   useEffect(() => {
     async function fetchTrends() {
@@ -1560,118 +1654,69 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
         {/* Outer Workspace containing Only the Radar Chart on the left */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-[#fafafa]/50">
           
-          {/* What changed vs previous period segment - matching Policy Monitor design */}
-          <div className="mb-2 p-5 border border-zinc-200 bg-white rounded-[8px] flex flex-col gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in pr-3">
-            <div>
-              <h4 className="text-[15px] font-medium tracking-tight text-zinc-800 font-sans">
-                What changed vs previous period
-              </h4>
-              <p className="text-[12.5px] text-zinc-500 leading-normal font-sans font-normal mt-0.5">
-                Comparing this week to last week — this is what you'd put in a client update, everything else is context.
-              </p>
+          {/* Daily Snapshot Card */}
+          {snapshotLoading ? (
+            <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] flex items-center gap-2">
+              <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
+              <span className="text-[12px] text-zinc-500">Loading snapshot...</span>
             </div>
-
-            <div className="flex flex-col divide-y divide-zinc-100">
-              {/* Row 1: Trade & tariffs */}
-              <div className="flex items-center justify-between py-1.5 gap-4">
-                <div className="w-[180px] shrink-0">
-                  <span className="text-[13px] font-medium text-zinc-800 font-sans">Trade & tariffs</span>
-                </div>
-                <div className="flex-1 flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center text-[10.5px] font-semibold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("slate")}`}>
-                    Monitor
-                  </span>
-                  <span className="text-zinc-400 text-xs shrink-0">&rarr;</span>
-                  <span className={`inline-flex items-center text-[10.5px] font-bold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("rose")}`}>
-                    Act now
-                  </span>
-                  <span className="text-[11.5px] text-zinc-500 font-normal font-sans shrink-0 leading-tight">
-                    +5 signals moved it
-                  </span>
-                </div>
-                <div className="w-[80px] shrink-0 flex justify-end">
-                  <svg className="w-16 h-6 stroke-red-500 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 2, strokeLinecap: 'round' }}>
-                    <path d="M 5,22 Q 35,19 65,10 T 95,4" />
-                  </svg>
-                </div>
+          ) : snapshot ? (
+            <div className="mb-3 shrink-0 border border-zinc-200 bg-white rounded-[8px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in">
+              <div className="px-4 py-2.5 border-b border-zinc-100 flex items-center justify-between">
+                <h3 className="text-[13px] font-semibold text-zinc-900 font-sans">
+                  {snapshot.module_title}
+                </h3>
+                <span className="text-[11px] font-medium text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded-[4px]">
+                  {new Date(snapshot.snapshot_date).toLocaleDateString("en-US", {
+                    weekday: "short", day: "numeric", month: "short", year: "numeric"
+                  })}
+                </span>
               </div>
 
-              {/* Row 2: Data & privacy */}
-              <div className="flex items-center justify-between py-1.5 gap-4">
-                <div className="w-[180px] shrink-0">
-                  <span className="text-[13px] font-medium text-zinc-800 font-sans">Data & privacy</span>
-                </div>
-                <div className="flex-1 flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center text-[10.5px] font-semibold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("amber")}`}>
-                    Watch closely
-                  </span>
-                  <span className="text-zinc-400 text-xs shrink-0">&rarr;</span>
-                  <span className={`inline-flex items-center text-[10.5px] font-bold py-0.5 px-2 rounded-[3px] select-none ${getTagStyles("blue")}`}>
-                    Monitor
-                  </span>
-                  <span className="text-[11.5px] text-zinc-500 font-normal font-sans shrink-0 leading-tight">
-                    +2 signals moved it
-                  </span>
-                </div>
-                <div className="w-[80px] shrink-0 flex justify-end">
-                  <svg className="w-16 h-6 stroke-blue-500 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 2, strokeLinecap: 'round' }}>
-                    <path d="M 5,4 Q 35,8 65,17 T 95,23" />
-                  </svg>
-                </div>
-              </div>
+              <div>
+                {(snapshot.rows || [])
+                  .filter((row: any) => !row.submodule_id || enabledSubmoduleIds.has(row.submodule_id))
+                  .map((row: any, idx: number) => (
+                  <div
+                    key={row.submodule_id ? `${row.submodule_id}-${idx}` : `fo-row-${idx}`}
+                    className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0"
+                  >
+                    <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass(row.color)}`}>
+                      {row.icon}
+                    </div>
 
-              {/* Row 3: Ingredient bans & safety */}
-              <div className="flex items-center justify-between py-1.5 gap-4">
-                <div className="w-[180px] shrink-0">
-                  <span className="text-[13px] font-medium text-zinc-800 font-sans">Ingredient bans & safety</span>
-                </div>
-                <div className="flex-1">
-                  <span className="text-[12px] text-zinc-600 font-normal font-sans leading-tight">
-                    +3 new signals, posture unchanged (Watch closely)
-                  </span>
-                </div>
-                <div className="w-[80px] shrink-0 flex justify-end">
-                  <svg className="w-16 h-6 stroke-zinc-400 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 1.5, strokeLinecap: 'round' }}>
-                    <path d="M 5,15 Q 25,14 45,16 T 75,14 T 95,15" />
-                  </svg>
-                </div>
-              </div>
+                    <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
+                      {row.label}
+                    </div>
 
-              {/* Row 4: Labeling & disclosure */}
-              <div className="flex items-center justify-between py-1.5 gap-4">
-                <div className="w-[180px] shrink-0">
-                  <span className="text-[13px] font-medium text-zinc-800 font-sans">Labeling & disclosure</span>
-                </div>
-                <div className="flex-1">
-                  <span className="text-[12px] text-zinc-600 font-normal font-sans leading-tight">
-                    +2 new signals, posture unchanged (Monitor)
-                  </span>
-                </div>
-                <div className="w-[80px] shrink-0 flex justify-end">
-                  <svg className="w-16 h-6 stroke-zinc-400 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 1.5, strokeLinecap: 'round' }}>
-                    <path d="M 5,15 Q 25,14 45,16 T 75,14 T 95,15" />
-                  </svg>
-                </div>
-              </div>
+                    <div className="min-w-0">
+                      <div className="text-[12.5px] text-zinc-600 leading-snug">
+                        {row.body}
+                      </div>
+                      {row.so_what && (
+                        <div className="text-[11.5px] text-zinc-400 leading-snug mt-0.5">
+                          {row.so_what}
+                        </div>
+                      )}
+                    </div>
 
-              {/* Row 5: ESG & sustainability */}
-              <div className="flex items-center justify-between py-1.5 gap-4">
-                <div className="w-[180px] shrink-0">
-                  <span className="text-[13px] font-medium text-zinc-800 font-sans">ESG & sustainability</span>
-                </div>
-                <div className="flex-1">
-                  <span className="text-[12px] text-zinc-500 font-normal font-sans leading-tight">
-                    +1 new signal, posture unchanged (Deprioritize)
-                  </span>
-                </div>
-                <div className="w-[80px] shrink-0 flex justify-end">
-                  <svg className="w-16 h-6 stroke-zinc-300 fill-none" viewBox="0 0 100 30" style={{ strokeWidth: 1.5, strokeLinecap: 'round' }}>
-                    <path d="M 5,16 Q 25,15 45,17 T 75,15 T 95,16" />
-                  </svg>
-                </div>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${getSnapshotChipClass(row.color)}`}>
+                        {row.status}
+                      </span>
+                      <span className="text-[10.5px] text-zinc-400 font-medium">
+                        {row.delta_label}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] text-center">
+              <p className="text-[12.5px] text-zinc-500">No snapshot available yet for this module.</p>
+            </div>
+          )}
           
           {/* TOP HALF: Trend Horizon Radar Chart */}
           <div id="radar-visualizer-section" className="py-1 px-2 flex flex-col items-center relative select-none">

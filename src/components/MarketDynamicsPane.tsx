@@ -398,6 +398,41 @@ export default function MarketDynamicsPane({
 }: MarketDynamicsPaneProps) {
   const [snapshot, setSnapshot] = useState<any>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(true);
+  const [enabledSubmoduleIds, setEnabledSubmoduleIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    async function loadEnabledSubmodules() {
+      if (!clientId) return;
+      try {
+        const { data, error } = await supabase
+          .schema("admin")
+          .from("client_signals")
+          .select(`
+            is_enabled,
+            signals!inner (
+              submodule_id,
+              module_id
+            )
+          `)
+          .eq("client_id", clientId)
+          .eq("is_enabled", true)
+          .eq("signals.module_id", MARKET_DYNAMICS_MODULE_ID);
+
+        if (error) throw error;
+
+        const ids = new Set<string>();
+        (data || []).forEach((row: any) => {
+          const subId = row.signals?.submodule_id;
+          if (subId) ids.add(subId);
+        });
+        setEnabledSubmoduleIds(ids);
+      } catch (err) {
+        console.error("Failed to load enabled submodules:", err);
+        setEnabledSubmoduleIds(new Set());
+      }
+    }
+    loadEnabledSubmodules();
+  }, [clientId]);
 
   useEffect(() => {
     async function loadSnapshot() {
@@ -895,28 +930,12 @@ export default function MarketDynamicsPane({
   }, [activeGridSignals, selectedCategory]);
 
   const currentSubCardTitles = useMemo(() => {
-    // If we have live titles for this category, use them
-    const liveTitles = signalSubCardTitles[selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1).toLowerCase()] || 
-                       signalSubCardTitles[selectedCategory] || 
-                       signalSubCardTitles[selectedCategory.toUpperCase()];
-    
-    if (liveTitles) return liveTitles;
+    const liveTitles =
+      signalSubCardTitles[selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1).toLowerCase()] ||
+      signalSubCardTitles[selectedCategory] ||
+      signalSubCardTitles[selectedCategory.toUpperCase()];
 
-    // Fallback to hardcoded titles for existing hardcoded data
-    switch (selectedCategory) {
-      case "Funding & investment":
-        return ["Funding rounds announced", "Venture capital investments", "Private equity investments"];
-      case "Industry structure":
-        return ["Market consolidation", "Mergers & acquisitions", "New industry entrants"];
-      case "Talent movement":
-        return ["CEO/CXO appointments", "Leadership exits", "Mass hiring initiatives"];
-      case "Macro & economic":
-        return ["Interest rate changes", "Inflation updates", "GDP growth forecasts"];
-      case "Tech adoption":
-        return ["AI adoption", "Cloud migration", "Digital transformation programs"];
-      default:
-        return ["Signal Category 1", "Signal Category 2", "Signal Category 3"];
-    }
+    return liveTitles || [];
   }, [selectedCategory, signalSubCardTitles]);
 
   const getSectionTitle = (category: string) => {
@@ -1343,7 +1362,7 @@ export default function MarketDynamicsPane({
                <span className="text-[12px] text-zinc-500">Loading snapshot...</span>
              </div>
            ) : snapshot ? (
-             <div className="mb-3 border border-zinc-200 bg-white rounded-[8px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in">
+             <div className="mb-3 shrink-0 border border-zinc-200 bg-white rounded-[8px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in">
                <div className="px-4 py-2.5 border-b border-zinc-100 flex items-center justify-between">
                  <h3 className="text-[13px] font-semibold text-zinc-900 font-sans">
                    {snapshot.module_title}
@@ -1356,7 +1375,9 @@ export default function MarketDynamicsPane({
                </div>
 
                <div>
-                 {(snapshot.rows || []).map((row: any, idx: number) => (
+                  {(snapshot.rows || [])
+                    .filter((row: any) => !row.submodule_id || enabledSubmoduleIds.has(row.submodule_id))
+                    .map((row: any, idx: number) => (
                    <div
                      key={row.submodule_id || idx}
                      onClick={() => {
