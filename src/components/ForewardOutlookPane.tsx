@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft, ArrowDown } from "lucide-react";
+import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft, ArrowDown, Minus } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { ChatSources } from "./ChatSources";
 import { FORWARD_OUTLOOK_MODULE_ID, API_URL } from "../constants";
@@ -902,7 +902,7 @@ export default function ForewardOutlookPane({
 }: ForewardOutlookPaneProps) {
   const [snapshot, setSnapshot] = useState<any>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(true);
-  const [enabledSubmoduleIds, setEnabledSubmoduleIds] = useState<Set<string>>(new Set());
+  const [enabledSubmodules, setEnabledSubmodules] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     async function loadEnabledSubmodules() {
@@ -915,7 +915,10 @@ export default function ForewardOutlookPane({
             is_enabled,
             signals!inner (
               submodule_id,
-              module_id
+              module_id,
+              submodules (
+                submodule_name
+              )
             )
           `)
           .eq("client_id", clientId)
@@ -924,15 +927,17 @@ export default function ForewardOutlookPane({
 
         if (error) throw error;
 
-        const ids = new Set<string>();
+        const subMap = new Map<string, string>();
         (data || []).forEach((row: any) => {
-          const subId = row.signals?.submodule_id;
-          if (subId) ids.add(subId);
+          const sig = Array.isArray(row.signals) ? row.signals[0] : row.signals;
+          const subId = sig?.submodule_id;
+          const subName = sig?.submodules?.submodule_name;
+          if (subId && subName) subMap.set(subId, subName);
         });
-        setEnabledSubmoduleIds(ids);
+        setEnabledSubmodules(subMap);
       } catch (err) {
         console.error("Failed to load enabled submodules:", err);
-        setEnabledSubmoduleIds(new Set());
+        setEnabledSubmodules(new Map());
       }
     }
     loadEnabledSubmodules();
@@ -1674,42 +1679,67 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
               </div>
 
               <div>
-                {(snapshot.rows || [])
-                  .filter((row: any) => !row.submodule_id || enabledSubmoduleIds.has(row.submodule_id))
-                  .map((row: any, idx: number) => (
-                  <div
-                    key={row.submodule_id ? `${row.submodule_id}-${idx}` : `fo-row-${idx}`}
-                    className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0"
-                  >
-                    <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass(row.color)}`}>
-                      {row.icon}
-                    </div>
-
-                    <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
-                      {row.label}
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="text-[12.5px] text-zinc-600 leading-snug">
-                        {row.body}
-                      </div>
-                      {row.so_what && (
-                        <div className="text-[11.5px] text-zinc-400 leading-snug mt-0.5">
-                          {row.so_what}
+                {Array.from(enabledSubmodules.entries()).map(([subId, subName], idx) => {
+                  const row = (snapshot?.rows || []).find((r: any) => r.submodule_id === subId);
+                  
+                  if (row) {
+                    return (
+                      <div
+                        key={row.submodule_id ? `${row.submodule_id}-${idx}` : `fo-row-${idx}`}
+                        className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0"
+                      >
+                        <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass(row.color)}`}>
+                          {row.icon}
                         </div>
-                      )}
-                    </div>
 
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${getSnapshotChipClass(row.color)}`}>
-                        {row.status}
-                      </span>
-                      <span className="text-[10.5px] text-zinc-400 font-medium">
-                        {row.delta_label}
-                      </span>
+                        <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
+                          {row.label}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="text-[12.5px] text-zinc-600 leading-snug">
+                            {row.body}
+                          </div>
+                          {row.so_what && (
+                            <div className="text-[11.5px] text-zinc-400 leading-snug mt-0.5">
+                              {row.so_what}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${getSnapshotChipClass(row.color)}`}>
+                            {row.status}
+                          </span>
+                          <span className="text-[10.5px] text-zinc-400 font-medium">
+                            {row.delta_label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Fallback for enabled submodule with no snapshot data
+                  return (
+                    <div
+                      key={subId}
+                      className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0 opacity-60"
+                    >
+                      <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass("slate")}`}>
+                        <Minus className="w-4 h-4 text-zinc-400" />
+                      </div>
+                      <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
+                        {subName}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[12.5px] text-zinc-600 leading-snug">
+                          No data for this period
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5" />
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : (

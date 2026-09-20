@@ -92,7 +92,7 @@ app.post("/api/chat", async (req, res) => {
     let responseText = "";
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         contents: formattedContents,
         config: {
           systemInstruction,
@@ -144,7 +144,7 @@ app.post("/api/ask", async (req, res) => {
     let responseText = "";
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         contents: [{ role: 'user', parts: [{ text: `[Client: ${clientId || "General"}, Industry: ${industry || "Beauty & Personal Care"}]\nQuestion: ${message}` }] }],
         config: {
           systemInstruction,
@@ -169,7 +169,10 @@ async function setupVite() {
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting server in development mode with HMR disabled");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: false 
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
