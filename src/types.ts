@@ -78,6 +78,9 @@ export interface ReportSource {
   url: string | null;
   module?: string | null;
   qdrant_point_id?: string | null;
+  article_id?: string | null;
+  signal_id?: string | null;
+  parent_id?: string | null;
   ticker?: string;
   fiscal_year?: number;
   item_code?: string;

@@ -476,6 +476,7 @@ export default function MarketDynamicsPane({
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
   const pendingFocusSignalIdRef = useRef<string | null>(null);
   const [pendingFocusSignalId, setPendingFocusSignalId] = useState<string | null>(null);
+  const [focusTrigger, setFocusTrigger] = useState(0);
 
   const [isBookmarked, setIsBookmarked] = useState<Record<string, boolean>>({});
   const [hiddenIds, setHiddenIds] = useState<Record<string, boolean>>({});
@@ -516,6 +517,7 @@ export default function MarketDynamicsPane({
           pendingFocusSignalIdRef.current = navigatedItemId;
           setPendingFocusSignalId(navigatedItemId);
           setSelectedInsightId(data.insight_id);
+          setFocusTrigger((n) => n + 1);
         }
       } catch (err) {
         console.error("Failed to resolve MD signal -> insight:", err);
@@ -728,6 +730,7 @@ export default function MarketDynamicsPane({
           if (focusId) {
             const target = mappedSources.find(s => s.id === focusId);
             if (target) {
+              setIsSourcesExpanded(true);
               setSelectedSignalId(target.id);
               pendingFocusSignalIdRef.current = null;
               setPendingFocusSignalId(null);
@@ -764,7 +767,7 @@ export default function MarketDynamicsPane({
     return () => {
       cancelled = true;
     };
-  }, [selectedInsightId, marketInsights]);
+    }, [selectedInsightId, marketInsights, focusTrigger]);
 
   // Date states (retained for identical design/functionality)
   const [startDateStr, setStartDateStr] = useState(() => sessionStorage.getItem("market_dynamics_start_date") || "");

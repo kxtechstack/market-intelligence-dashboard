@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import {
   ArrowUp,
+  ArrowLeft,
   Loader2,
   Sparkles,
   Bot,
@@ -1210,6 +1211,13 @@ export default function DecisionIntelligencePane({
     return `${line1}\n${line2}\n${line3}\n${line4}\n${line5}\n${line6}`;
   };
 
+    const handleSourceOpen = (source: any) => {
+    console.log("[DI open]", source.module, "|", source.title, "| signal_id:", source.signal_id);
+    const tab = MODULE_TO_TAB[source.module || ""];
+    if (!tab || !onTabChange) return;
+    onTabChange(tab.tabId, source.signal_id || undefined);
+  };
+
   const handleListItemClick = (item: {
     id: string;
     title: string;
@@ -2013,6 +2021,19 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
       {/* 100% Full Width Column */}
       <div className="w-full h-full flex flex-col justify-between relative bg-white overflow-hidden">
         
+        {/* Back to Home Button - Only shown when in a chat session */}
+        {messages.length > 0 && (
+          <div className="absolute top-6 left-6 z-20">
+            <button
+              onClick={handleNewChat}
+              className="flex items-center justify-center w-8 h-8 text-zinc-500 hover:text-zinc-900 bg-white border border-zinc-200 rounded-[4px] shadow-2xs hover:bg-zinc-50 transition-all cursor-pointer group"
+              title="Back to Home"
+            >
+              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+            </button>
+          </div>
+        )}
+
         {/* Main Content / Chat Stream Area */}
         <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 flex flex-col justify-between">
           {messages.length === 0 ? (
@@ -2091,6 +2112,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                         sources={msg.reportSources}
                         chart={msg.chartBase64}
                         chartMeta={msg.chartMeta}
+                        onSourceClick={handleSourceOpen}
                       />
                     ) : (
                       <div className="markdown-body text-[13px] leading-relaxed font-sans text-zinc-800 space-y-3">

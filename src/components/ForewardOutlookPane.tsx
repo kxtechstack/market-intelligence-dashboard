@@ -1023,6 +1023,18 @@ export default function ForewardOutlookPane({
         if (data?.trend_id) {
           pendingFocusSignalIdRef.current = navigatedItemId;
           console.log("[FO nav] setting pending ref to", navigatedItemId);
+          const tr = trends.find(t => t.id === data.trend_id);
+          const pub = (tr?.source_published_date || "").split("T")[0];
+          if (pub) {
+            if (startDateStr && pub < startDateStr) {
+              setStartDateStr(pub);
+              sessionStorage.setItem("foreward_outlook_start_date", pub);
+            }
+            if (endDateStr && pub > endDateStr) {
+              setEndDateStr(pub);
+              sessionStorage.setItem("foreward_outlook_end_date", pub);
+            }
+          }
           setSelectedTrendId(data.trend_id);
           setFocusTrigger((n) => n + 1);
         }

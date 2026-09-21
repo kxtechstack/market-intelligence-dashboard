@@ -237,7 +237,7 @@ export default function App() {
         {activeTab === "competitive_radar" && <CompetitiveRadarPane onReturn={handleReturn} />}
         {activeTab === "voice_of_customer" && <VoiceOfCustomerPane onReturn={handleReturn} />}
         
-        {activeTab === "decision_intelligence" && (
+        <div className={activeTab === "decision_intelligence" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
           <DecisionIntelligencePane 
             onReturn={handleReturn}
             onTabChange={(tabId, signalId) => {
@@ -250,7 +250,7 @@ export default function App() {
             industry={industry || ""}
             userId={userId || ""}
           />
-        )}
+        </div>
 
         <div className={activeTab === "my_bookmarks" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
           <MyBookmarksPane clientId={clientId || ""} userId={userId || ""} onNavigate={handleNavigateFromBookmarks} />

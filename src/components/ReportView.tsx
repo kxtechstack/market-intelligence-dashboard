@@ -1,5 +1,5 @@
 import React from "react";
-import { ExternalLink, BarChart2 } from "lucide-react";
+import { ExternalLink, BarChart2, ArrowUpRight } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DecisionReportPayload, InferenceReportPayload, ReportSource } from "../types";
@@ -10,11 +10,18 @@ const MODULE_FALLBACK: Record<string, string> = {
   '2eb989fd-0ea0-4320-b73a-f7eb8b970473': 'Forward Outlook',
 };
 
+const MODULE_TAB_LABEL: Record<string, string> = {
+  "Policy & Risk": "Policy & Risk Monitor",
+  "Market Dynamics": "Market Dynamics",
+  "Forward Outlook": "Forward Outlook",
+};
+
 interface ReportViewProps {
   report: DecisionReportPayload | InferenceReportPayload;
   sources?: ReportSource[];
   chart?: string | null;
   chartMeta?: { chartType?: string } | null;
+  onSourceClick?: (source: ReportSource) => void;
 }
 
 export default function ReportView({
@@ -22,6 +29,7 @@ export default function ReportView({
   sources,
   chart,
   chartMeta,
+  onSourceClick,
 }: ReportViewProps) {
   const isDecision = (
     rep: DecisionReportPayload | InferenceReportPayload
@@ -64,10 +72,11 @@ export default function ReportView({
           {sources.map((source, idx) => {
             const hasUrl = Boolean(source.url && source.url.trim());
             const isSec = source.type === "sec";
+            const tabLabel = !isSec && source.module && source.signal_id ? MODULE_TAB_LABEL[source.module] : undefined;
 
             const pillClass = isSec
-              ? "shrink-0 rounded-[3px] px-1.5 py-0.5 text-[9.5px] uppercase tracking-wider font-medium font-sans bg-amber-50 border border-amber-200/80 text-amber-800"
-              : "shrink-0 rounded-[3px] px-1.5 py-0.5 text-[9.5px] uppercase tracking-wider font-medium font-sans bg-blue-50 border border-blue-200/80 text-blue-800";
+              ? "shrink-0 w-[112px] flex items-center justify-center rounded-[3px] py-0.5 text-[9.5px] uppercase tracking-wider font-medium font-sans bg-amber-50 border border-amber-200/80 text-amber-800"
+              : "shrink-0 w-[112px] flex items-center justify-center rounded-[3px] py-0.5 text-[9.5px] uppercase tracking-wider font-medium font-sans bg-blue-50 border border-blue-200/80 text-blue-800";
 
             const pillLabel = isSec
               ? "10-K"
@@ -84,7 +93,7 @@ export default function ReportView({
             }
 
             const rowInnerClass =
-              "flex items-start gap-2 py-1.5 pl-2 " +
+              "flex items-start gap-4 py-1.5 pl-2 " +
               (idx > 0 ? "border-t border-zinc-100 " : "") +
               (hasUrl ? "group hover:bg-zinc-50/70 rounded-[3px] transition-colors" : "");
 
@@ -92,7 +101,7 @@ export default function ReportView({
               <div className={rowInnerClass}>
                 <span className={pillClass}>{pillLabel}</span>
                 <div className="flex-1 min-w-0">
-                  <span className="text-[11.5px] text-zinc-700 leading-normal">
+                  <span className="text-[11.5px] text-zinc-700 leading-normal group-hover:text-zinc-900 transition-colors">
                     {source.title}
                   </span>
                   {secSuffixParts.length > 0 && (
@@ -101,11 +110,29 @@ export default function ReportView({
                     </span>
                   )}
                 </div>
-                {hasUrl && (
-                  <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 shrink-0 mt-0.5" />
-                )}
+                {tabLabel && onSourceClick ? (
+                  <span title={`Open in ${tabLabel}`}>
+                    <ArrowUpRight 
+                      className="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#7c3aed] shrink-0 mt-0.5 transition-colors" 
+                    />
+                  </span>
+                ) : hasUrl ? (
+                  <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 shrink-0 mt-0.5 transition-colors" />
+                ) : null}
               </div>
             );
+
+                        if (tabLabel && onSourceClick) {
+              return (
+                <div
+                  key={source.index ?? idx}
+                  onClick={() => onSourceClick(source)}
+                  className="cursor-pointer group hover:bg-zinc-50/70 rounded-[3px] transition-colors"
+                >
+                  {contentNode}
+                </div>
+              );
+            }
 
             if (hasUrl && source.url) {
               return (
