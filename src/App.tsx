@@ -58,6 +58,16 @@ export default function App() {
 
   const [navigatedItemId, setNavigatedItemId] = useState<string | null>(null);
 
+  // Clear date filters on refresh (mount)
+  useEffect(() => {
+    sessionStorage.removeItem("policy_risk_start_date");
+    sessionStorage.removeItem("policy_risk_end_date");
+    sessionStorage.removeItem("market_dynamics_start_date");
+    sessionStorage.removeItem("market_dynamics_end_date");
+    sessionStorage.removeItem("foreward_outlook_start_date");
+    sessionStorage.removeItem("foreward_outlook_end_date");
+  }, []);
+
   const handleNavigateFromBookmarks = (module: string, id: string) => {
     setActiveTab(module);
     setNavigatedItemId(id);
