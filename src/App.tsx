@@ -27,7 +27,35 @@ export default function App() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>("decision_intelligence");
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const VALID_TABS = [
+    "policy_risk_monitor", "market_dynamics", "foreward_outlook", 
+    "latest", "find_opportunities", "competitive_radar", 
+    "voice_of_customer", "decision_intelligence", "my_bookmarks", 
+    "support", "settings"
+  ];
+
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("app_active_tab");
+      if (saved && VALID_TABS.includes(saved)) {
+        return saved;
+      }
+    } catch (e) {
+      console.error("Failed to read activeTab from localStorage", e);
+    }
+    return "decision_intelligence";
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("app_active_tab", activeTab);
+    } catch (e) {
+      console.error("Failed to save activeTab to localStorage", e);
+    }
+  }, [activeTab]);
+
   const [navigatedItemId, setNavigatedItemId] = useState<string | null>(null);
 
   const handleNavigateFromBookmarks = (module: string, id: string) => {
@@ -37,16 +65,65 @@ export default function App() {
   const [isRecoveryFlow, setIsRecoveryFlow] = useState(() => window.location.hash.includes('access_token'));
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const initializeAuth = async () => {
+      setAuthLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session && !isRecoveryFlow) {
+          const userEmail = session.user.email;
+          if (userEmail) {
+            // Look up client_id and id in admin.client_users
+            const { data: userData, error: userError } = await supabase
+              .schema('admin')
+              .from('client_users')
+              .select('id, client_id')
+              .eq('email', userEmail.toLowerCase())
+              .single();
+
+            if (userError || !userData?.client_id) {
+              console.error("Session restore: client lookup failed", userError);
+              await supabase.auth.signOut();
+            } else {
+              // Fetch client industry from admin.clients
+              const { data: clientData, error: clientError } = await supabase
+                .schema('admin')
+                .from('clients')
+                .select('industry')
+                .eq('id', userData.client_id)
+                .single();
+
+              setUserId(userData.id);
+              setClientId(userData.client_id);
+              setIndustry(clientData?.industry || "Retail");
+              setIsLoggedIn(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Auth initialization error:", err);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "PASSWORD_RECOVERY" || event === "USER_UPDATED") {
         setIsRecoveryFlow(true);
+      } else if (event === "SIGNED_OUT") {
+        setIsLoggedIn(false);
+        setUserId(null);
+        setClientId(null);
+        setIndustry(null);
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isRecoveryFlow]);
   const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 
@@ -181,6 +258,7 @@ export default function App() {
     sessionStorage.removeItem("market_dynamics_end_date");
     sessionStorage.removeItem("foreward_outlook_start_date");
     sessionStorage.removeItem("foreward_outlook_end_date");
+    localStorage.removeItem("app_active_tab");
     setIsLoggedIn(false);
     setActiveTab("decision_intelligence");
     setUserId(null);
@@ -286,6 +364,14 @@ export default function App() {
   };
   if (isRecoveryFlow) {
     return <SetPasswordPane onDone={() => setIsRecoveryFlow(false)} />;
+  }
+
+  if (authLoading) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-zinc-50">
+        <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
+      </div>
+    );
   }
 
   return (
