@@ -1521,6 +1521,7 @@ export default function MarketDynamicsPane({
                                    setActiveSignalDetail(null);
                                    setSelectedGridSignal(sig);
                                    setSelectedInsightId(sig.id || null);
+                                    setActiveTab("insights");
                                  }
                                }}
                                className={`px-4 py-3.5 border-b border-zinc-100 last:border-b-0 transition-all text-left cursor-pointer flex flex-col gap-1 ${
@@ -1618,11 +1619,6 @@ export default function MarketDynamicsPane({
 
         {activeTab === "insights" && renderedTrend && (
           <div key={renderedTrend.id} className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-5 animate-fade-in bg-[#fafafa]/30 select-text relative">
-            {isDetailLoading && (
-              <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] flex items-center justify-center z-10 animate-in fade-in duration-300">
-                 <Loader2 className="w-6 h-6 text-violet-600 animate-spin" />
-              </div>
-            )}
             
             {/* Category, Actions and Title */}
             <div className="flex flex-col gap-2">
@@ -1951,6 +1947,7 @@ export default function MarketDynamicsPane({
                           setSelectedGridSignal(null);
                           setActiveSignalDetail(null);
                           setSelectedInsightId(prospect.id);
+                          setActiveTab("insights");
                         }}
                         className="text-left text-zinc-700 hover:text-[#7c3aed] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans"
                       >

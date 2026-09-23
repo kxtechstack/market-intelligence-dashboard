@@ -1626,7 +1626,7 @@ export default function IntelligencePane({
                       </div>
                     )}
                   </div>
- 
+  
               {/* Form input bar */}
               <form
                 onSubmit={(e) => {

@@ -1916,7 +1916,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                         r="18"
                         fill="transparent"
                         className="cursor-pointer"
-                        onClick={() => setSelectedTrendId(trend.id)}
+                        onClick={() => { setSelectedTrendId(trend.id); setActiveTab("insights"); }}
                       />
                       {/* Solid node circle */}
                       <circle
@@ -1925,14 +1925,14 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                         r={nodeRadius}
                         fill={isSelected || isHovered ? "#7c3aed" : "#18181b"}
                         className="cursor-pointer transition-all duration-150"
-                        onClick={() => setSelectedTrendId(trend.id)}
+                        onClick={() => { setSelectedTrendId(trend.id); setActiveTab("insights"); }}
                       />
                       {/* Text labels adjacent to node */}
                       <text
                         x={pt.x + (trend.angle > 90 ? -12 : trend.angle < 90 ? 12 : 0)}
                         y={pt.y + (trend.angle > 85 && trend.angle < 95 ? -14 : 4)}
                         textAnchor={trend.angle > 90 ? "end" : trend.angle < 90 ? "start" : "middle"}
-                        onClick={() => setSelectedTrendId(trend.id)}
+                        onClick={() => { setSelectedTrendId(trend.id); setActiveTab("insights"); }}
                         className={`font-sans text-[10px] cursor-pointer font-medium select-none tracking-tight transition-colors duration-150 ${
                           isSelected || isHovered
                             ? "fill-[#7c3aed] font-bold" 
@@ -2266,11 +2266,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 {/* List of source tags/pills directly - NO dots, NO categorization as requested, COLLAPSIBLE */}
                 {isSourcesExpanded && (
                   <div className="flex flex-col gap-2 mt-1 animate-fade-in">
-                    {isSignalsLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-5 h-5 text-zinc-300 animate-spin" />
-                      </div>
-                    ) : selectedTrend.sources.length === 0 ? (
+                    {selectedTrend.sources.length === 0 ? (
                       <div className="text-[12px] text-zinc-400 py-4 text-center">
                         No signals associated with this horizon trend.
                       </div>
@@ -2395,7 +2391,12 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                       <div className="flex items-start gap-2 py-0.5" key={idx}>
                         <FileText className="w-3.5 h-3.5 text-zinc-400 mt-[2px] shrink-0 select-none" />
                         <button
-                          onClick={() => (prospect.trend_id || prospect.id) && setSelectedTrendId(prospect.trend_id || prospect.id)}
+                          onClick={() => {
+                            if (prospect.trend_id || prospect.id) {
+                              setSelectedTrendId(prospect.trend_id || prospect.id);
+                              setActiveTab("insights");
+                            }
+                          }}
                           className="text-left text-[12px] text-zinc-700 hover:text-[#7c3aed] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer"
                         >
                           {prospect.name || prospect.title}
