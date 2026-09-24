@@ -4,6 +4,7 @@ import {
   FileText, Lightbulb, Zap, Loader2, MessageSquare, Compass
 } from "lucide-react";
 import { ChatMessage } from "../types";
+import { MarketGenieMarkdown } from "./ReportView";
 
 interface AIChatPaneProps {
   chatHistory: ChatMessage[];
@@ -237,10 +238,13 @@ export default function AIChatPane({ chatHistory, setChatHistory, activeAlertTit
                         : "bg-white text-zinc-800 border-zinc-200"
                     }`}
                   >
-                    {/* Render helper text line-by-line to preserve structure */}
-                    <div className="whitespace-pre-wrap font-normal">
-                      {msg.text}
-                    </div>
+                    {isUser ? (
+                      <div className="whitespace-pre-wrap font-normal">
+                        {msg.text}
+                      </div>
+                    ) : (
+                      <MarketGenieMarkdown content={msg.text} />
+                    )}
                   </div>
                   <span className="text-[9px] text-zinc-400 mt-1 px-1">
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

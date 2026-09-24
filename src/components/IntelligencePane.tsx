@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { AlertItem, ChatMessage } from "../types";
 import { ChatSources } from "./ChatSources";
+import { MarketGenieMarkdown } from "./ReportView";
 import { POLICY_RISK_MODULE_ID, API_URL } from "../constants";
 import { supabase } from "../lib/supabase";
 
@@ -1577,9 +1578,15 @@ export default function IntelligencePane({
                                     : "bg-zinc-50/60 text-zinc-800 border-zinc-200 font-sans"
                                 }`}
                               >
-                                <div className="whitespace-pre-wrap font-normal animate-fade-in">
-                                  {msg.text}
-                                </div>
+                                {isUser ? (
+                                  <div className="whitespace-pre-wrap font-normal animate-fade-in">
+                                    {msg.text}
+                                  </div>
+                                ) : (
+                                  <div className="animate-fade-in">
+                                    <MarketGenieMarkdown content={msg.text} />
+                                  </div>
+                                )}
                                 <ChatSources sources={'sources' in msg ? (msg as any).sources || [] : []} />
                                 {msg.detailedText && (
                                   <div className="mt-2 text-[12px] font-normal leading-relaxed text-zinc-700 animate-fade-in">

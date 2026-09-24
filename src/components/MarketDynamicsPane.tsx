@@ -3,6 +3,7 @@ import { Sparkles, Bookmark, Share2, FileText, Send, Loader2, ArrowUpRight, Aler
 import { supabase } from "../lib/supabase";
 import { SourceItem } from "./ForewardOutlookPane";
 import { ChatSources } from "./ChatSources";
+import { MarketGenieMarkdown } from "./ReportView";
 import { MARKET_DYNAMICS_MODULE_ID, API_URL } from "../constants";
 
 interface MarketDynamicsPaneProps {
@@ -2015,7 +2016,11 @@ export default function MarketDynamicsPane({
                         : "bg-violet-50 text-zinc-800 border border-violet-100 self-start rounded-bl-none"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                    {msg.role === "user" ? (
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    ) : (
+                      <MarketGenieMarkdown content={msg.text} />
+                    )}
                     <ChatSources sources={msg.sources || []} />
                   </div>
                 ))

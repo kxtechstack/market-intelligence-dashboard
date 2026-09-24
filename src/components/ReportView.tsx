@@ -163,41 +163,7 @@ export default function ReportView({
     const hasChartInFallback = Boolean(chart && chart.trim());
     return (
       <div className="w-full">
-        <div className="markdown-body text-[13px] leading-relaxed font-sans text-zinc-800 space-y-3">
-          <Markdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              h3: ({ children }) => (
-                <h3 className="text-[15px] font-bold text-zinc-900 mt-4 mb-2 font-sans border-b border-zinc-200/80 pb-1.5">
-                  {children}
-                </h3>
-              ),
-              h4: ({ children }) => (
-                <h4 className="text-[13.5px] font-bold text-zinc-900 mt-3.5 mb-1.5 font-sans">
-                  {children}
-                </h4>
-              ),
-              p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
-              ul: ({ children }) => (
-                <ul className="list-disc pl-5 my-2 space-y-1 text-zinc-700">{children}</ul>
-              ),
-              ol: ({ children }) => (
-                <ol className="list-decimal pl-5 my-2 space-y-1 text-zinc-700">{children}</ol>
-              ),
-              li: ({ children }) => (
-                <li className="leading-normal text-[12.5px] py-0.5 text-zinc-700">
-                  {children}
-                </li>
-              ),
-              strong: ({ children }) => (
-                <strong className="font-semibold text-zinc-900">{children}</strong>
-              ),
-              em: ({ children }) => <em className="italic text-zinc-600">{children}</em>,
-            }}
-          >
-            {report.bodyText}
-          </Markdown>
-        </div>
+        <MarketGenieMarkdown content={report.bodyText} />
 
         {hasChartInFallback && (
           <div className="mt-4 pt-3 border-t border-zinc-200/60">
@@ -404,3 +370,117 @@ export default function ReportView({
     </div>
   );
 }
+
+interface MarketGenieMarkdownProps {
+  content: string;
+  className?: string;
+}
+
+export function MarketGenieMarkdown({ content, className = "" }: MarketGenieMarkdownProps) {
+  if (!content) return null;
+
+  return (
+    <div className={`markdown-body text-[12.5px] leading-relaxed font-sans text-zinc-800 space-y-2.5 ${className}`}>
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => (
+            <h1 className="text-[15px] font-bold text-zinc-900 mt-4 mb-2 font-sans border-b border-zinc-200/80 pb-1.5 first:mt-0">
+              {children}
+            </h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-[14px] font-bold text-zinc-900 mt-3.5 mb-1.5 font-sans border-b border-zinc-200/60 pb-1 first:mt-0">
+              {children}
+            </h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-[13.5px] font-bold text-zinc-900 mt-3 mb-1 font-sans first:mt-0">
+              {children}
+            </h3>
+          ),
+          h4: ({ children }) => (
+            <h4 className="text-[13px] font-bold text-zinc-900 mt-2.5 mb-1 font-sans first:mt-0">
+              {children}
+            </h4>
+          ),
+          h5: ({ children }) => (
+            <h5 className="text-[12.5px] font-bold text-zinc-900 mt-2 mb-1 font-sans first:mt-0">
+              {children}
+            </h5>
+          ),
+          h6: ({ children }) => (
+            <h6 className="text-[12px] font-bold text-zinc-900 mt-2 mb-1 font-sans first:mt-0">
+              {children}
+            </h6>
+          ),
+          p: ({ children }) => (
+            <p className="mb-2 last:mb-0 leading-relaxed text-zinc-800">{children}</p>
+          ),
+          ul: ({ children }) => (
+            <ul className="list-disc pl-5 my-2 space-y-1 text-zinc-700 [&_ul]:list-[circle] [&_ul]:my-1 [&_ul]:pl-4">
+              {children}
+            </ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal pl-5 my-2 space-y-1 text-zinc-700 [&_ol]:list-[lower-alpha] [&_ol]:my-1 [&_ol]:pl-4">
+              {children}
+            </ol>
+          ),
+          li: ({ children }) => (
+            <li className="leading-normal text-[12.5px] py-0.5 text-zinc-700">
+              {children}
+            </li>
+          ),
+          strong: ({ children }) => (
+            <strong className="font-semibold text-zinc-900">{children}</strong>
+          ),
+          em: ({ children }) => (
+            <em className="italic text-zinc-600">{children}</em>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-[#7c3aed]/50 pl-3 my-2 text-zinc-600 italic">
+              {children}
+            </blockquote>
+          ),
+          code: ({ children }) => (
+            <code className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-800 text-[11.5px] font-mono">
+              {children}
+            </code>
+          ),
+          pre: ({ children }) => (
+            <pre className="p-2.5 rounded bg-zinc-100 text-zinc-800 text-[11.5px] font-mono overflow-x-auto my-2">
+              {children}
+            </pre>
+          ),
+          table: ({ children }) => (
+            <div className="my-2.5 overflow-x-auto rounded border border-zinc-200">
+              <table className="w-full text-left text-[11.5px] border-collapse bg-white">
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children }) => (
+            <thead className="bg-zinc-100 border-b border-zinc-200 font-semibold text-zinc-900">
+              {children}
+            </thead>
+          ),
+          th: ({ children }) => (
+            <th className="px-2.5 py-1.5 font-semibold text-zinc-900 border-b border-zinc-200">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="px-2.5 py-1.5 text-zinc-800 border-b border-zinc-100">
+              {children}
+            </td>
+          ),
+          hr: () => <hr className="my-2.5 border-zinc-200/80" />,
+        }}
+      >
+        {content}
+      </Markdown>
+    </div>
+  );
+}
+

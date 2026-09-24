@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft, ArrowDown, Minus } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { ChatSources } from "./ChatSources";
+import { MarketGenieMarkdown } from "./ReportView";
 import { FORWARD_OUTLOOK_MODULE_ID, API_URL } from "../constants";
 
 interface ForewardOutlookPaneProps {
@@ -2463,7 +2464,11 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                           : "bg-violet-50 text-zinc-800 border border-violet-100 self-start rounded-bl-none"
                       }`}
                     >
-                      <p className="font-sans whitespace-pre-wrap">{msg.text}</p>
+                      {msg.role === "user" ? (
+                        <p className="font-sans whitespace-pre-wrap">{msg.text}</p>
+                      ) : (
+                        <MarketGenieMarkdown content={msg.text} />
+                      )}
                       <ChatSources sources={msg.sources || []} />
                     </div>
                   ))
