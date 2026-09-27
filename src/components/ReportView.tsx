@@ -241,6 +241,20 @@ export default function ReportView({
         </div>
       )}
 
+            {/* 3b. Analysis */}
+      {Boolean(
+        (report as any).analysis &&
+          ((typeof (report as any).analysis === "string" && (report as any).analysis.trim()) ||
+           (Array.isArray((report as any).analysis) && (report as any).analysis.length > 0))
+      ) && (
+        <div>
+          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+            Analysis
+          </h4>
+          {renderTextOrArray((report as any).analysis)}
+        </div>
+      )}
+
       {/* 4. Key Movement & Impact Analysis */}
       {hasKeyMovement && report.key_movement_analysis && (
         <div>
@@ -292,6 +306,20 @@ export default function ReportView({
             alt="Data visualization"
             className="w-full max-w-md rounded-[4px] border border-zinc-200 bg-white"
           />
+        </div>
+      )}
+
+            {/* 5b. Key Facts */}
+      {Boolean((report as any).key_facts && Array.isArray((report as any).key_facts) && (report as any).key_facts.length > 0) && (
+        <div>
+          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+            Key Facts
+          </h4>
+          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] text-zinc-700">
+            {(report as any).key_facts.map((fact: string, idx: number) => (
+              <li key={idx}>{fact}</li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -1884,6 +1884,14 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
       } as any;
 
       setMessages((prev) => [...prev.filter((m) => m.id !== modelId), initialModelMessage]);
+      // If the response is a structured report, skip fake streaming -- ReportView
+// renders directly from the report object, so the typewriter timer just
+// adds latency for no visual benefit.
+if (report) {
+  setLoading(false);
+  loadConversations();
+  return;
+}
 
       const wordsPerTick = 12;
       const intervalTime = 25;
