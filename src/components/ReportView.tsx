@@ -61,7 +61,7 @@ export default function ReportView({
 
   const hasSources = Boolean(sources && sources.length > 0);
 
-  const renderSourcesSection = () => {
+    const renderSourcesSection = () => {
     if (!hasSources || !sources) return null;
     return (
       <div className="mt-4 pt-3 border-t border-zinc-200/60 font-sans">
@@ -72,7 +72,61 @@ export default function ReportView({
           {sources.map((source, idx) => {
             const hasUrl = Boolean(source.url && source.url.trim());
             const isSec = source.type === "sec";
-            const tabLabel = !isSec && source.module && source.signal_id ? MODULE_TAB_LABEL[source.module] : undefined;
+            const isCustomSource = source.type === "custom_source";
+
+            // ── Custom-source citation: single row per uploaded document.
+            // The backend already dedupes to one entry per source_id, so we
+            // just render a document chip that links straight to the PDF
+            // (or the signed URL for uploaded files).
+            if (isCustomSource) {
+              const docLabel =
+                (source.source_type || "file").toUpperCase() === "PDF"
+                  ? "PDF"
+                  : (source.source_type || "FILE").toUpperCase();
+
+              const rowInner = (
+                <div
+                  className={
+                    "flex items-start gap-4 py-1.5 pl-2 " +
+                    (idx > 0 ? "border-t border-zinc-100 " : "") +
+                    (hasUrl ? "group hover:bg-zinc-50/70 rounded-[3px] transition-colors" : "")
+                  }
+                >
+                  <span className="shrink-0 w-[112px] flex items-center justify-center rounded-[3px] py-0.5 text-[9.5px] uppercase tracking-wider font-medium font-sans bg-violet-50 border border-violet-200/80 text-violet-800">
+                    {docLabel}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11.5px] text-zinc-700 leading-normal group-hover:text-zinc-900 transition-colors">
+                      {source.source_name || source.title || "Uploaded document"}
+                    </span>
+                  </div>
+                  {hasUrl && (
+                    <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 shrink-0 mt-0.5 transition-colors" />
+                  )}
+                </div>
+              );
+
+              if (hasUrl && source.url) {
+                return (
+                  <a
+                    key={source.index ?? idx}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-left no-underline"
+                  >
+                    {rowInner}
+                  </a>
+                );
+              }
+              return <div key={source.index ?? idx}>{rowInner}</div>;
+            }
+
+            // ── SEC / client-signal citations (existing rendering) ──
+            const tabLabel =
+              !isSec && source.module && source.signal_id
+                ? MODULE_TAB_LABEL[source.module]
+                : undefined;
 
             const pillClass = isSec
               ? "shrink-0 w-[112px] flex items-center justify-center rounded-[3px] py-0.5 text-[9.5px] uppercase tracking-wider font-medium font-sans bg-amber-50 border border-amber-200/80 text-amber-800"
@@ -80,22 +134,22 @@ export default function ReportView({
 
             const pillLabel = isSec
               ? "10-K"
-              : (source.module && MODULE_FALLBACK[source.module]) || source.module || "Client";
+              : (source.module && MODULE_FALLBACK[source.module]) ||
+                source.module ||
+                "Client";
 
             const secSuffixParts: string[] = [];
             if (isSec) {
-              if (source.fiscal_year) {
-                secSuffixParts.push(`FY${source.fiscal_year}`);
-              }
-              if (source.item_code) {
-                secSuffixParts.push(source.item_code);
-              }
+              if (source.fiscal_year) secSuffixParts.push(`FY${source.fiscal_year}`);
+              if (source.item_code) secSuffixParts.push(source.item_code);
             }
 
             const rowInnerClass =
               "flex items-start gap-4 py-1.5 pl-2 " +
               (idx > 0 ? "border-t border-zinc-100 " : "") +
-              (hasUrl ? "group hover:bg-zinc-50/70 rounded-[3px] transition-colors" : "");
+              (hasUrl
+                ? "group hover:bg-zinc-50/70 rounded-[3px] transition-colors"
+                : "");
 
             const contentNode = (
               <div className={rowInnerClass}>
@@ -112,9 +166,7 @@ export default function ReportView({
                 </div>
                 {tabLabel && onSourceClick ? (
                   <span title={`Open in ${tabLabel}`}>
-                    <ArrowUpRight 
-                      className="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#7c3aed] shrink-0 mt-0.5 transition-colors" 
-                    />
+                    <ArrowUpRight className="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#7c3aed] shrink-0 mt-0.5 transition-colors" />
                   </span>
                 ) : hasUrl ? (
                   <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 shrink-0 mt-0.5 transition-colors" />
@@ -122,7 +174,7 @@ export default function ReportView({
               </div>
             );
 
-                        if (tabLabel && onSourceClick) {
+            if (tabLabel && onSourceClick) {
               return (
                 <div
                   key={source.index ?? idx}
