@@ -1111,8 +1111,8 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 r,
                 angle,
                 summary: item.write_up?.summary || "",
-                country: "Global",
-                source_type: "Market Intelligence",
+                country: item.country || "",
+                source_type: item.source_type || "Market Intelligence",
                 source_published_date: item.last_updated_at || item.created_at,
                 impact_level: item.write_up?.impact || "Medium",
                 business_impact: item.write_up?.business_impact || [],
@@ -1181,7 +1181,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
               source_name: s.signal_title || "Signal",
               details: s.summary || "",
               category: s.signal_type as any || "Innovation",
-              date: s.source_published_date ? new Date(s.source_published_date).toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : "Jul 23",
+              date: s.source_published_date ? new Date(s.source_published_date).toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : "",
               organization: s.organization,
               source_url: s.source_article_url
             }));
@@ -1579,7 +1579,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
   const formattedPublishDate = useMemo(() => {
     if (!selectedTrend) return "";
     const d = new Date(selectedTrend.source_published_date);
-    if (isNaN(d.getTime())) return "July 2026";
+    if (isNaN(d.getTime())) return "N/A";
     return d.toLocaleDateString("en-US", {
       month: "long",
       day: "numeric",
@@ -2346,7 +2346,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                               <div className="flex flex-col bg-white border border-zinc-100 rounded-[4px] px-3 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                                 <div className="flex items-center justify-between py-1 border-b border-zinc-50">
                                   <span className="text-zinc-600 text-[10.5px]">Published date</span>
-                                  <span className="text-zinc-900 text-[10.5px] font-medium">{src.date} 2026</span>
+                                  <span className="text-zinc-900 text-[10.5px] font-medium">{src.date}</span>
                                 </div>
                                 <div className="flex items-center justify-between py-1 border-b border-zinc-50">
                                   <span className="text-zinc-600 text-[10.5px]">Organisation</span>

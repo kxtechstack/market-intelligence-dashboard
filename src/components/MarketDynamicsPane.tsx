@@ -1121,35 +1121,67 @@ export default function MarketDynamicsPane({
 
 
   const renderedTrend = useMemo(() => {
+    // 1. Prefer the active detail with full sources if available
     if (activeSignalDetail && selectedInsightId && activeSignalDetail.id === selectedInsightId) {
       return activeSignalDetail;
     }
-    if (selectedGridSignal) {
+
+    // 2. If we have an insight ID but details are still loading, use the preview data from marketInsights
+    if (selectedInsightId) {
+      const insight = marketInsights.find(mi => mi.id === selectedInsightId);
+      if (insight) {
+        return {
+          id: insight.id,
+          title: insight.title || insight.summary || "",
+          sector: insight.category || "General",
+          term: (insight.ring === "long_term" ? "Long-Term" : insight.ring === "mid_term" ? "Mid-Term" : "Near-Term") as any,
+          impact_level: (() => {
+            const rel = (insight.relevance_level_live || "").toLowerCase();
+            if (rel === "critical") return "Critical";
+            if (rel === "high") return "High";
+            if (rel === "medium") return "Medium";
+            if (rel === "low") return "Low";
+            return "Medium";
+          })() as any,
+          confidence: "High",
+          summary: insight.summary || "",
+          business_impact: [],
+          sources: [],
+          country: insight.country || "",
+          last_enriched_at: insight.last_enriched_at,
+          created_at: insight.created_at,
+          trendStatus: "Stable" as const,
+          signalsCount: 0
+        };
+      }
+    }
+
+    // 3. Fallback to mock generation ONLY if there is no selectedInsightId (legacy/mock path)
+    if (selectedGridSignal && !selectedInsightId) {
       const details = getSignalDetails(selectedGridSignal, selectedCategory);
       return {
-        id: selectedInsightId || details.title,
+        id: details.title,
         title: details.title,
         sector: details.category as any,
         term: details.term,
         r: 100,
         angle: 45,
         summary: details.summary,
-        country: "Global",
+        country: details.country,
         source_type: "Market Report",
-        source_published_date: "2026-07-21T00:00:00Z",
+        source_published_date: "",
         impact_level: details.impact_level,
         business_impact: details.business_impact,
         textAnchor: "start" as const,
         dx: 0,
         dy: 0,
         confidence: details.confidence,
-        signalsCount: selectedInsightId ? 0 : details.sources.length,
+        signalsCount: details.sources.length,
         trendStatus: "Trending up" as const,
         statValue1: "",
         statValue2: "",
         sparklinePath: "M0 15 L8 12 L16 14 L24 8 L32 9 L40 3",
-        // If we have selectedInsightId, we are loading real sources, so hide mock ones
-        sources: selectedInsightId ? [] : details.sources.map(src => {
+        sources: details.sources.map(src => {
           const originalCat = src.category;
           const mappedCat = mapToEightCategories({
             source_name: src.source_name,
@@ -1168,7 +1200,7 @@ export default function MarketDynamicsPane({
       };
     }
     return null;
-  }, [selectedGridSignal, selectedCategory, activeSignalDetail, selectedInsightId]);
+  }, [selectedGridSignal, selectedCategory, activeSignalDetail, selectedInsightId, marketInsights]);
 
   const isCurrentTrendBookmarked = !!(renderedTrend?.id && isBookmarked[renderedTrend.id]);
 
@@ -1268,9 +1300,10 @@ export default function MarketDynamicsPane({
   };
 
   const formattedPublishDate = useMemo(() => {
-    const dateVal = activeSignalDetail?.last_enriched_at || activeSignalDetail?.created_at || (renderedTrend as any)?.source_published_date || (renderedTrend as any)?.created_at;
-    const d = new Date(dateVal || "2026-07-21");
-    if (isNaN(d.getTime())) return "July 21, 2026";
+    const dateVal = activeSignalDetail?.last_enriched_at || activeSignalDetail?.created_at || (renderedTrend as any)?.last_enriched_at || (renderedTrend as any)?.created_at || (renderedTrend as any)?.source_published_date;
+    if (!dateVal) return "N/A";
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "N/A";
     return d.toLocaleDateString("en-US", {
       month: "long",
       day: "numeric",
@@ -1899,7 +1932,7 @@ export default function MarketDynamicsPane({
                             <div className="flex flex-col bg-white border border-zinc-100 rounded-[4px] px-3 mt-1 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-[10.5px]">
                               <div className="flex items-center justify-between py-1 border-b border-zinc-50">
                                 <span className="text-zinc-600">Published date</span>
-                                <span className="text-zinc-900 font-medium">{src.date} 2026</span>
+                                <span className="text-zinc-900 font-medium">{src.date}</span>
                               </div>
                               <div className="flex items-center justify-between py-1 border-b border-zinc-50">
                                 <span className="text-zinc-600">Organisation</span>

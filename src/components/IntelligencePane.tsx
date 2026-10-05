@@ -456,7 +456,7 @@ export default function IntelligencePane({
 
   const dateDetected = selectedAlert?.source_published_date ? formatDateHuman(selectedAlert.source_published_date) : "";
 
-  const sourceType = selectedAlert?.source_type || selectedAlert?.source || "Regulatory Consultation";
+  const sourceType = selectedAlert?.source_type || selectedAlert?.source || "N/A";
 
   const country = selectedAlert?.country || "";
 
@@ -680,11 +680,11 @@ export default function IntelligencePane({
     if (impact === "high") return 3;
     if (impact === "medium") return 2;
     if (impact === "low") return 1;
-    return 2;
+    return 0;
   };
 
   const getImpactLabel = (alert: AlertItem): string => {
-    return alert.impact_level || "Medium";
+    return alert.impact_level || "N/A";
   };
 
   const resolveTagColor = (alert: AlertItem) => {
