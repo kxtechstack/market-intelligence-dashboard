@@ -73,7 +73,7 @@ export interface DailyHighlight {
 
 export interface ReportSource {
   index: number;
-  type: 'client' | 'sec';
+  type: 'client' | 'sec' | 'custom_source';
   title: string;
   url: string | null;
   module?: string | null;
@@ -84,38 +84,58 @@ export interface ReportSource {
   ticker?: string;
   fiscal_year?: number;
   item_code?: string;
+  source_name?: string;
+  source_type?: string;
 }
+
+export type ReportBlock =
+  | { type: 'heading'; text: string }
+  | { type: 'paragraph'; text: string }
+  | { type: 'bullets'; items: string[] }
+  | { type: 'numbered_list'; items: string[] }
+  | { type: 'table'; columns: string[]; rows: { cells: string[] }[] }
+  | { type: 'callout'; text: string; intent?: 'info' | 'warning' | 'success' };
 
 export interface DecisionReportPayload {
   title: string;
   outlook: string | string[];
+  analysis?: string | string[];
   key_movement_analysis?: {
     columns: string[];
     rows: { cells: string[] }[];
   };
   driving_factors?: string[];
+  key_facts?: string[];
   what_to_watch?: string | string[];
   decision_implication?: string;
   bottom_line?: string;
   confidence_evidence?: { label: string; value: string }[];
   bodyText?: string;
+  sections?: { heading: string; points: string[] }[];
+  blocks?: ReportBlock[];
 }
 
 export interface InferenceReportPayload {
   title: string;
   outlook?: string | string[];
+  analysis?: string | string[];
   key_movement_analysis?: {
     columns: string[];
     rows: { cells: string[] }[];
   };
   driving_factors?: string[];
+  key_facts?: string[];
   what_to_watch?: string | string[];
   bottom_line?: string;
   bodyText?: string;
+  sections?: { heading: string; points: string[] }[];
+  blocks?: ReportBlock[];
 }
 
 export interface FrameworkReportPayload {
   title: string;
   bodyText: string;
+  sections?: { heading: string; points: string[] }[];
+  blocks?: ReportBlock[];
 }
 

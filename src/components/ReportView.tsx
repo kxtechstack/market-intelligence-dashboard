@@ -2,7 +2,7 @@ import React from "react";
 import { ExternalLink, BarChart2, ArrowUpRight } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { DecisionReportPayload, InferenceReportPayload, ReportSource } from "../types";
+import { DecisionReportPayload, InferenceReportPayload, ReportSource, ReportBlock, FrameworkReportPayload } from "../types";
 
 const MODULE_FALLBACK: Record<string, string> = {
   '777a2b2e-8bb2-44ef-a4f2-1c0c1e03b960': 'Policy & Risk',
@@ -17,7 +17,7 @@ const MODULE_TAB_LABEL: Record<string, string> = {
 };
 
 interface ReportViewProps {
-  report: DecisionReportPayload | InferenceReportPayload;
+  report: DecisionReportPayload | InferenceReportPayload | FrameworkReportPayload;
   sources?: ReportSource[];
   chart?: string | null;
   chartMeta?: { chartType?: string } | null;
@@ -32,7 +32,7 @@ export default function ReportView({
   onSourceClick,
 }: ReportViewProps) {
   const isDecision = (
-    rep: DecisionReportPayload | InferenceReportPayload
+    rep: DecisionReportPayload | InferenceReportPayload | FrameworkReportPayload
   ): rep is DecisionReportPayload => {
     return "decision_implication" in rep || "confidence_evidence" in rep;
   };
@@ -47,21 +47,95 @@ export default function ReportView({
       const filtered = content.filter((item) => Boolean(item && item.trim()));
       if (filtered.length === 0) return null;
       return (
-        <>
+        <div className="mb-2">
           {filtered.map((item, idx) => (
             <p key={idx} className="text-[13px] leading-relaxed text-zinc-800 mb-2">
               {item}
             </p>
           ))}
-        </>
+        </div>
       );
     }
     return null;
   };
 
+  const renderBlock = (block: ReportBlock, index: number) => {
+    switch (block.type) {
+      case "heading":
+        return (
+          <h4 key={index} className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+            {block.text}
+          </h4>
+        );
+      case "paragraph":
+        return (
+          <p key={index} className="text-[13px] leading-relaxed text-zinc-800 mb-2">
+            {block.text}
+          </p>
+        );
+      case "bullets":
+        return (
+          <ul key={index} className="list-disc pl-5 my-2 space-y-1 text-[13px] text-zinc-700">
+            {block.items.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        );
+      case "numbered_list":
+        return (
+          <ol key={index} className="list-decimal pl-5 my-2 space-y-1 text-[13px] text-zinc-700">
+            {block.items.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ol>
+        );
+      case "table":
+        return (
+          <div key={index} className="my-3 overflow-x-auto rounded-[6px] border border-zinc-200 shadow-2xs">
+            <table className="w-full text-left text-[12px] border-collapse bg-white">
+              <thead className="bg-zinc-100/90 border-b border-zinc-200 text-zinc-900 font-semibold uppercase text-[10px] tracking-wider">
+                <tr>
+                  {block.columns.map((col, idx) => (
+                    <th key={idx} className="px-3.5 py-2.5 font-semibold text-zinc-900">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200/70 text-zinc-800">
+                {block.rows.map((row, rIdx) => (
+                  <tr key={rIdx}>
+                    {row.cells.map((cell, cIdx) => (
+                      <td key={cIdx} className="px-3.5 py-2.5 text-zinc-800">
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      case "callout":
+        const intentClass =
+          block.intent === "warning"
+            ? "bg-amber-50 border-amber-200 text-amber-800"
+            : block.intent === "success"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+            : "bg-blue-50 border-blue-200 text-blue-800";
+        return (
+          <div key={index} className={`my-3 p-3 rounded-[6px] border text-[12.5px] leading-relaxed ${intentClass}`}>
+            {block.text}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   const hasSources = Boolean(sources && sources.length > 0);
 
-    const renderSourcesSection = () => {
+  const renderSourcesSection = () => {
     if (!hasSources || !sources) return null;
     return (
       <div className="mt-4 pt-3 border-t border-zinc-200/60 font-sans">
@@ -74,10 +148,6 @@ export default function ReportView({
             const isSec = source.type === "sec";
             const isCustomSource = source.type === "custom_source";
 
-            // ── Custom-source citation: single row per uploaded document.
-            // The backend already dedupes to one entry per source_id, so we
-            // just render a document chip that links straight to the PDF
-            // (or the signed URL for uploaded files).
             if (isCustomSource) {
               const docLabel =
                 (source.source_type || "file").toUpperCase() === "PDF"
@@ -122,7 +192,6 @@ export default function ReportView({
               return <div key={source.index ?? idx}>{rowInner}</div>;
             }
 
-            // ── SEC / client-signal citations (existing rendering) ──
             const tabLabel =
               !isSec && source.module && source.signal_id
                 ? MODULE_TAB_LABEL[source.module]
@@ -207,93 +276,77 @@ export default function ReportView({
     );
   };
 
-  // 1. Fallback path: If report.bodyText is a non-empty string, render it
-  // as markdown -- this is the framework report shape (SWOT, PESTLE, Five
-  // Forces, Risk Analysis) which comes back from the LLM as text with
-  // **bold headers** and - bullet lists.
-  if (report.bodyText && report.bodyText.trim()) {
-    const hasChartInFallback = Boolean(chart && chart.trim());
-    return (
-      <div className="w-full">
-        <MarketGenieMarkdown content={report.bodyText} />
-
-        {hasChartInFallback && (
-          <div className="mt-4 pt-3 border-t border-zinc-200/60">
-            <div className="text-[11.5px] font-semibold text-zinc-700 mb-2 flex items-center gap-1.5">
-              <BarChart2 className="w-3.5 h-3.5 text-[#7c3aed]" />
-              <span>
-                {chartMeta?.chartType
-                  ? chartMeta.chartType.charAt(0).toUpperCase() +
-                    chartMeta.chartType.slice(1) +
-                    " Chart"
-                  : "Chart"}
-              </span>
-            </div>
-            <img
-              src={"data:image/png;base64," + chart}
-              alt="Data visualization"
-              className="w-full max-w-md rounded-[4px] border border-zinc-200 bg-white"
-            />
-          </div>
-        )}
-
-        {renderSourcesSection()}
-      </div>
-    );
-  }
-
-  // Structured report view
-  const hasKeyMovement = Boolean(
-    report.key_movement_analysis &&
-      report.key_movement_analysis.columns &&
-      report.key_movement_analysis.columns.length > 0 &&
-      report.key_movement_analysis.rows &&
-      report.key_movement_analysis.rows.length > 0
-  );
-
-  const hasDrivingFactors = Boolean(
-    report.driving_factors && report.driving_factors.length > 0
-  );
-
   const hasChart = Boolean(chart && chart.trim());
 
   const decisionImplication =
-    isDecision(report) && report.decision_implication && report.decision_implication.trim()
-      ? report.decision_implication
+    isDecision(report) && (report as any).decision_implication && (report as any).decision_implication.trim()
+      ? (report as any).decision_implication
       : null;
 
   const confidenceEvidence =
     isDecision(report) &&
-    report.confidence_evidence &&
-    report.confidence_evidence.length > 0
-      ? report.confidence_evidence
+    (report as any).confidence_evidence &&
+    (report as any).confidence_evidence.length > 0
+      ? (report as any).confidence_evidence
       : null;
+
+  // Internal conversion of sections to blocks for Phase 2 readiness
+  const blocks: ReportBlock[] = [];
+  if (report.sections) {
+    report.sections.forEach((s) => {
+      if (s.heading) blocks.push({ type: "heading", text: s.heading });
+      if (s.points && s.points.length > 0) blocks.push({ type: "bullets", items: s.points });
+    });
+  }
+  if (report.blocks) {
+    blocks.push(...report.blocks);
+  }
+
+  const hasKeyMovement = Boolean(
+    (report as any).key_movement_analysis &&
+      (report as any).key_movement_analysis.columns &&
+      (report as any).key_movement_analysis.columns.length > 0 &&
+      (report as any).key_movement_analysis.rows &&
+      (report as any).key_movement_analysis.rows.length > 0
+  );
+
+  const hasDrivingFactors = Boolean(
+    (report as any).driving_factors && (report as any).driving_factors.length > 0
+  );
 
   return (
     <div className="w-full">
-      {/* 2. Title */}
+      {/* 1. Title */}
       {report.title && report.title.trim() && (
         <h3 className="text-[15px] font-bold text-zinc-900 mb-3 font-sans">
           {report.title}
         </h3>
       )}
 
-      {/* 3. Outlook */}
+      {/* 2. Body Text (Legacy Markdown Fallback - Prioritized First) */}
+      {report.bodyText && report.bodyText.trim() && (
+        <MarketGenieMarkdown content={report.bodyText} />
+      )}
+
+      {/* 3. Structured Blocks (Phase 1 sections converted to blocks + Phase 2 native blocks) */}
+      {blocks.map((block, i) => renderBlock(block, i))}
+
+      {/* 4. Outlook (Legacy) */}
       {Boolean(
-        report.outlook &&
-          (typeof report.outlook === "string"
-            ? report.outlook.trim()
-            : report.outlook.length > 0)
+        (report as any).outlook &&
+          (typeof (report as any).outlook === "string"
+            ? (report as any).outlook.trim()
+            : (report as any).outlook.length > 0)
       ) && (
         <div>
           <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
             Outlook
           </h4>
-          {renderTextOrArray(report.outlook)}
+          {renderTextOrArray((report as any).outlook)}
         </div>
       )}
 
-            {/* 3b. Analysis */}
+      {/* 5. Analysis (Legacy) */}
       {Boolean(
         (report as any).analysis &&
           ((typeof (report as any).analysis === "string" && (report as any).analysis.trim()) ||
@@ -307,8 +360,8 @@ export default function ReportView({
         </div>
       )}
 
-      {/* 4. Key Movement & Impact Analysis */}
-      {hasKeyMovement && report.key_movement_analysis && (
+      {/* 6. Key Movement & Impact Analysis (Legacy Table) */}
+      {hasKeyMovement && (report as any).key_movement_analysis && (
         <div>
           <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
             Key Movement & Impact Analysis
@@ -317,7 +370,7 @@ export default function ReportView({
             <table className="w-full text-left text-[12px] border-collapse bg-white">
               <thead className="bg-zinc-100/90 border-b border-zinc-200 text-zinc-900 font-semibold uppercase text-[10px] tracking-wider">
                 <tr>
-                  {report.key_movement_analysis.columns.map((col, idx) => (
+                  {(report as any).key_movement_analysis.columns.map((col: string, idx: number) => (
                     <th key={idx} className="px-3.5 py-2.5 font-semibold text-zinc-900">
                       {col}
                     </th>
@@ -325,9 +378,9 @@ export default function ReportView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200/70 text-zinc-800">
-                {report.key_movement_analysis.rows.map((row, rIdx) => (
+                {(report as any).key_movement_analysis.rows.map((row: any, rIdx: number) => (
                   <tr key={rIdx}>
-                    {row.cells.map((cell, cIdx) => (
+                    {row.cells.map((cell: string, cIdx: number) => (
                       <td key={cIdx} className="px-3.5 py-2.5 text-zinc-800">
                         {cell}
                       </td>
@@ -340,7 +393,7 @@ export default function ReportView({
         </div>
       )}
 
-      {/* 5. Chart */}
+      {/* 7. Chart (Positioned after primary content) */}
       {hasChart && (
         <div className="mt-4 pt-3 border-t border-zinc-200/60">
           <div className="text-[11.5px] font-semibold text-zinc-700 mb-2 flex items-center gap-1.5">
@@ -361,7 +414,7 @@ export default function ReportView({
         </div>
       )}
 
-            {/* 5b. Key Facts */}
+      {/* 8. Key Facts (Legacy) */}
       {Boolean((report as any).key_facts && Array.isArray((report as any).key_facts) && (report as any).key_facts.length > 0) && (
         <div>
           <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
@@ -375,36 +428,36 @@ export default function ReportView({
         </div>
       )}
 
-      {/* 6. Driving Factors */}
-      {hasDrivingFactors && report.driving_factors && (
+      {/* 9. Driving Factors (Legacy) */}
+      {hasDrivingFactors && (report as any).driving_factors && (
         <div>
           <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
             Driving Factors
           </h4>
           <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] text-zinc-700">
-            {report.driving_factors.map((factor, idx) => (
+            {(report as any).driving_factors.map((factor: string, idx: number) => (
               <li key={idx}>{factor}</li>
             ))}
           </ul>
         </div>
       )}
 
-      {/* 7. What to Watch */}
+      {/* 10. What to Watch (Legacy) */}
       {Boolean(
-        report.what_to_watch &&
-          (typeof report.what_to_watch === "string"
-            ? report.what_to_watch.trim()
-            : report.what_to_watch.length > 0)
+        (report as any).what_to_watch &&
+          (typeof (report as any).what_to_watch === "string"
+            ? (report as any).what_to_watch.trim()
+            : (report as any).what_to_watch.length > 0)
       ) && (
         <div>
           <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
             What to Watch
           </h4>
-          {renderTextOrArray(report.what_to_watch)}
+          {renderTextOrArray((report as any).what_to_watch)}
         </div>
       )}
 
-      {/* 8. Decision Implication */}
+      {/* 11. Decision Implication (Legacy) */}
       {decisionImplication && (
         <div>
           <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
@@ -416,19 +469,19 @@ export default function ReportView({
         </div>
       )}
 
-      {/* 9. Bottom Line */}
-      {report.bottom_line && report.bottom_line.trim() && (
+      {/* 12. Bottom Line */}
+      {Boolean((report as any).bottom_line && (report as any).bottom_line.trim()) && (
         <div>
           <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 border-t border-zinc-200/60 pt-3 font-sans">
             Bottom Line
           </h4>
           <p className="text-[13px] leading-relaxed text-zinc-800 font-medium">
-            {report.bottom_line}
+            {(report as any).bottom_line}
           </p>
         </div>
       )}
 
-      {/* 10. Confidence & Evidence */}
+      {/* 13. Confidence & Evidence (Legacy) */}
       {confidenceEvidence && (
         <div>
           <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
@@ -445,7 +498,7 @@ export default function ReportView({
         </div>
       )}
 
-      {/* 11. Sources */}
+      {/* 14. Sources */}
       {renderSourcesSection()}
     </div>
   );
@@ -563,4 +616,3 @@ export function MarketGenieMarkdown({ content, className = "" }: MarketGenieMark
     </div>
   );
 }
-
