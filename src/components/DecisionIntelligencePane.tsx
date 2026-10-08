@@ -1792,7 +1792,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
     const explicitType = categoryHint ? typeMap[categoryHint] : undefined;
 
     try {
-      const response = await fetch(`${API_URL}/decision-intelligence-v2/chat`, {
+      const response = await fetch(`${API_URL}/decision-intelligence-v2/chat-with-memory`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
