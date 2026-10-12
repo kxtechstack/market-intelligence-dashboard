@@ -27,10 +27,26 @@
   background: #d4d4d8;
 }
 
+html {
+  background-color: #f4f4f5;
+}
+
+/* Color inversion: inverts black to white while preserving brand hues */
+html.dark {
+  filter: invert(1) hue-rotate(180deg);
+  background-color: #0b0b0c;
+}
+
+html.dark img,
+html.dark video {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 body {
   font-family: var(--font-sans);
   background-color: #f4f4f5;
   color: #18181b;
   overflow: hidden;
 }
+
 
