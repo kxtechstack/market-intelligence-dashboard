@@ -177,7 +177,7 @@ function TopMenuBar({
       let isMounted = true;
       async function fetchUsage() {
         try {
-          const res = await fetch(`/api/credit-usage/${clientId}?userId=${userId}`).catch(() => null);
+          const res = await fetch(`${API_URL}/credit-usage/${clientId}?userId=${userId}`).catch(() => null);
           if (res && res.ok) {
             const data = await res.json().catch(() => null);
             if (isMounted && data && typeof data.used === "number" && typeof data.total === "number") {
@@ -837,7 +837,7 @@ export default function App() {
   const fetchCreditUsage = async () => {
     if (!clientId || !userId) return;
     try {
-      const res = await fetch(`/api/credit-usage/${clientId}?userId=${userId}`).catch(() => null);
+      const res = await fetch(`${API_URL}/credit-usage/${clientId}?userId=${userId}`).catch(() => null);
       if (res && res.ok) {
         const data = await res.json().catch(() => null);
         if (data && typeof data.used === "number" && typeof data.total === "number") {
