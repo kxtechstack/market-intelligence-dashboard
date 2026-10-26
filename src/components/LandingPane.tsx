@@ -172,176 +172,40 @@ const getSourceBadge = (moduleName: string) => {
   };
 };
 
-const FALLBACK_HIGHLIGHTS: HighlightRow[] = [
+interface SignalUsedItem {
+  id: string;
+  insight_id?: string;
+  title: string;
+  tag: string;
+}
+
+interface DailyHighlightItem {
+  module_id: string;
+  highlight_text: string;
+  signal_date?: string;
+  created_at?: string;
+  signals_used?: SignalUsedItem[];
+}
+
+interface DailyHighlightsData {
+  highlights: DailyHighlightItem[];
+  intro: string | null;
+  conclusion: string | null;
+  latestSignalDate?: string | null;
+}
+
+const BRIEFING_MODULES = [
   {
-    moduleId: MARKET_DYNAMICS_MODULE_ID,
-    moduleName: "Market Dynamics",
-    tabId: "market_dynamics",
-    label: "Funding & Investment Activity",
-    body: "Biotech firms leverage covalent molecules for innovative treatments",
-    subSignals: [
-      {
-        title: "Consolidating Forecasting Across Banners: A Strategic Shift for Multi-Brand Retailers",
-        tag: "Market Intelligence",
-      },
-      {
-        title: "Local Cosmetics Brands Thrive in Digital Landscape",
-        tag: "Innovation & Product",
-      },
-    ],
+    id: MARKET_DYNAMICS_MODULE_ID,
+    name: "Market Dynamics",
   },
   {
-    moduleId: MARKET_DYNAMICS_MODULE_ID,
-    moduleName: "Market Dynamics",
-    tabId: "market_dynamics",
-    label: "Industry Structure Changes",
-    body: "Independent Beauty Brands Can Compete with Conglomerates via Niche Strategies",
-    subSignals: [
-      {
-        title: "Strategic Partnership for AI-Driven Antibody Discovery",
-        tag: "Innovation & Product",
-      },
-      {
-        title: "Treasure AI Revolutionizes Marketing with Governed AI Teammate",
-        tag: "Corporate Activity",
-      },
-    ],
+    id: POLICY_RISK_MODULE_ID,
+    name: "Policy & Risk Monitor",
   },
   {
-    moduleId: POLICY_RISK_MODULE_ID,
-    moduleName: "Policy & Risk Monitor",
-    tabId: "policy_risk_monitor",
-    label: "Regulatory Consultation",
-    body: "Ghana Calls for Cosmetology Council to Regulate Beauty Industry",
-    subSignals: [
-      {
-        title: "Beauty Salons in Italy Face Regulatory Action for Compliance Failures",
-        tag: "Regulatory Enforcement",
-      },
-      {
-        title: "Indonesia Postpones Mandatory Halal Certification Deadline for Cosmetics",
-        tag: "Regulatory Risk",
-      },
-    ],
-  },
-  {
-    moduleId: POLICY_RISK_MODULE_ID,
-    moduleName: "Policy & Risk Monitor",
-    tabId: "policy_risk_monitor",
-    label: "Regulatory Enforcement",
-    body: "Korea Deploys Task Force to Shield Cosmetics Industry from New Rules",
-    subSignals: [
-      {
-        title: "New Sunscreen Filter Added to US Regulations",
-        tag: "Regulatory Change",
-      },
-      {
-        title: "Cosmetics Industry Chemists Face Crackdown on Illicit Drug Sales",
-        tag: "Regulatory Enforcement",
-      },
-    ],
-  },
-  {
-    moduleId: FORWARD_OUTLOOK_MODULE_ID,
-    moduleName: "Future Outlook",
-    tabId: "foreward_outlook",
-    label: "Product",
-    body: "Opal Cosmetics files patent for Skin Care Composition Containing Tussilago Farfara Leaf Extract",
-    subSignals: [
-      {
-        title: "Programmable microfluidic system for multidimensional health profiling",
-        tag: "R&D",
-      },
-      {
-        title: "The Power of Ferulic Acid in Modern Cosmetics",
-        tag: "Innovation",
-      },
-    ],
-  },
-  {
-    moduleId: FORWARD_OUTLOOK_MODULE_ID,
-    moduleName: "Future Outlook",
-    tabId: "foreward_outlook",
-    label: "Technology",
-    body: "Amorepacific Integrates 70 Years of Research Data Using AI",
-    subSignals: [
-      {
-        title: "NINGBO INNO PHARMCHEM CO.,LTD. introduces 1,2-O-Dioctadecyl-sn-glycerol for Cosmetics",
-        tag: "Innovation",
-      },
-      {
-        title: "Febuxostat shows promise as topical treatment for psoriasis",
-        tag: "R&D",
-      },
-    ],
-  },
-  {
-    moduleId: MARKET_DYNAMICS_MODULE_ID,
-    moduleName: "Market Dynamics",
-    tabId: "market_dynamics",
-    label: "Consumer Trends",
-    body: "Rising demand for microbiome-friendly personal care formulations across APAC",
-    subSignals: [
-      {
-        title: "Retailers Reinforce Security Measures Amid Rising Theft Rates",
-        tag: "Market Intelligence",
-      },
-      {
-        title: "Strategic Partnership Drives Mainstream Adoption of AI Technology in Malaysia",
-        tag: "Innovation & Product",
-      },
-    ],
-  },
-  {
-    moduleId: POLICY_RISK_MODULE_ID,
-    moduleName: "Policy & Risk Monitor",
-    tabId: "policy_risk_monitor",
-    label: "Compliance Update",
-    body: "EU Updates Guidelines on Nano-materials in Cosmetic Sunscreen Products",
-    subSignals: [
-      {
-        title: "EPA Finalizes Significant-New-Use Rules for 19 Chemicals",
-        tag: "Compliance Requirement",
-      },
-      {
-        title: "Hidden Steroids in Skin Creams Pose Risks to Consumers",
-        tag: "Regulatory Risk",
-      },
-    ],
-  },
-  {
-    moduleId: FORWARD_OUTLOOK_MODULE_ID,
-    moduleName: "Future Outlook",
-    tabId: "foreward_outlook",
-    label: "Sustainability",
-    body: "Major cosmetic brands commit to 100% recyclable PCR packaging by 2028",
-    subSignals: [
-      {
-        title: "Seed to Skin's 360-degree bio-autonomy approach to skincare",
-        tag: "Innovation",
-      },
-      {
-        title: "UCLA Scientists Develop Mineral Sunscreen Without the Chalky White Cast",
-        tag: "R&D",
-      },
-    ],
-  },
-  {
-    moduleId: MARKET_DYNAMICS_MODULE_ID,
-    moduleName: "Market Dynamics",
-    tabId: "market_dynamics",
-    label: "Strategic Partnership",
-    body: "Global beauty conglomerates partner with biotech startups for sustainable actives",
-    subSignals: [
-      {
-        title: "Major Expansion in Southeast Asian R&D",
-        tag: "Market Intelligence",
-      },
-      {
-        title: "Guangzhou's Beauty Industry Hub Takes Shape",
-        tag: "Market Intelligence",
-      },
-    ],
+    id: FORWARD_OUTLOOK_MODULE_ID,
+    name: "Forward Outlook",
   },
 ];
 
@@ -1162,24 +1026,6 @@ const getSignalDetails = (titleText: string) => {
   };
 };
 
-const MODULE_NARRATIVES: Record<string, string[]> = {
-  "Market Dynamics": [
-    "Recent commercial intelligence reflects accelerated investment into multi-banner inventory forecasting and unified digital commerce. Direct-to-consumer and prestige beauty brands are actively restructuring supply chain commitments to guard margins against inflationary logistics costs, while allocating increased venture capital toward clinical-grade active ingredients.",
-    "Corporate activity shows a sharp uptick in strategic biotech partnerships and boutique brand acquisitions across Europe and East Asia. Category leaders are deploying AI-enabled demand sensing to capture emerging wellness niches, shifting capital from legacy promotional discounting to specialized formulation R&D.",
-    "Retail distribution channels report shifts in consumer sentiment toward transparent sourcing and microbiome-supportive daily regimens, prompting omnichannel retailers to rationalize floor allocations in favor of certified high-efficacy personal care lines."
-  ],
-  "Policy & Risk Monitor": [
-    "Global regulatory authorities are enforcing tightened supervisory frameworks across cosmetic safety, packaging claims, and raw material provenance. Recent directives from international health ministries—including the FDA's MoCRA implementation and South Korea's mandatory safety data assessments—require manufacturers to furnish validated toxicological profiles for existing product lines.",
-    "Cross-border regulatory friction is particularly pronounced across APAC and Middle Eastern trade corridors, where expedited registration rules for halal-certified bio-actives contrast with heightened customs enforcement on unverified active compounds. Regional task forces are actively targeting mislabeled aesthetic formulations and OTC cosmetic overlaps.",
-    "Compliance teams are urged to conduct rapid exposure audits on UV filter additives and microplastic binders ahead of impending statutory enforcement deadlines, ensuring dual compliance across labeling disclosures and digital product passport registries."
-  ],
-  "Forward Outlook": [
-    "Patent filings across proprietary cosmetic formulations highlight a decisive shift toward bio-fermented peptides, adaptive UV defense compounds, and personalized topical diagnostics. Major research laboratories are leveraging generative AI platforms to integrate decades of clinical screening data, shortening novel active ingredient discovery cycles from years to months.",
-    "Sustainability roadmaps are transitioning from aspirational targets into strict operational mandates. Pioneering cosmetic manufacturers are filing intellectual property for cold-process emulsification and 100% post-consumer recycled (PCR) barrier resins, anticipating tighter regional packaging waste levies by 2028.",
-    "Long-range horizon scans indicate that non-invasive epigenetic diagnostics and circadian-aligned dermal delivery systems will represent the next major wave of premium skincare innovation, establishing significant competitive moats for early IP holders."
-  ]
-};
-
 export default function LandingPane({
   onReturn,
   onTabChange,
@@ -1196,7 +1042,6 @@ export default function LandingPane({
   const [sharedMessageIds, setSharedMessageIds] = useState<Record<string, boolean>>({});
   const [homeQuestions, setHomeQuestions] = useState<HomePrompt[]>([]);
   const [libraryQuestions, setLibraryQuestions] = useState<QuestionLibraryItem[]>([]);
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   // Persist conversationId in localStorage so it survives unmount/remount
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(
@@ -1507,9 +1352,21 @@ export default function LandingPane({
   const [selectedLibraryTab, setSelectedLibraryTab] = useState<"Decision Intelligence" | "Inference" | "List">("Decision Intelligence");
   const [librarySearchQuery, setLibrarySearchQuery] = useState("");
 
-  const [highlightsData, setHighlightsData] = useState<HighlightRow[]>(FALLBACK_HIGHLIGHTS);
+  const [dailyHighlights, setDailyHighlights] = useState<DailyHighlightsData | null>(null);
   const [highlightsLoading, setHighlightsLoading] = useState(true);
   const [highlightsDate, setHighlightsDate] = useState<string>("");
+  const [showAllSignals, setShowAllSignals] = useState<Record<string, boolean>>({});
+
+  const handleSignalClick = (moduleId: string, signal: SignalUsedItem) => {
+    if (!onTabChange) return;
+    if (moduleId === MARKET_DYNAMICS_MODULE_ID) {
+      onTabChange("market_dynamics", signal.insight_id || signal.id);
+    } else if (moduleId === POLICY_RISK_MODULE_ID) {
+      onTabChange("policy_risk_monitor", signal.id);
+    } else if (moduleId === FORWARD_OUTLOOK_MODULE_ID) {
+      onTabChange("foreward_outlook", signal.id);
+    }
+  };
 
   const todayFormattedDate = useMemo(() => {
     const now = new Date();
@@ -1522,98 +1379,46 @@ export default function LandingPane({
     return `${ordinalDay} ${month} ${year}`;
   }, []);
 
+  const hasAnyHighlightsData = useMemo(() => {
+    return Boolean(
+      (dailyHighlights?.intro && dailyHighlights.intro.trim()) ||
+      (dailyHighlights?.conclusion && dailyHighlights.conclusion.trim()) ||
+      (dailyHighlights?.highlights && dailyHighlights.highlights.some((h) => h.highlight_text && h.highlight_text.trim()))
+    );
+  }, [dailyHighlights]);
+
   useEffect(() => {
     async function loadTodayHighlights() {
-      const targetClientId = clientId || "b61b4d3b-caeb-457b-9971-636c83688ee4";
+      if (!clientId) {
+        setHighlightsLoading(false);
+        setDailyHighlights(null);
+        return;
+      }
       setHighlightsLoading(true);
 
       try {
-        const [mktRes, mktSignalsRes, polRes, trdRes] = await Promise.all([
-          supabase.from("market_insights_live").select("id, title, category, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(4),
-          supabase.from("market_dynamics_signals").select("id, signal_title, category, insight_id, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(30),
-          supabase.from("policy_signals").select("id, signal_title, category, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(20),
-          supabase.from("trend_signals").select("id, signal_title, sector, signal_type, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(20)
-        ]);
-
-        const rows: HighlightRow[] = [];
-
-        if (mktRes.data) {
-          const mktSignals = mktSignalsRes.data || [];
-          mktRes.data.forEach((r: any, i: number) => {
-            let subs: SubSignal[] = mktSignals
-              .filter((s: any) => s.insight_id === r.id)
-              .map((s: any) => ({
-                title: s.signal_title,
-                tag: s.category || "Market Intelligence",
-              }));
-            if (subs.length < 2) {
-              const extra = mktSignals
-                .filter((s: any) => s.insight_id !== r.id)
-                .slice(i * 2, i * 2 + (2 - subs.length))
-                .map((s: any) => ({
-                  title: s.signal_title,
-                  tag: s.category || "Market Intelligence",
-                }));
-              subs = [...subs, ...extra];
+        const res = await fetch(`${API_URL}/daily-highlights/${clientId}`).catch(() => null);
+        if (res && res.ok) {
+          const dailyRes = await res.json().catch(() => null);
+          if (dailyRes) {
+            setDailyHighlights({
+              highlights: Array.isArray(dailyRes.highlights) ? dailyRes.highlights : [],
+              intro: dailyRes.intro ?? null,
+              conclusion: dailyRes.conclusion ?? null,
+              latestSignalDate: dailyRes.latestSignalDate ?? null,
+            });
+            if (dailyRes.latestSignalDate) {
+              setHighlightsDate(dailyRes.latestSignalDate);
             }
-            rows.push({
-              moduleId: MARKET_DYNAMICS_MODULE_ID,
-              moduleName: "Market Dynamics",
-              tabId: "market_dynamics",
-              itemId: r.id,
-              label: r.category || "Market Dynamics",
-              body: r.title || "",
-              subSignals: subs,
-            });
-          });
-        }
-
-        if (polRes.data) {
-          const allPol = polRes.data || [];
-          allPol.slice(0, 4).forEach((r: any, i: number) => {
-            const subs: SubSignal[] = allPol.slice(4 + i * 2, 4 + i * 2 + 2).map((s: any) => ({
-              title: s.signal_title,
-              tag: s.category || "Regulatory Policy",
-            }));
-            rows.push({
-              moduleId: POLICY_RISK_MODULE_ID,
-              moduleName: "Policy & Risk Monitor",
-              tabId: "policy_risk_monitor",
-              itemId: r.id,
-              label: r.category || "Policy & Risk",
-              body: r.signal_title || "",
-              subSignals: subs,
-            });
-          });
-        }
-
-        if (trdRes.data) {
-          const allTrd = trdRes.data || [];
-          allTrd.slice(0, 4).forEach((r: any, i: number) => {
-            const subs: SubSignal[] = allTrd.slice(4 + i * 2, 4 + i * 2 + 2).map((s: any) => ({
-              title: s.signal_title,
-              tag: s.signal_type || s.sector || "Foresight",
-            }));
-            rows.push({
-              moduleId: FORWARD_OUTLOOK_MODULE_ID,
-              moduleName: "Future Outlook",
-              tabId: "foreward_outlook",
-              itemId: r.id,
-              label: r.sector || "Future Outlook",
-              body: r.signal_title || "",
-              subSignals: subs,
-            });
-          });
-        }
-
-        if (rows.length > 0) {
-          setHighlightsData(rows);
+          } else {
+            setDailyHighlights(null);
+          }
         } else {
-          setHighlightsData(FALLBACK_HIGHLIGHTS);
+          setDailyHighlights(null);
         }
       } catch (err) {
         console.error("Failed to load today highlights:", err);
-        setHighlightsData(FALLBACK_HIGHLIGHTS);
+        setDailyHighlights(null);
       } finally {
         setHighlightsLoading(false);
       }
@@ -2626,152 +2431,136 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
 
                 {/* Unified Conversational Answer Card */}
                 <div className="bg-white border border-zinc-200/90 rounded-[10px] p-5 md:p-6 shadow-2xs space-y-5 text-slate-700 font-normal leading-relaxed tracking-normal">
-                  
-                  {/* Introduction */}
-                  <div className="space-y-4">
+                  {highlightsLoading ? (
+                    <div className="py-8 flex items-center justify-center gap-2 text-xs text-zinc-400">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2d39d2]" />
+                      <span>Loading highlights…</span>
+                    </div>
+                  ) : !hasAnyHighlightsData ? (
                     <p className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal">
-                      Today’s intelligence briefing aggregates critical signal shifts across market dynamics, regulatory compliance, and strategic foresight. Enterprise leaders are accelerating digital core transformation and generative AI adoption, resulting in notable efficiency gains across developer productivity and asset optimization, while simultaneously navigating tighter capital constraints.
+                      No highlights available yet. They appear after the next scheduled update.
                     </p>
-                    <p className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal">
-                      Market consolidation strategies are becoming increasingly prevalent, as organizations aim to streamline operations and bolster balance sheets against economic volatility. Digital adoption, specifically generative AI, is no longer just an efficiency lever but a core requirement for competitive differentiation.
-                    </p>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Introduction */}
+                      {dailyHighlights?.intro && (
+                        <div>
+                          <p className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal">
+                            {dailyHighlights.intro}
+                          </p>
+                        </div>
+                      )}
 
-                  {/* Intelligence Summary by Module */}
-                  <div className="space-y-8 pt-4">
-                    {["Market Dynamics", "Policy & Risk Monitor", "Forward Outlook"].map((moduleName) => {
-                      const moduleHighlights = highlightsData.filter(r => 
-                        moduleName === "Forward Outlook" 
-                          ? (r.moduleName === "Forward Outlook" || r.moduleName === "Future Outlook")
-                          : r.moduleName === moduleName
-                      );
+                      {/* Intelligence Summary by Module */}
+                      <div className="space-y-8 pt-4">
+                        {BRIEFING_MODULES.map((module) => {
+                          const moduleHighlight = dailyHighlights?.highlights?.find(
+                            (h) => h.module_id === module.id
+                          );
+                          const highlightText = moduleHighlight?.highlight_text || "";
+                          const paragraphs = highlightText
+                            ? highlightText
+                                .split(/\n\s*\n/)
+                                .map((p) => p.trim())
+                                .filter(Boolean)
+                            : [];
 
-                      if (moduleHighlights.length === 0) return null;
+                          const signals = Array.isArray(moduleHighlight?.signals_used)
+                            ? moduleHighlight.signals_used
+                            : [];
 
-                      return (
-                        <div key={moduleName} className="space-y-3">
-                          <h3 className="text-[11.5px] font-medium text-zinc-600 uppercase tracking-widest font-sans">
-                            {moduleName} Highlights
-                          </h3>
-                          <div className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal space-y-3">
-                            {(MODULE_NARRATIVES[moduleName] || MODULE_NARRATIVES["Market Dynamics"]).map((paragraph, pIdx) => (
-                              <p key={pIdx}>{paragraph}</p>
-                            ))}
-                          </div>
-                          
-                          <div className="border border-zinc-200/90 rounded-[8px] bg-white overflow-hidden shadow-2xs">
-                            <table className="w-full text-left border-collapse">
-                              <tbody className="divide-y divide-zinc-100 text-zinc-800">
-                                {highlightsLoading ? (
-                                  <tr>
-                                    <td colSpan={2} className="py-6 text-center text-xs text-zinc-400">
-                                      <div className="flex items-center justify-center gap-2">
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2d39d2]" />
-                                        <span>Loading {moduleName.toLowerCase()} highlights…</span>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ) : moduleHighlights.length === 0 ? (
-                                  <tr>
-                                    <td colSpan={2} className="py-6 text-center text-xs text-zinc-400">
-                                      No {moduleName} highlights found.
-                                    </td>
-                                  </tr>
-                                ) : (
-                                  moduleHighlights.slice(0, 4).map((row, idx) => {
-                                    const badge = getSourceBadge(row.moduleName);
-                                    const IconComp = badge.icon;
-                                    const rowKey = `${moduleName}-${idx}`;
-                                    const isExpanded = !!expandedRows[rowKey];
+                          const hasHighlightText = paragraphs.length > 0;
+                          const hasSignalRows = signals.length > 0;
 
-                                    return (
-                                      <React.Fragment key={idx}>
+                          if (!hasHighlightText && !hasSignalRows) return null;
+
+                          const isExpanded = !!showAllSignals[module.id];
+                          const visibleSignals = isExpanded ? signals : signals.slice(0, 4);
+                          const badge = getSourceBadge(module.name);
+                          const IconComp = badge.icon;
+
+                          return (
+                            <div key={module.id} className="space-y-3">
+                              <h3 className="text-[11.5px] font-medium text-zinc-600 uppercase tracking-widest font-sans">
+                                {module.name} Highlights
+                              </h3>
+                              {hasHighlightText && (
+                                <div className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal space-y-3">
+                                  {paragraphs.map((paragraph, pIdx) => (
+                                    <p key={pIdx}>{paragraph}</p>
+                                  ))}
+                                </div>
+                              )}
+
+                              {hasSignalRows && (
+                                <div className="border border-zinc-200/90 rounded-[8px] bg-white overflow-hidden shadow-2xs">
+                                  <table className="w-full text-left border-collapse">
+                                    <tbody className="divide-y divide-zinc-100 text-zinc-800">
+                                      {visibleSignals.map((signal, idx) => (
                                         <tr
-                                          onClick={() => onTabChange && onTabChange(row.tabId, row.itemId)}
+                                          key={signal.id || idx}
+                                          onClick={() => handleSignalClick(module.id, signal)}
                                           className="hover:bg-zinc-50/80 transition-colors group cursor-pointer"
-                                          title={`Click to view in ${row.moduleName}`}
+                                          title={`Click to view in ${module.name}`}
                                         >
                                           <td className="py-2.5 px-3.5 align-middle">
                                             <div className="text-[12px] text-zinc-800 font-normal">
-                                              {row.body}
+                                              {signal.title}
                                             </div>
                                           </td>
                                           <td className="py-2.5 px-3.5 align-middle text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-2">
-                                              <span className="text-[9.5px] font-medium text-zinc-600">
-                                                {row.label}
-                                              </span>
+                                              {signal.tag && (
+                                                <span className="text-[9.5px] font-medium text-zinc-600">
+                                                  {signal.tag}
+                                                </span>
+                                              )}
                                               <span
                                                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] border text-[9.5px] font-medium shrink-0 ${badge.bg}`}
                                               >
                                                 <IconComp className="w-2.5 h-2.5 shrink-0" />
-                                                <span className="whitespace-nowrap">{row.moduleName}</span>
+                                                <span className="whitespace-nowrap">{module.name}</span>
                                               </span>
-                                              <button
-                                                  onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setExpandedRows(prev => ({ ...prev, [rowKey]: !prev[rowKey] }));
-                                                  }}
-                                                  className="p-0.5 text-zinc-400 hover:text-zinc-600 cursor-pointer"
-                                              >
-                                                  {isExpanded ? <MinusCircle className="w-4 h-4" /> : <PlusCircle className="w-4 h-4" />}
-                                              </button>
                                             </div>
                                           </td>
                                         </tr>
-                                        {isExpanded && (
-                                          <>
-                                            {(row.subSignals && row.subSignals.length > 0
-                                              ? row.subSignals
-                                              : [
-                                                  {
-                                                    title: "Consolidating Forecasting Across Banners: A Strategic Shift for Multi-Brand Retailers",
-                                                    tag: "Market Intelligence",
-                                                  },
-                                                  {
-                                                    title: "Supply Chain Resilience: Balancing Cost Optimization with Strategic Buffer Stocking",
-                                                    tag: "Market Intelligence",
-                                                  },
-                                                ]
-                                            ).map((sub, sIdx) => (
-                                              <tr
-                                                key={sIdx}
-                                                className="bg-[#faf8f5] hover:bg-[#f5f1ea] transition-colors border-t border-zinc-200/50"
-                                              >
-                                                <td colSpan={2} className="py-2.5 px-4 pl-6 align-middle">
-                                                  <div className="flex items-center justify-between gap-4">
-                                                    <span className="text-[11.5px] text-zinc-700 font-normal leading-relaxed">
-                                                      {sub.title}
-                                                    </span>
-                                                    <span className="shrink-0 text-[8.5px] font-medium px-2 py-0.5 rounded-[4px] bg-sky-50 text-sky-700 border border-sky-200/70 whitespace-nowrap">
-                                                      {sub.tag}
-                                                    </span>
-                                                  </div>
-                                                </td>
-                                              </tr>
-                                            ))}
-                                          </>
-                                        )}
-                                      </React.Fragment>
-                                    );
-                                  })
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                  {signals.length > 4 && (
+                                    <div className="border-t border-zinc-100 px-3.5 py-2 bg-zinc-50/40">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setShowAllSignals((prev) => ({
+                                            ...prev,
+                                            [module.id]: !prev[module.id],
+                                          }))
+                                        }
+                                        className="text-[11.5px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer"
+                                      >
+                                        {isExpanded ? "Show less" : `Show all ${signals.length} signals`}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Conclusion */}
+                      {dailyHighlights?.conclusion && (
+                        <div className="border-t border-zinc-200 pt-6 mt-6">
+                          <p className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal">
+                            {dailyHighlights.conclusion}
+                          </p>
                         </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Conclusion */}
-                  <div className="border-t border-zinc-200 pt-6 mt-6">
-                    <p className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal">
-                        In conclusion, the integrated analysis across market, policy, and forward-looking domains underscores the necessity for comprehensive intelligence management. By maintaining situational awareness and institutional agility, organizations can more effectively steer through emerging challenges and capitalize on long-term growth opportunities.
-                    </p>
-                  </div>
-
-                  </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ) : (
