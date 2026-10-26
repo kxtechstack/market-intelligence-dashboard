@@ -179,6 +179,10 @@ interface SignalUsedItem {
   tag: string;
 }
 
+interface CardSignal { id: string; title: string; tag: string | null; }
+interface HighlightCard { id: string; title: string; tag: string | null; signals: CardSignal[]; }
+interface ModuleCards { cards: HighlightCard[]; loose: CardSignal[]; total: number; }
+
 interface DailyHighlightItem {
   module_id: string;
   highlight_text: string;
@@ -1355,12 +1359,14 @@ export default function LandingPane({
   const [dailyHighlights, setDailyHighlights] = useState<DailyHighlightsData | null>(null);
   const [highlightsLoading, setHighlightsLoading] = useState(true);
   const [highlightsDate, setHighlightsDate] = useState<string>("");
-  const [showAllSignals, setShowAllSignals] = useState<Record<string, boolean>>({});
+  const [moduleCards, setModuleCards] = useState<Record<string, ModuleCards>>({});
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [showAllCards, setShowAllCards] = useState<Record<string, boolean>>({});
 
-  const handleSignalClick = (moduleId: string, signal: SignalUsedItem) => {
+  const handleSignalClick = (moduleId: string, signal: { id: string }) => {
     if (!onTabChange) return;
     if (moduleId === MARKET_DYNAMICS_MODULE_ID) {
-      onTabChange("market_dynamics", signal.insight_id || signal.id);
+      onTabChange("market_dynamics", signal.id);
     } else if (moduleId === POLICY_RISK_MODULE_ID) {
       onTabChange("policy_risk_monitor", signal.id);
     } else if (moduleId === FORWARD_OUTLOOK_MODULE_ID) {
@@ -1392,12 +1398,17 @@ export default function LandingPane({
       if (!clientId) {
         setHighlightsLoading(false);
         setDailyHighlights(null);
+        setModuleCards({});
         return;
       }
       setHighlightsLoading(true);
 
       try {
-        const res = await fetch(`${API_URL}/daily-highlights/${clientId}`).catch(() => null);
+        const [res, cardsRes] = await Promise.all([
+          fetch(`${API_URL}/daily-highlights/${clientId}`).catch(() => null),
+          fetch(`${API_URL}/daily-highlight-cards/${clientId}`).catch(() => null),
+        ]);
+
         if (res && res.ok) {
           const dailyRes = await res.json().catch(() => null);
           if (dailyRes) {
@@ -1416,9 +1427,17 @@ export default function LandingPane({
         } else {
           setDailyHighlights(null);
         }
+
+        if (cardsRes && cardsRes.ok) {
+          const cardsJson = await cardsRes.json().catch(() => null);
+          setModuleCards(cardsJson?.modules || {});
+        } else {
+          setModuleCards({});
+        }
       } catch (err) {
         console.error("Failed to load today highlights:", err);
         setDailyHighlights(null);
+        setModuleCards({});
       } finally {
         setHighlightsLoading(false);
       }
@@ -2444,10 +2463,19 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                     <>
                       {/* Introduction */}
                       {dailyHighlights?.intro && (
-                        <div>
-                          <p className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal">
-                            {dailyHighlights.intro}
-                          </p>
+                        <div className="space-y-3">
+                          {dailyHighlights.intro
+                            .split(/\n\s*\n/)
+                            .map((p) => p.trim())
+                            .filter(Boolean)
+                            .map((paragraph, pIdx) => (
+                              <p
+                                key={pIdx}
+                                className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal"
+                              >
+                                {paragraph}
+                              </p>
+                            ))}
                         </div>
                       )}
 
@@ -2459,23 +2487,23 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                           );
                           const highlightText = moduleHighlight?.highlight_text || "";
                           const paragraphs = highlightText
-                            ? highlightText
-                                .split(/\n\s*\n/)
-                                .map((p) => p.trim())
-                                .filter(Boolean)
+                            ? highlightText.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
                             : [];
 
-                          const signals = Array.isArray(moduleHighlight?.signals_used)
-                            ? moduleHighlight.signals_used
-                            : [];
+                          const cards = moduleCards[module.id]?.cards ?? [];
+                          const loose = moduleCards[module.id]?.loose ?? [];
+                          const totalItems = moduleCards[module.id]?.total ?? (cards.length + loose.length);
+                          const isCardsExpanded = !!showAllCards[module.id];
+
+                          const visibleCards = isCardsExpanded ? cards : cards.slice(0, 4);
+                          const remainingSlots = isCardsExpanded ? loose.length : Math.max(0, 4 - cards.length);
+                          const visibleLoose = isCardsExpanded ? loose : loose.slice(0, remainingSlots);
 
                           const hasHighlightText = paragraphs.length > 0;
-                          const hasSignalRows = signals.length > 0;
+                          const hasSignalRows = cards.length > 0 || loose.length > 0;
 
                           if (!hasHighlightText && !hasSignalRows) return null;
 
-                          const isExpanded = !!showAllSignals[module.id];
-                          const visibleSignals = isExpanded ? signals : signals.slice(0, 4);
                           const badge = getSourceBadge(module.name);
                           const IconComp = badge.icon;
 
@@ -2496,24 +2524,83 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                 <div className="border border-zinc-200/90 rounded-[8px] bg-white overflow-hidden shadow-2xs">
                                   <table className="w-full text-left border-collapse">
                                     <tbody className="divide-y divide-zinc-100 text-zinc-800">
-                                      {visibleSignals.map((signal, idx) => (
+                                      {visibleCards.map((card) => {
+                                        const cardKey = `${module.id}-${card.id}`;
+                                        const isOpen = !!expandedCards[cardKey];
+                                        const toggle = () =>
+                                          setExpandedCards((prev) => ({ ...prev, [cardKey]: !prev[cardKey] }));
+                                        return (
+                                          <React.Fragment key={cardKey}>
+                                            <tr
+                                              onClick={toggle}
+                                              className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
+                                            >
+                                              <td className="py-2.5 px-3.5 align-middle">
+                                                <div className="text-[12px] text-zinc-800 font-normal">{card.title}</div>
+                                              </td>
+                                              <td className="py-2.5 px-3.5 align-middle text-right whitespace-nowrap">
+                                                <div className="flex items-center justify-end gap-2">
+                                                  {card.tag && (
+                                                    <span className="text-[9.5px] font-medium text-zinc-600">{card.tag}</span>
+                                                  )}
+                                                  <span
+                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] border text-[9.5px] font-medium shrink-0 ${badge.bg}`}
+                                                  >
+                                                    <IconComp className="w-2.5 h-2.5 shrink-0" />
+                                                    <span className="whitespace-nowrap">{module.name}</span>
+                                                  </span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      toggle();
+                                                    }}
+                                                    className="p-0.5 text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                                                  >
+                                                    {isOpen ? (
+                                                      <MinusCircle className="w-4 h-4" />
+                                                    ) : (
+                                                      <PlusCircle className="w-4 h-4" />
+                                                    )}
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                            {isOpen &&
+                                              card.signals.map((sig) => (
+                                                <tr
+                                                  key={sig.id}
+                                                  onClick={() => handleSignalClick(module.id, sig)}
+                                                  className="bg-zinc-50/50 hover:bg-zinc-100/60 transition-colors cursor-pointer"
+                                                >
+                                                  <td className="py-2 px-3.5 pl-8 align-middle">
+                                                    <div className="text-[11.5px] text-zinc-700 font-normal">{sig.title}</div>
+                                                  </td>
+                                                  <td className="py-2 px-3.5 align-middle text-right whitespace-nowrap">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                      {sig.tag && (
+                                                        <span className="text-[9px] font-medium text-zinc-500">{sig.tag}</span>
+                                                      )}
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                          </React.Fragment>
+                                        );
+                                      })}
+                                      {visibleLoose.map((sig) => (
                                         <tr
-                                          key={signal.id || idx}
-                                          onClick={() => handleSignalClick(module.id, signal)}
-                                          className="hover:bg-zinc-50/80 transition-colors group cursor-pointer"
-                                          title={`Click to view in ${module.name}`}
+                                          key={sig.id}
+                                          onClick={() => handleSignalClick(module.id, sig)}
+                                          className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
                                         >
                                           <td className="py-2.5 px-3.5 align-middle">
-                                            <div className="text-[12px] text-zinc-800 font-normal">
-                                              {signal.title}
-                                            </div>
+                                            <div className="text-[12px] text-zinc-800 font-normal">{sig.title}</div>
                                           </td>
                                           <td className="py-2.5 px-3.5 align-middle text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-2">
-                                              {signal.tag && (
-                                                <span className="text-[9.5px] font-medium text-zinc-600">
-                                                  {signal.tag}
-                                                </span>
+                                              {sig.tag && (
+                                                <span className="text-[9.5px] font-medium text-zinc-600">{sig.tag}</span>
                                               )}
                                               <span
                                                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] border text-[9.5px] font-medium shrink-0 ${badge.bg}`}
@@ -2527,19 +2614,19 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                       ))}
                                     </tbody>
                                   </table>
-                                  {signals.length > 4 && (
+                                  {totalItems > 4 && (
                                     <div className="border-t border-zinc-100 px-3.5 py-2 bg-zinc-50/40">
                                       <button
                                         type="button"
                                         onClick={() =>
-                                          setShowAllSignals((prev) => ({
+                                          setShowAllCards((prev) => ({
                                             ...prev,
                                             [module.id]: !prev[module.id],
                                           }))
                                         }
                                         className="text-[11.5px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer"
                                       >
-                                        {isExpanded ? "Show less" : `Show all ${signals.length} signals`}
+                                        {isCardsExpanded ? "Show less" : `Show all ${totalItems} cards`}
                                       </button>
                                     </div>
                                   )}
@@ -2552,10 +2639,19 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
 
                       {/* Conclusion */}
                       {dailyHighlights?.conclusion && (
-                        <div className="border-t border-zinc-200 pt-6 mt-6">
-                          <p className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal">
-                            {dailyHighlights.conclusion}
-                          </p>
+                        <div className="border-t border-zinc-200 pt-6 mt-6 space-y-3">
+                          {dailyHighlights.conclusion
+                            .split(/\n\s*\n/)
+                            .map((p) => p.trim())
+                            .filter(Boolean)
+                            .map((paragraph, pIdx) => (
+                              <p
+                                key={pIdx}
+                                className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal"
+                              >
+                                {paragraph}
+                              </p>
+                            ))}
                         </div>
                       )}
                     </>

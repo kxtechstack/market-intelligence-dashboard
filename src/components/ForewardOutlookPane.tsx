@@ -1050,22 +1050,11 @@ export default function ForewardOutlookPane({
   const [focusTrigger, setFocusTrigger] = useState(0);
 
   useEffect(() => {
-    console.log("[FO nav] effect fired", { navigatedItemId, trendsCount: trends.length });
     if (!navigatedItemId || trends.length === 0) return;
 
-    // Is it a trend id? (existing behavior)
-    const isTrendId = trends.some(t => t.id === navigatedItemId);
-    if (isTrendId) {
-      setSelectedTrendId(navigatedItemId);
-      pendingFocusSignalIdRef.current = null;
-      if (onClearNavigatedItem) onClearNavigatedItem();
-      return;
-    }
-
-    // Otherwise treat it as a signal id. Look it up in Supabase to
-    // find which trend it belongs to.
     (async () => {
       try {
+        // First check if navigatedItemId is a signal id in trend_membership
         const { data, error } = await supabase
           .from("trend_membership")
           .select("trend_id")
@@ -1073,13 +1062,29 @@ export default function ForewardOutlookPane({
           .limit(1)
           .maybeSingle();
 
-        console.log("[FO nav] lookup result", { signalId: navigatedItemId, data, error: error?.message });
+        let targetTrendId = data?.trend_id;
+        let isSignal = Boolean(targetTrendId);
 
-        if (error) throw error;
-        if (data?.trend_id) {
-          pendingFocusSignalIdRef.current = navigatedItemId;
-          console.log("[FO nav] setting pending ref to", navigatedItemId);
-          const tr = trends.find(t => t.id === data.trend_id);
+        // If not found in membership, check if navigatedItemId is directly a trend id
+        if (!targetTrendId) {
+          const isTrendId = trends.some(t => t.id === navigatedItemId);
+          if (isTrendId) {
+            targetTrendId = navigatedItemId;
+            isSignal = false;
+          }
+        }
+
+        if (targetTrendId) {
+          if (isSignal) {
+            pendingFocusSignalIdRef.current = navigatedItemId;
+          } else {
+            pendingFocusSignalIdRef.current = null;
+          }
+
+          // Clear search filter so the trend is never filtered out
+          setSearchQuery("");
+
+          const tr = trends.find(t => t.id === targetTrendId);
           const pub = (tr?.source_published_date || "").split("T")[0];
           if (pub) {
             if (startDateStr && pub < startDateStr) {
@@ -1091,11 +1096,11 @@ export default function ForewardOutlookPane({
               sessionStorage.setItem("foreward_outlook_end_date", pub);
             }
           }
-          setSelectedTrendId(data.trend_id);
+          setSelectedTrendId(targetTrendId);
           setFocusTrigger((n) => n + 1);
         }
       } catch (err) {
-        console.error("Failed to resolve signal -> trend:", err);
+        console.error("Failed to resolve signal -> trend in FO:", err);
       } finally {
         if (onClearNavigatedItem) onClearNavigatedItem();
       }
@@ -1304,26 +1309,32 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
     // If we're navigating to a specific signal, honor it once the
     // trend's signals are actually loaded.
     if (pendingFocusSignalIdRef.current) {
-      console.log("[FO focus] searching for", pendingFocusSignalIdRef.current,
-        "in", trend.sources.map(s => s.id));
       const target = trend.sources.find((s: any) => s.id === pendingFocusSignalIdRef.current);
-      console.log("[FO focus] target result", { found: !!target, targetId: target?.id });
       if (target) {
         setSelectedSignalId(target.id);
+        const focusId = target.id;
+        const targetIndex = trend.sources.findIndex((s: any) => s.id === target.id);
         pendingFocusSignalIdRef.current = null;
-        // Scroll on the next animation frame -- React will have flushed
-        // the expand render by then.
+
+        const scrollAndHighlight = () => {
+          const el = document.getElementById(`outlook-signal-card-${focusId}`) ||
+                     document.getElementById(`outlook-signal-card-${targetIndex}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("ring-2", "ring-[#2d39d2]", "ring-offset-2");
+            setTimeout(() => {
+              el.classList.remove("ring-2", "ring-[#2d39d2]", "ring-offset-2");
+            }, 2500);
+            return true;
+          }
+          return false;
+        };
+
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const el = document.getElementById(`outlook-signal-card-${trend.sources.findIndex((s: any) => s.id === target.id)}`);
-            if (el) {
-              el.scrollIntoView({ behavior: "smooth", block: "center" });
-              el.classList.add("ring-2", "ring-[#2d39d2]", "ring-offset-2");
-              setTimeout(() => {
-                el.classList.remove("ring-2", "ring-[#2d39d2]", "ring-offset-2");
-              }, 2000);
-            }
-          });
+          if (!scrollAndHighlight()) {
+            setTimeout(scrollAndHighlight, 120);
+          }
+          setTimeout(scrollAndHighlight, 350);
         });
         return;
       }
@@ -1556,19 +1567,18 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
   }, [baseTrends, hiddenIds, startDateStr, endDateStr, searchQuery]);
 
   const selectedTrend = useMemo(() => {
-    return filteredTrends.find(t => t.id === selectedTrendId) || null;
-  }, [selectedTrendId, filteredTrends]);
+    if (!selectedTrendId) return null;
+    return baseTrends.find(t => t.id === selectedTrendId) || null;
+  }, [selectedTrendId, baseTrends]);
 
   useEffect(() => {
-    if (filteredTrends.length > 0) {
-      const currentExists = filteredTrends.find(t => t.id === selectedTrendId);
-      if (!currentExists && selectedTrendId !== null) {
+    if (selectedTrendId) {
+      const existsInBase = baseTrends.some(t => t.id === selectedTrendId);
+      if (!existsInBase) {
         setSelectedTrendId(null);
       }
-    } else {
-      setSelectedTrendId(null);
     }
-  }, [filteredTrends, selectedTrendId]);
+  }, [baseTrends, selectedTrendId]);
 
   // SVG Radar Coordinates Calculation helper
   const cx = 400;

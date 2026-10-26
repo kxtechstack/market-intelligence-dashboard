@@ -597,38 +597,37 @@ export default function MarketDynamicsPane({
   useEffect(() => {
     if (!navigatedItemId || marketInsights.length === 0) return;
 
-    // If navigatedItemId already matches an insight id, treat it as before.
-    const isInsightId = marketInsights.some(mi => mi.id === navigatedItemId);
-    if (isInsightId) {
-      setSelectedInsightId(navigatedItemId);
-      setPendingFocusSignalId(null);
-      if (onClearNavigatedItem) onClearNavigatedItem();
-      return;
-    }
-
-    // Otherwise treat it as a signal id and look up its parent insight.
     (async () => {
       try {
+        // First check if it's a signal id in market_dynamics_signals
         const { data, error } = await supabase
           .from("market_dynamics_signals")
-          .select("insight_id")
+          .select("insight_id, published_date, created_at")
           .eq("id", navigatedItemId)
           .limit(1)
           .maybeSingle();
 
-        if (error) throw error;
-        if (data?.insight_id) {
+        if (!error && data?.insight_id) {
           pendingFocusSignalIdRef.current = navigatedItemId;
           setPendingFocusSignalId(navigatedItemId);
+          setSearchQuery("");
           setSelectedInsightId(data.insight_id);
           setFocusTrigger((n) => n + 1);
+          return;
         }
       } catch (err) {
         console.error("Failed to resolve MD signal -> insight:", err);
-      } finally {
-        if (onClearNavigatedItem) onClearNavigatedItem();
       }
-    })();
+
+      // If not a signal ID, check if it matches an insight ID directly
+      const isInsightId = marketInsights.some(mi => mi.id === navigatedItemId);
+      if (isInsightId) {
+        setSelectedInsightId(navigatedItemId);
+        setPendingFocusSignalId(null);
+      }
+    })().finally(() => {
+      if (onClearNavigatedItem) onClearNavigatedItem();
+    });
   }, [navigatedItemId, marketInsights]);
 
   useEffect(() => {
@@ -865,17 +864,25 @@ export default function MarketDynamicsPane({
               setSelectedSignalId(target.id);
               pendingFocusSignalIdRef.current = null;
               setPendingFocusSignalId(null);
+
+              const scrollAndHighlight = () => {
+                const el = document.getElementById(`signal-card-${target.id}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  el.classList.add("ring-2", "ring-[#2d39d2]", "ring-offset-2");
+                  setTimeout(() => {
+                    el.classList.remove("ring-2", "ring-[#2d39d2]", "ring-offset-2");
+                  }, 2500);
+                  return true;
+                }
+                return false;
+              };
+
               requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  const el = document.getElementById(`signal-card-${target.id}`);
-                  if (el) {
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
-                    el.classList.add("ring-2", "ring-[#2d39d2]", "ring-offset-2");
-                    setTimeout(() => {
-                      el.classList.remove("ring-2", "ring-[#2d39d2]", "ring-offset-2");
-                    }, 2000);
-                  }
-                });
+                if (!scrollAndHighlight()) {
+                  setTimeout(scrollAndHighlight, 120);
+                }
+                setTimeout(scrollAndHighlight, 350);
               });
               return;
             }
@@ -930,12 +937,14 @@ export default function MarketDynamicsPane({
         setSelectedCategory(prev => prev.toUpperCase() !== rawName.toUpperCase() ? rawName : prev);
       }
       
-      setTimeout(() => {
-        const el = document.getElementById(`signal-card-${selectedInsightId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 150);
+      if (!pendingFocusSignalIdRef.current) {
+        setTimeout(() => {
+          const el = document.getElementById(`signal-card-${selectedInsightId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 150);
+      }
     }
   }, [selectedInsightId, richSignals, signalSubCardTitles, startDateStr, endDateStr]);
 

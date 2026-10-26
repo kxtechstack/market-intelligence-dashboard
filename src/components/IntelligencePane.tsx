@@ -471,6 +471,10 @@ export default function IntelligencePane({
         const el = document.getElementById(`alert-card-${selectedAlert.id}`);
         if (el) {
           el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("ring-2", "ring-[#2d39d2]", "ring-offset-2");
+          setTimeout(() => {
+            el.classList.remove("ring-2", "ring-[#2d39d2]", "ring-offset-2");
+          }, 2500);
         }
       }, 150);
     }
