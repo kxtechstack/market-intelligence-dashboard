@@ -1374,16 +1374,16 @@ export default function LandingPane({
     }
   };
 
-  const todayFormattedDate = useMemo(() => {
-    const now = new Date();
-    const day = now.getDate();
-    const s = ["th", "st", "nd", "rd"];
-    const v = day % 100;
-    const ordinalDay = day + (s[(v - 20) % 10] || s[v] || s[0]);
-    const month = now.toLocaleDateString("en-US", { month: "long" });
-    const year = now.getFullYear();
-    return `${ordinalDay} ${month} ${year}`;
-  }, []);
+  const formatSignalDate = (dateStr?: string) => {
+    if (!dateStr || typeof dateStr !== "string") return null;
+    const parts = dateStr.trim().split("-");
+    if (parts.length !== 3) return dateStr;
+    const [y, m, d] = parts;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthName = months[parseInt(m, 10) - 1] || m;
+    const dayNum = parseInt(d, 10);
+    return `${isNaN(dayNum) ? d : dayNum} ${monthName} ${y}`;
+  };
 
   const hasAnyHighlightsData = useMemo(() => {
     return Boolean(
@@ -2444,7 +2444,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                 {/* Highlights Header */}
                 <div className="flex items-center justify-between">
                   <h2 className="text-[14.5px] font-normal text-zinc-900 tracking-tight font-serif">
-                    Today’s Highlights & Intelligence Briefing ({todayFormattedDate})
+                    Latest Highlights & Intelligence Briefing
                   </h2>
                 </div>
 
@@ -2511,6 +2511,11 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                             <div key={module.id} className="space-y-3">
                               <h3 className="text-[11.5px] font-medium text-zinc-600 uppercase tracking-widest font-sans">
                                 {module.name} Highlights
+                                {moduleHighlight?.signal_date && (
+                                  <span className="text-zinc-400 font-normal normal-case tracking-normal ml-1.5">
+                                    · {formatSignalDate(moduleHighlight.signal_date)}
+                                  </span>
+                                )}
                               </h3>
                               {hasHighlightText && (
                                 <div className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal space-y-3">
