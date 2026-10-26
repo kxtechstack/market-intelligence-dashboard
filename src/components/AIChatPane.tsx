@@ -101,7 +101,7 @@ export default function AIChatPane({ chatHistory, setChatHistory, activeAlertTit
       {/* Upper header section */}
       <div id="chat-header" className="p-4 py-3 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-[#7c3aed]" />
+          <MessageSquare className="w-4 h-4 text-[#2d39d2]" />
           <h2 id="chat-heading-title" className="text-[14.5px] font-medium tracking-tight text-zinc-900">
             Al Chat
           </h2>
@@ -154,7 +154,7 @@ export default function AIChatPane({ chatHistory, setChatHistory, activeAlertTit
           <div id="welcome-chat-view" className="flex-1 flex flex-col items-center justify-center py-8 text-center px-4 self-center max-w-sm my-auto">
             
             {/* Graceview abstract purple/violet block icon */}
-            <div id="graceview-logo-emblem" className="w-[42px] h-[42px] bg-gradient-to-tr from-[#7c3aed] to-[#a78bfa] rounded-[4px] flex items-center justify-center shadow-sm mb-5">
+            <div id="graceview-logo-emblem" className="w-[42px] h-[42px] bg-gradient-to-tr from-[#2d39d2] to-[#6e79ed] rounded-[4px] flex items-center justify-center shadow-sm mb-5">
               <Sparkles className="w-[18px] h-[18px] text-white" />
             </div>
 
@@ -256,7 +256,7 @@ export default function AIChatPane({ chatHistory, setChatHistory, activeAlertTit
             {/* Analyzing Indicator */}
             {loading && (
               <div className="self-start flex items-center gap-2 bg-white border border-zinc-200 p-3 rounded-[4px] text-[12px] text-zinc-500">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#7c3aed]" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2d39d2]" />
                 <span>Graceview is analyzing policies ...</span>
               </div>
             )}

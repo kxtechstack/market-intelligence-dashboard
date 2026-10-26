@@ -4,7 +4,7 @@ import {
   Check, Share2, Info, MoreHorizontal, FileText, Search,
   ShieldAlert, BookOpen, Scale, AlertTriangle, Cpu, Layers, Pencil,
   Sparkles, Bookmark, CornerDownLeft, Trash2, ArrowUpRight, Square,
-  Loader2, Minus
+  Loader2, Minus, X, Plus, CornerDownRight, Filter
 } from "lucide-react";
 import { AlertItem, ChatMessage } from "../types";
 import { ChatSources } from "./ChatSources";
@@ -40,6 +40,7 @@ interface IntelligencePaneProps {
   onSelectAlert: (alert: AlertItem) => void;
   navigatedItemId?: string | null;
   onClearNavigatedItem?: () => void;
+  onSwitchToDecisionIntelligence?: (query: string, tab: string, label: string, returnLabel?: string) => void;
 }
 
 export default function IntelligencePane({ 
@@ -49,7 +50,8 @@ export default function IntelligencePane({
   selectedAlert, 
   onSelectAlert,
   navigatedItemId,
-  onClearNavigatedItem
+  onClearNavigatedItem,
+  onSwitchToDecisionIntelligence
 }: IntelligencePaneProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -397,13 +399,7 @@ export default function IntelligencePane({
     return alerts.filter(a => !hiddenIds[a.id]);
   }, [alerts, hiddenIds]);
 
-  useEffect(() => {
-    if (dashboardAlerts.length > 0) {
-      if (!selectedAlert || !dashboardAlerts.some(a => a.id === selectedAlert.id)) {
-        onSelectAlert(dashboardAlerts[0]);
-      }
-    }
-  }, [dashboardAlerts]);
+
   const [isMarkedRead, setIsMarkedRead] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<"insights" | "ask_marketgenie" | "bookmarks">("insights");
 
@@ -456,7 +452,7 @@ export default function IntelligencePane({
 
   const dateDetected = selectedAlert?.source_published_date ? formatDateHuman(selectedAlert.source_published_date) : "";
 
-  const sourceType = selectedAlert?.source_type || selectedAlert?.source || "N/A";
+  const sourceType = selectedAlert?.source_type || "News Report";
 
   const country = selectedAlert?.country || "";
 
@@ -467,6 +463,7 @@ export default function IntelligencePane({
   const [defaultStartDate, setDefaultStartDate] = useState("");
   const [defaultEndDate, setDefaultEndDate] = useState("");
   const [isEditingDates, setIsEditingDates] = useState(false);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   useEffect(() => {
     if (selectedAlert?.id) {
@@ -575,7 +572,57 @@ export default function IntelligencePane({
     return `${formatDate(startDateStr)} – ${formatDate(endDateStr)}`;
   }, [startDateStr, endDateStr]);
 
-  // Filter alerts based on search and selected timeline day
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(["All"]);
+  const [impactFilter, setImpactFilter] = useState<"All" | "Critical" | "High" | "Medium" | "Low">("All");
+
+  const availableCategories = useMemo(() => {
+    const cats = new Set<string>();
+    dashboardAlerts.forEach((a) => {
+      if (a.category && a.category.trim()) {
+        cats.add(a.category.trim());
+      }
+    });
+
+    const priorityOrder = [
+      "Regulatory Risk",
+      "Regulatory Change",
+      "Compliance Requirement",
+      "Licensing Change",
+      "Regulatory Consultation",
+      "Data Privacy & Protection",
+      "Sanctions & Embargo",
+    ];
+
+    const sortedCats = Array.from(cats).sort((a, b) => {
+      const idxA = priorityOrder.indexOf(a);
+      const idxB = priorityOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    return ["All", ...sortedCats];
+  }, [dashboardAlerts]);
+
+  const handleCategoryToggle = (cat: string) => {
+    if (cat === "All") {
+      setSelectedCategories(["All"]);
+      return;
+    }
+
+    setSelectedCategories((prev) => {
+      const withoutAll = prev.filter((c) => c !== "All");
+      if (withoutAll.includes(cat)) {
+        const next = withoutAll.filter((c) => c !== cat);
+        return next.length === 0 ? ["All"] : next;
+      } else {
+        return [...withoutAll, cat];
+      }
+    });
+  };
+
+  // Filter alerts based on search, date, category tags, and impact level slider
   const filteredAlerts = useMemo(() => {
     return dashboardAlerts.filter((alert) => {
       const matchSearch = 
@@ -588,10 +635,18 @@ export default function IntelligencePane({
         const pubDateStr = alert.source_published_date.split('T')[0];
         matchDate = pubDateStr >= startDateStr && pubDateStr <= endDateStr;
       }
+
+      const matchCategory =
+        selectedCategories.includes("All") ||
+        selectedCategories.some((c) => (alert.category || "").toLowerCase() === c.toLowerCase());
       
-      return matchSearch && matchDate;
+      const matchImpact =
+        impactFilter === "All" ||
+        (alert.impact_level || "").toLowerCase() === impactFilter.toLowerCase();
+
+      return matchSearch && matchDate && matchCategory && matchImpact;
     });
-  }, [searchQuery, dashboardAlerts, startDateStr, endDateStr]);
+  }, [searchQuery, dashboardAlerts, startDateStr, endDateStr, selectedCategories, impactFilter]);
 
   // Helper to format date with UPPERCASE month: '18 JULY 2026' and ordinal suffix
   const formatDateToHeader = (dateStr: string | null | undefined): string => {
@@ -633,6 +688,15 @@ export default function IntelligencePane({
 
     return { groupedAlerts: groups, orderedGroupDates: dates };
   }, [filteredAlerts]);
+
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+
+  const toggleDateGroup = (dateGroup: string, gIdx: number) => {
+    setExpandedDates(prev => {
+      const current = prev[dateGroup] !== undefined ? prev[dateGroup] : gIdx === 0;
+      return { ...prev, [dateGroup]: !current };
+    });
+  };
 
   const absoluteRecentDate = useMemo(() => {
     if (dashboardAlerts.length === 0) return "";
@@ -938,93 +1002,305 @@ export default function IntelligencePane({
     }
   };
 
+  const hasActiveFilters = 
+    searchQuery.trim() !== "" || 
+    impactFilter !== "All" || 
+    startDateStr !== defaultStartDate || 
+    endDateStr !== defaultEndDate || 
+    (selectedCategories.length > 0 && !(selectedCategories.length === 1 && selectedCategories[0] === "All"));
+
   return (
-    <div id="intelligence-dashboard" className="flex-1 h-full flex bg-white divide-x divide-zinc-200 overflow-hidden">
+    <div id="intelligence-dashboard" className="flex-1 h-full flex bg-white overflow-hidden relative justify-center">
       
-      {/* LEFT COLUMN: Roadmap and policy feed (60% width) */}
-      <div id="roadmap-column" className="w-[60%] h-full flex flex-col bg-white flex-shrink-0 animate-fade-in">
+      {/* COLUMN: Roadmap and policy feed */}
+      <div id="roadmap-column" className="w-full max-w-[1178px] mx-auto h-full flex flex-col bg-white flex-shrink-0 animate-fade-in border-x border-zinc-200">
         
         {/* Header section */}
         <div id="roadmap-header" className="h-[53px] px-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-4">
-            <h2 id="roadmap-heading-title" className="text-[19px] font-semibold tracking-tight text-zinc-900 select-none">
+            <h2 
+              id="roadmap-heading-title" 
+              style={{ fontFamily: "'Source Serif 4', Georgia, Cambria, 'Times New Roman', Times, serif" }}
+              className="text-[19px] font-semibold tracking-tight text-zinc-900 select-none font-serif-source"
+            >
               Policy & Risk Monitor
             </h2>
           </div>
-          {isEditingDates ? (
-            <div className="flex items-center gap-1">
-              <input 
-                type="date" 
-                value={startDateStr} 
-                max={todayStr}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) {
-                    setStartDateStr(defaultStartDate);
-                  } else if (val > todayStr) {
-                    setStartDateStr(todayStr);
-                  } else {
-                    setStartDateStr(val);
-                  }
-                }}
-                className="text-[11px] border border-zinc-200 bg-[#fbfbfb] rounded px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
-              />
-              <span className="text-zinc-400 text-xs">-</span>
-              <input 
-                type="date" 
-                value={endDateStr} 
-                max={todayStr}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) {
-                    setEndDateStr(defaultEndDate);
-                  } else if (val > todayStr) {
-                    setEndDateStr(todayStr);
-                  } else {
-                    setEndDateStr(val);
-                  }
-                }}
-                className="text-[11px] border border-zinc-200 bg-[#fbfbfb] rounded px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
-              />
-              <button 
-                onClick={() => {
-                  const finalStart = startDateStr || defaultStartDate;
-                  const finalEnd = endDateStr || defaultEndDate;
-
-                  if (!startDateStr) setStartDateStr(defaultStartDate);
-                  if (!endDateStr) setEndDateStr(defaultEndDate);
-
-                  // Persist confirmed dates
-                  sessionStorage.setItem("policy_risk_start_date", finalStart);
-                  sessionStorage.setItem("policy_risk_end_date", finalEnd);
-
-                  setIsEditingDates(false);
-                }}
-                className="p-1 bg-[#18181b] hover:bg-black text-white rounded transition-colors"
-                title="Confirm changes"
-              >
-                <Check className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div 
-              onClick={() => setIsEditingDates(true)}
-              className="flex items-center gap-1.5 cursor-pointer hover:bg-zinc-100 px-2 py-1 rounded transition-colors"
-              title="Click to edit date range"
+          <div className="flex flex-col items-end">
+            <button 
+              type="button"
+              onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+              className={`p-1.5 rounded-[6px] border transition-colors cursor-pointer flex items-center justify-center relative ${
+                isFilterPanelOpen 
+                  ? "bg-zinc-900 text-white border-zinc-900" 
+                  : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+              }`}
+              title="Toggle filters"
             >
-              <span className="text-xs text-zinc-500 font-medium select-none">
-                {formattedDateRange}
-              </span>
-              <Pencil className="w-3 h-3 text-zinc-400 select-none" />
-            </div>
-          )}
+              <Filter className="w-[13px] h-[13px]" />
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-600 rounded-full"></span>
+              )}
+            </button>
+            {hasActiveFilters && !isFilterPanelOpen && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setImpactFilter("All");
+                  setStartDateStr(defaultStartDate);
+                  setEndDateStr(defaultEndDate);
+                  setSelectedCategories(["All"]);
+                  sessionStorage.removeItem("policy_risk_start_date");
+                  sessionStorage.removeItem("policy_risk_end_date");
+                }}
+                className="text-[9.5px] text-zinc-500 hover:text-zinc-900 underline mt-0.5 cursor-pointer whitespace-nowrap"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Alerts list workspace */}
-        <div id="alerts-scrollbar-area" className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-[#fafafa]/50">
+        {/* Collapsible Filter Panel (shown when filter icon is clicked) */}
+        {isFilterPanelOpen && (
+          <div className="px-4 py-3 bg-zinc-50/90 border-b border-zinc-100 flex flex-col gap-3 animate-in fade-in duration-200 flex-shrink-0">
+            {hasActiveFilters && (
+              <div className="flex items-center justify-between pb-1 border-b border-zinc-200/60">
+                <span className="text-[10px] text-zinc-500 font-medium">Active filters applied</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setImpactFilter("All");
+                    setStartDateStr(defaultStartDate);
+                    setEndDateStr(defaultEndDate);
+                    setSelectedCategories(["All"]);
+                    sessionStorage.removeItem("policy_risk_start_date");
+                    sessionStorage.removeItem("policy_risk_end_date");
+                  }}
+                  className="text-[10px] text-zinc-600 hover:text-zinc-900 font-medium underline cursor-pointer"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+            {/* Search Area */}
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-[6px] border border-zinc-200">
+              <Search className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search Policy & Risk Monitor..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full text-xs bg-transparent text-zinc-800 outline-none placeholder:text-zinc-400"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="text-zinc-400 hover:text-zinc-600 text-xs cursor-pointer"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Date Filters */}
+              {isEditingDates ? (
+                <div className="flex items-center gap-1 text-[10px]">
+                  <input 
+                    type="date" 
+                    value={startDateStr} 
+                    max={todayStr}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setStartDateStr(defaultStartDate);
+                      } else if (val > todayStr) {
+                        setStartDateStr(todayStr);
+                      } else {
+                        setStartDateStr(val);
+                      }
+                    }}
+                    className="text-[10px] border border-zinc-200 bg-white rounded-[3px] px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
+                  />
+                  <span className="text-zinc-400 text-[10px]">-</span>
+                  <input 
+                    type="date" 
+                    value={endDateStr} 
+                    max={todayStr}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setEndDateStr(defaultEndDate);
+                      } else if (val > todayStr) {
+                        setEndDateStr(todayStr);
+                      } else {
+                        setEndDateStr(val);
+                      }
+                    }}
+                    className="text-[10px] border border-zinc-200 bg-white rounded-[3px] px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
+                  />
+                  <button 
+                    onClick={() => {
+                      const finalStart = startDateStr || defaultStartDate;
+                      const finalEnd = endDateStr || defaultEndDate;
+                      if (!startDateStr) setStartDateStr(defaultStartDate);
+                      if (!endDateStr) setEndDateStr(defaultEndDate);
+                      sessionStorage.setItem("policy_risk_start_date", finalStart);
+                      sessionStorage.setItem("policy_risk_end_date", finalEnd);
+                      setIsEditingDates(false);
+                    }}
+                    className="p-0.5 bg-[#18181b] hover:bg-black text-white rounded-[3px] transition-colors"
+                    title="Confirm changes"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => setIsEditingDates(true)}
+                  className="flex items-center gap-1 cursor-pointer hover:bg-zinc-200/50 px-1.5 py-0.5 rounded-[4px] transition-colors bg-white border border-zinc-200"
+                  title="Click to edit date range"
+                >
+                  <span className="text-[10px] text-zinc-600 font-medium select-none">
+                    {formattedDateRange}
+                  </span>
+                  <Pencil className="w-3 h-3 text-zinc-400 select-none" />
+                </div>
+              )}
+
+              {/* Slider Filters (Impact) */}
+              <div className="flex items-center gap-2 select-none">
+                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider font-sans">
+                  Impact
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setImpactFilter("All")}
+                  className={`px-2 py-0.5 text-[10px] font-medium rounded-[4px] border transition-all cursor-pointer ${
+                    impactFilter === "All"
+                      ? "bg-zinc-800 text-white border-zinc-800 shadow-xs font-semibold"
+                      : "bg-white text-zinc-500 border-zinc-200 hover:text-zinc-800 hover:bg-zinc-100"
+                  }`}
+                  title="Show all impact levels"
+                >
+                  All
+                </button>
+
+                <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-[6px] border border-zinc-200">
+                  <button
+                    type="button"
+                    onClick={() => setImpactFilter(prev => prev === "Critical" ? "All" : "Critical")}
+                    className={`text-[9.5px] font-semibold tracking-tight cursor-pointer transition-colors ${
+                      impactFilter === "Critical" ? "text-rose-600 font-bold" : "text-zinc-400 hover:text-zinc-600"
+                    }`}
+                    title="Filter by Critical impact"
+                  >
+                    Critical
+                  </button>
+
+                  <div className="relative flex items-center w-20">
+                    <input
+                      type="range"
+                      min={0}
+                      max={3}
+                      step={1}
+                      value={
+                        impactFilter === "Critical" ? 0 :
+                        impactFilter === "High" ? 1 :
+                        impactFilter === "Medium" ? 2 :
+                        impactFilter === "Low" ? 3 : 0
+                      }
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        const map: ("Critical" | "High" | "Medium" | "Low")[] = ["Critical", "High", "Medium", "Low"];
+                        setImpactFilter(map[val]);
+                      }}
+                      className={`w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer focus:outline-none ${
+                        impactFilter === "Critical" ? "accent-rose-500" :
+                        impactFilter === "High" ? "accent-orange-500" :
+                        impactFilter === "Medium" ? "accent-amber-500" :
+                        impactFilter === "Low" ? "accent-emerald-500" :
+                        "accent-zinc-400"
+                      }`}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setImpactFilter(prev => prev === "Low" ? "All" : "Low")}
+                    className={`text-[9.5px] font-semibold tracking-tight cursor-pointer transition-colors ${
+                      impactFilter === "Low" ? "text-emerald-600 font-bold" : "text-zinc-400 hover:text-zinc-600"
+                    }`}
+                    title="Filter by Low impact"
+                  >
+                    Low
+                  </button>
+                </div>
+
+                {impactFilter !== "All" && (
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-[4px] border ${
+                        impactFilter === "Critical"
+                          ? "bg-rose-50 text-rose-700 border-rose-200"
+                          : impactFilter === "High"
+                          ? "bg-orange-50 text-orange-700 border-orange-200"
+                          : impactFilter === "Medium"
+                          ? "bg-amber-50 text-amber-700 border-amber-200"
+                          : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      }`}
+                    >
+                      {impactFilter}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setImpactFilter("All")}
+                      className="text-zinc-400 hover:text-zinc-600 text-[11px] leading-none p-0.5 cursor-pointer"
+                      title="Clear impact filter"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Category Filter Tags */}
+        <div className="px-4 pt-2 pb-2 border-b border-zinc-100 bg-white flex-shrink-0 z-10 flex flex-col gap-1.5">
+          <div className="overflow-x-auto max-w-full pb-0.5 scrollbar-none">
+            <div className="inline-flex items-center p-0.5 bg-zinc-100 rounded-[8px] border border-zinc-200">
+              {availableCategories.map((cat) => {
+                const isSelected = selectedCategories.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => handleCategoryToggle(cat)}
+                    className={`px-4 py-1.5 text-[12px] font-medium rounded-[6px] whitespace-nowrap transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-white text-zinc-900 shadow-sm font-semibold"
+                        : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Alerts list workspace without background color */}
+        <div id="alerts-scrollbar-area" className="flex-1 overflow-y-auto px-0 py-3 flex flex-col gap-4 transition-all duration-300">
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center text-sm text-zinc-400">
-               <div className="w-5 h-5 border-2 border-[#7c3aed] border-t-transparent rounded-full animate-spin"></div>
+               <div className="w-5 h-5 border-2 border-[#2d39d2] border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : errorMsg ? (
             <div className="flex-1 flex items-center justify-center text-sm text-rose-500 font-medium tracking-tight">
@@ -1038,225 +1314,154 @@ export default function IntelligencePane({
                 </div>
               ) : (
                 <>
-                  {/* Daily Snapshot Card */}
-                  {snapshotLoading ? (
-                    <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] flex items-center gap-2 shrink-0">
-                      <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
-                      <span className="text-[12px] text-zinc-500">Loading snapshot...</span>
-                    </div>
-                  ) : snapshot ? (
-                    <div className="mb-3 shrink-0 border border-zinc-200 bg-white rounded-[8px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in select-text">
-                      <div className="px-4 py-2.5 border-b border-zinc-100 flex items-center justify-between">
-                        <h3 className="text-[13px] font-semibold text-zinc-900 font-sans">
-                          {snapshot.module_title}
-                        </h3>
-                        <span className="text-[11px] font-medium text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded-[4px]">
-                          {new Date(snapshot.snapshot_date).toLocaleDateString("en-US", {
-                            weekday: "short", day: "numeric", month: "short", year: "numeric"
-                          })}
-                        </span>
-                      </div>
-
-                      <div>
-                        {Array.from(enabledSubmodules.entries()).map(([subId, subName], idx) => {
-                          const row = (snapshot?.rows || []).find((r: any) => r.submodule_id === subId);
-                          
-                          if (row) {
-                            return (
-                              <div
-                                key={row.submodule_id ? `${row.submodule_id}-${idx}` : `pr-row-${idx}`}
-                                className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0"
-                              >
-                                <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass(row.color)}`}>
-                                  {row.icon}
-                                </div>
-
-                                <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
-                                  {row.label}
-                                </div>
-
-                                <div className="min-w-0">
-                                  <div className="text-[12.5px] text-zinc-600 leading-snug">
-                                    {row.body}
-                                  </div>
-                                  {row.so_what && (
-                                    <div className="text-[11.5px] text-zinc-400 leading-snug mt-0.5">
-                                      {row.so_what}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="flex flex-col items-end gap-0.5">
-                                  <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${getSnapshotChipClass(row.color)}`}>
-                                    {row.status}
-                                  </span>
-                                  <span className="text-[10.5px] text-zinc-400 font-medium">
-                                    {row.delta_label}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          // Fallback for enabled submodule with no snapshot data
-                          return (
-                            <div
-                              key={subId}
-                              className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0 opacity-60"
-                            >
-                              <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass("slate")}`}>
-                                <Minus className="w-4 h-4 text-zinc-400" />
-                              </div>
-                              <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
-                                {subName}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-[12.5px] text-zinc-600 leading-snug">
-                                  No data for this period
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-0.5" />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-3 shrink-0 p-5 border border-zinc-200 bg-white rounded-[8px] text-center">
-                      <p className="text-[12.5px] text-zinc-500">No snapshot available yet for this module.</p>
-                    </div>
-                  )}
-
                   {filteredAlerts.length === 0 ? (
                     <div className="p-8 text-center text-zinc-400 text-xs">
                       No matching alerts for your filter parameters.
                     </div>
                   ) : (
-                    orderedGroupDates.map((dateGroup, gIdx) => {
-                  const alertsInGroup = groupedAlerts[dateGroup] || [];
-                  
-                  return (
-                    <div key={dateGroup} className="flex flex-col gap-2">
-                      {/* Date Header for Signals (Always present) */}
-                      <h3 className="text-[10px] font-bold text-zinc-600 tracking-wider mb-1.5 select-none uppercase">
-                        {dateGroup}
-                      </h3>
-
-                      {/* List of cards in this date group */}
-                  <div className="flex flex-col gap-2">
-                    {alertsInGroup.map((alert) => {
-                      const isSelected = selectedAlert?.id === alert.id;
-                      const impactScore = getAlertImpactScore(alert);
-
-                      // Modern clean styles based on existing tags but refined
-                      let bgClass = "";
-                      let borderClass = "";
-                      let textClass = "";
-
-                      const resolvedColor = resolveTagColor(alert);
-
-                      switch (resolvedColor) {
-                        case "rose":
-                          bgClass = "bg-[#fff5f5]/60 hover:bg-[#fff5f5]";
-                          borderClass = isSelected ? "border-[#ef4444] ring-2 ring-[#ef4444]/25 shadow-sm" : "border-[#fde8e8]";
-                          textClass = "text-zinc-900";
-                          break;
-                        case "amber":
-                          bgClass = "bg-[#fffbeb]/60 hover:bg-[#fffbeb]";
-                          borderClass = isSelected ? "border-[#f59e0b] ring-2 ring-[#f59e0b]/25 shadow-sm" : "border-[#fef3c7]";
-                          textClass = "text-zinc-900";
-                          break;
-                        case "blue":
-                          bgClass = "bg-[#f0f9ff]/60 hover:bg-[#f0f9ff]";
-                          borderClass = isSelected ? "border-[#3b82f6] ring-2 ring-[#3b82f6]/25 shadow-sm" : "border-[#e0f2fe]";
-                          textClass = "text-zinc-900";
-                          break;
-                        default:
-                          bgClass = "bg-white hover:bg-zinc-50";
-                          borderClass = isSelected ? "border-zinc-400 ring-2 ring-zinc-400/25 shadow-sm" : "border-zinc-200";
-                          textClass = "text-zinc-950";
-                      }
-                      
-                      const tagBadgeClass = getTagStyles(getCategoryTagColor(alert.category));
+                    <div key={impactFilter} className="flex flex-col gap-4 animate-in fade-in duration-300 w-full">
+                      {orderedGroupDates.map((dateGroup, gIdx) => {
+                        const alertsInGroup = groupedAlerts[dateGroup] || [];
+                        const isExpanded = expandedDates[dateGroup] !== undefined ? !!expandedDates[dateGroup] : gIdx === 0;
 
                       return (
-                        <div
-                          key={alert.id}
-                          id={`alert-card-${alert.id}`}
-                          onClick={() => {
-                            onSelectAlert(alert);
-                            setActiveTab("insights");
-                          }}
-                          className={`px-3 py-2 border rounded-[4px] cursor-pointer transition-all flex items-start gap-2.5 justify-between ${bgClass} ${borderClass} ${textClass}`}
-                        >
-                          {/* Left contents block */}
-                          <div className="flex-1 flex flex-col items-start select-none">
-                            <p className="text-[12.5px] font-medium leading-tight text-zinc-900">
-                              {alert.signal_title}
-                            </p>
-                            <div className={`mt-1 rounded-[3px] py-0.5 px-2 text-[9px] font-semibold tracking-tight inline-block font-sans ${tagBadgeClass}`}>
-                              {alert.category}
+                        <div key={dateGroup} className="flex flex-col w-full">
+                          {/* Date Header for Signals (Clickable with Plus/Minus toggle) */}
+                          <div 
+                            onClick={() => toggleDateGroup(dateGroup, gIdx)}
+                            className="flex items-center justify-between py-1.5 px-4 cursor-pointer hover:bg-zinc-100/70 transition-colors select-none group/date w-full"
+                          >
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-[10px] font-bold text-zinc-600 tracking-wider uppercase group-hover/date:text-zinc-900 transition-colors">
+                                {dateGroup}
+                              </h3>
+                              <span className="text-[9.5px] font-medium text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded">
+                                {alertsInGroup.length} {alertsInGroup.length === 1 ? "signal" : "signals"}
+                              </span>
                             </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleDateGroup(dateGroup, gIdx);
+                              }}
+                              className="p-1 text-zinc-400 group-hover/date:text-zinc-700 hover:bg-zinc-200/60 transition-colors flex items-center justify-center rounded cursor-pointer"
+                              title={isExpanded ? "Collapse" : "Expand"}
+                              aria-label={isExpanded ? "Collapse date" : "Expand date"}
+                            >
+                              {isExpanded ? (
+                                <Minus className="w-3.5 h-3.5 text-zinc-500" />
+                              ) : (
+                                <Plus className="w-3.5 h-3.5 text-zinc-500" />
+                              )}
+                            </button>
                           </div>
 
-                          {/* Right impact indicator block */}
-                          <div className="flex flex-col items-end flex-shrink-0 min-w-[65px] select-none pt-0.5">
-                            <span className="text-[8.5px] font-bold tracking-wider text-zinc-400 mb-0.5 uppercase">
-                              IMPACT
-                            </span>
-                            <div className="flex gap-1 items-center">
-                              {Array.from({ length: 4 }).map((_, i) => {
-                                const colorCls = getUnifiedImpactBarClass(alert, i);
+                          {/* List of cards in this date group - full width extending border till section end */}
+                          {isExpanded && (
+                            <div className="w-full flex flex-col border-y border-zinc-200/80 divide-y divide-zinc-200/80 animate-in fade-in duration-150">
+                              {alertsInGroup.map((alert) => {
+                                const isSelected = selectedAlert?.id === alert.id;
+                                const impactScore = getAlertImpactScore(alert);
+
+                                const resolvedColor = resolveTagColor(alert);
+
+                                let bgClass = "bg-white hover:bg-zinc-50/70";
+                                if (isSelected) {
+                                  switch (resolvedColor) {
+                                    case "rose":  bgClass = "bg-[#fff5f5]/80"; break;
+                                    case "amber": bgClass = "bg-[#fffbeb]/80"; break;
+                                    case "blue":  bgClass = "bg-[#f0f9ff]/80"; break;
+                                    default:      bgClass = "bg-[#eef1fe]/50"; break;
+                                  }
+                                } else {
+                                  switch (resolvedColor) {
+                                    case "rose":  bgClass = "bg-white hover:bg-[#fff5f5]/40"; break;
+                                    case "amber": bgClass = "bg-white hover:bg-[#fffbeb]/40"; break;
+                                    case "blue":  bgClass = "bg-white hover:bg-[#f0f9ff]/40"; break;
+                                    default:      bgClass = "bg-white hover:bg-zinc-50/70"; break;
+                                  }
+                                }
+
+                                const selectedBorderClass = isSelected
+                                  ? (resolvedColor === "rose" ? "border-l-[3.5px] border-l-[#ef4444]"
+                                    : resolvedColor === "amber" ? "border-l-[3.5px] border-l-[#f59e0b]"
+                                    : resolvedColor === "blue" ? "border-l-[3.5px] border-l-[#3b82f6]"
+                                    : "border-l-[3.5px] border-l-[#2d39d2]")
+                                  : "border-l-[3.5px] border-l-transparent";
+                                
+                                const tagBadgeClass = getTagStyles(getCategoryTagColor(alert.category));
+
                                 return (
                                   <div
-                                    key={i}
-                                    className={`w-3 h-1 rounded-[0.5px] ${colorCls}`}
-                                  />
+                                    key={alert.id}
+                                    id={`alert-card-${alert.id}`}
+                                    onClick={() => {
+                                      onSelectAlert(alert);
+                                      setActiveTab("insights");
+                                    }}
+                                    className={`w-full px-4 py-2 cursor-pointer transition-all flex items-start gap-3 justify-between ${bgClass} ${selectedBorderClass} text-zinc-900`}
+                                  >
+                                    {/* Left contents block */}
+                                    <div className="flex-1 flex flex-col items-start select-none">
+                                      <p className="text-[13px] font-semibold leading-snug text-zinc-900">
+                                        {alert.signal_title}
+                                      </p>
+                                      <div className={`mt-1 rounded-[3px] py-0.5 px-2 text-[9px] font-semibold tracking-tight inline-block font-sans ${tagBadgeClass}`}>
+                                        {alert.category}
+                                      </div>
+                                    </div>
+
+                                    {/* Right impact indicator block */}
+                                    <div className="flex flex-col items-end flex-shrink-0 min-w-[65px] select-none pt-0.5">
+                                      <span className="text-[8.5px] font-bold tracking-wider text-zinc-400 mb-0.5 uppercase">
+                                        IMPACT
+                                      </span>
+                                      <div className="flex gap-1 items-center">
+                                        {Array.from({ length: 4 }).map((_, i) => {
+                                          const colorCls = getUnifiedImpactBarClass(alert, i);
+                                          return (
+                                            <div
+                                              key={i}
+                                              className={`w-3 h-1 rounded-[0.5px] ${colorCls}`}
+                                            />
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  </div>
                                 );
                               })}
                             </div>
-                          </div>
+                          )}
                         </div>
                       );
                     })}
-                  </div>
-
-                </div>
-                  );
-                })
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
-        </>
-      )}
-    </div>
+        </div>
 
         {/* Chat area removed */}
 
       </div>
 
-      {/* RIGHT COLUMN: Selected Alert details view (Pane 2 - 40% width) */}
-      <div id="alert-content-pane" className="w-[40%] h-full flex flex-col bg-white overflow-hidden relative">
+      {/* RIGHT COLUMN: Selected Alert details view (Pane 2 - 40% width) - visible only when clicked */}
+      {selectedAlert && (
+      <div id="alert-content-pane" className="absolute top-0 right-0 w-[40%] h-full flex flex-col bg-white overflow-hidden shadow-2xl z-[100] animate-in slide-in-from-right duration-300">
         
-        {/* Header of Content Detail */}
-        <div id="content-header" className="h-[53px] px-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-            <span className="text-[12px] text-zinc-600 font-semibold tracking-tight">
-              AI powered Insights by MarketGenie
-            </span>
-          </div>
-          
-        </div>
-
-        {/* Tab switcher: contents */}
-        <div id="content-tabbar" className="px-5 border-b border-zinc-100 flex items-center justify-between h-10 select-text flex-shrink-0 animate-fade-in">
-          <div className="flex items-center gap-4 h-full">
+        {/* Tab switcher with Close button in the same line - Tabs hidden matching Market Dynamics */}
+        <div id="content-tabbar" className="px-5 border-b border-zinc-100 flex flex-col pt-1 pb-1 select-text flex-shrink-0 animate-fade-in">
+          <div className="hidden items-center gap-4 h-9">
             <button
               onClick={() => setActiveTab("insights")}
-              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
+              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 font-sans ${
                 activeTab === "insights"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
+                  ? "border-[#2d39d2] text-zinc-900 font-semibold"
                   : "border-transparent text-zinc-500 hover:text-zinc-800"
               }`}
             >
@@ -1264,9 +1469,9 @@ export default function IntelligencePane({
             </button>
             <button
               onClick={() => setActiveTab("ask_marketgenie")}
-              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
+              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 font-sans ${
                 activeTab === "ask_marketgenie"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
+                  ? "border-[#2d39d2] text-zinc-900 font-semibold"
                   : "border-transparent text-zinc-500 hover:text-zinc-800"
               }`}
             >
@@ -1274,9 +1479,9 @@ export default function IntelligencePane({
             </button>
             <button
               onClick={() => setActiveTab("bookmarks")}
-              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
+              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 font-sans ${
                 activeTab === "bookmarks"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
+                  ? "border-[#2d39d2] text-zinc-900 font-semibold"
                   : "border-transparent text-zinc-500 hover:text-zinc-800"
               }`}
             >
@@ -1284,6 +1489,14 @@ export default function IntelligencePane({
               <span>Bookmark ({bookmarkedCount})</span>
             </button>
           </div>
+
+          <button
+            onClick={() => onSelectAlert(null as any)}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer self-end"
+            title="Close details"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Dynamic switcher content */}
@@ -1293,8 +1506,8 @@ export default function IntelligencePane({
           </div>
         )}
         {activeTab === "insights" && selectedAlert && (
-          /* Document Content Viewport representing mockup design choices */
-          <div key={selectedAlert.id} id="details-viewport" ref={detailsViewportRef} className="animate-fade-in flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-5 bg-white">
+          /* Document Content Viewport representing mockup design choices matching Market Dynamics */
+          <div key={selectedAlert.id} id="details-viewport" ref={detailsViewportRef} className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-5 animate-fade-in bg-[#fafafa]/30 select-text relative">
             
             <div className="flex flex-col gap-2">
               <h1 className="text-xl sm:text-[22px] font-semibold leading-tight tracking-tight text-[#111827] font-sans">
@@ -1332,7 +1545,7 @@ export default function IntelligencePane({
                         triggerToast("Failed to hide article");
                       }
                     }}
-                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[3px] flex items-center justify-center transition-colors"
+                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors"
                     title="Not Interested"
                   >
                     <Square className="w-3 h-3" />
@@ -1378,7 +1591,7 @@ export default function IntelligencePane({
                         triggerToast("Failed to update bookmark");
                       }
                     }}
-                    className={`w-[22px] h-[22px] border rounded-[3px] flex items-center justify-center transition-colors duration-150 ${
+                    className={`w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 ${
                       isBookmarked[selectedAlert.id]
                         ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
                         : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
@@ -1391,7 +1604,7 @@ export default function IntelligencePane({
                   <button
                     id="export-doc-button"
                     onClick={() => triggerToast(`Exported report for ${selectedAlert.signal_title} to PDF/CSV draft.`)}
-                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50 rounded-[3px] flex items-center justify-center transition-colors"
+                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50 rounded-[4px] flex items-center justify-center transition-colors"
                     title="Export"
                   >
                     <Share2 className="w-3 h-3" />
@@ -1400,16 +1613,21 @@ export default function IntelligencePane({
               </div>
             </div>
 
-            {/* Meta values and Impact bar row inside a thin border box */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 border border-zinc-200 rounded-[6px] p-4 bg-zinc-50/30 mt-2 select-text">
-              <div className="flex flex-col gap-1 text-[12.5px] text-zinc-655">
-                <div>
-                  <span className="font-semibold text-zinc-800 font-sans">Source Published Date:</span>{" "}
+            {/* Meta values and Impact bar row inside a thin border box matching Market Dynamics */}
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 border border-zinc-200 rounded-[4px] p-4 bg-zinc-50/30 select-text">
+              <div className="flex flex-col gap-1 text-[12.5px] text-zinc-600 font-sans">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-zinc-800 font-sans">Reported on:</span>{" "}
                   <span className="text-zinc-600 font-sans">{dateDetected}</span>
-                </div>
-                <div>
-                  <span className="font-semibold text-zinc-800 font-sans">Source Type:</span>{" "}
-                  <span className="text-zinc-600 font-sans">{sourceType}</span>
+                  <div
+                    className="relative group/info inline-flex items-center cursor-help ml-0.5"
+                    title={`Source Type: ${sourceType}`}
+                  >
+                    <Info className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 transition-colors" />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/info:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[11px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                      {`Source Type: ${sourceType}`}
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <span className="font-semibold text-zinc-800 font-sans">Country:</span>{" "}
@@ -1417,8 +1635,8 @@ export default function IntelligencePane({
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-1.5 min-w-[100px]">
-                <span className="text-[10px] font-bold tracking-widest text-zinc-400">IMPACT</span>
+              <div className="flex flex-col items-end gap-1.5 min-w-[100px] select-none">
+                <span className="text-[9px] font-bold tracking-widest text-zinc-500 font-sans">IMPACT</span>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: 4 }).map((_, i) => {
                     const colorCls = getUnifiedImpactBarClass(selectedAlert, i);
@@ -1436,27 +1654,27 @@ export default function IntelligencePane({
               </div>
             </div>
 
-            {/* Document Content Paragraphs: full-width narrative and source box underneath */}
-            <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-zinc-705 font-sans mt-2 select-text">
-              <p className="text-left">{selectedAlert.summary}</p>
+            {/* Document Content Paragraphs: full-width narrative and reference box underneath matching Market Dynamics */}
+            <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-zinc-600 font-sans select-text">
+              <p className="font-light text-zinc-800 leading-relaxed text-left">{selectedAlert.summary}</p>
               
-              {/* 1 in a small box under the main text representing sources, visible link on hover */}
-              <div className="flex items-center gap-1.5 select-text text-[11px] text-zinc-400 mt-1">
-                <span className="font-normal text-zinc-400">Source:</span>
+              {/* Reference */}
+              <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-600 mt-1">
+                <span className="font-normal text-zinc-600 mt-[3px]">Reference:</span>
                 {selectedAlert.source_article_url ? (
                   <a 
                     href={selectedAlert.source_article_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center w-[18px] h-[18px] bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200 rounded text-[10.5px] font-bold text-zinc-500 hover:text-zinc-750 cursor-pointer transition-colors animate-fade-in select-none"
-                    title={selectedAlert.id === "cross-border-taxation" ? "Singapore Monetary Authority (MAS) Regulatory Consultation Platform" : `${selectedAlert.category} Primary Circular`}
+                    className="group inline-flex items-center justify-center px-1.5 h-[17px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[3px] text-[10px] font-semibold text-zinc-700 transition-colors cursor-pointer select-none"
+                    title={selectedAlert.source || "Primary Source"}
                   >
                     1
                   </a>
                 ) : (
                   <span 
-                    className="inline-flex items-center justify-center w-[18px] h-[18px] bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200 rounded text-[10.5px] font-bold text-zinc-500 hover:text-zinc-750 cursor-help transition-colors animate-fade-in select-none"
-                    title={selectedAlert.id === "cross-border-taxation" ? "Singapore Monetary Authority (MAS) Regulatory Consultation Platform" : `${selectedAlert.category} Primary Circular`}
+                    className="group inline-flex items-center justify-center px-1.5 h-[17px] bg-zinc-100 border border-zinc-200 rounded-[3px] text-[10px] font-semibold text-zinc-700 select-none"
+                    title={selectedAlert.source || "Primary Source"}
                   >
                     1
                   </span>
@@ -1464,16 +1682,16 @@ export default function IntelligencePane({
               </div>
             </div>
 
-            {/* Business Impact bullet segment (styled inside a lilac card, selectable and refined) */}
-            <div className="flex flex-col gap-2 mt-4 select-text">
-              <h3 className="text-[13.5px] font-bold tracking-tight text-zinc-900 font-sans select-text">
+            {/* Business Impact bullet segment matching Market Dynamics */}
+            <div className="flex flex-col gap-2 mt-2">
+              <h3 className="text-[13px] font-semibold tracking-tight text-zinc-800 font-sans">
                 Business Impact
               </h3>
-              <div className="bg-[#f5f3ff]/60 border border-violet-100 p-4 rounded-[4px] flex flex-col gap-3">
+              <div className="bg-[#eef1fe]/60 border border-violet-100 p-4 rounded-[4px] flex flex-col gap-3">
                 {businessImpactList.map((bullet, idx) => (
                   <div key={idx} className="flex gap-2.5 items-start">
-                    <span className="text-[#7c3aed] text-xs mt-1 shrink-0 select-none">•</span>
-                    <p className="text-[12px] leading-relaxed text-zinc-700 font-normal select-text">
+                    <span className="text-[#2d39d2] text-xs mt-1 shrink-0 select-none">•</span>
+                    <p className="text-[13px] leading-relaxed text-zinc-800 font-light select-text font-sans">
                       {bullet}
                     </p>
                   </div>
@@ -1481,20 +1699,20 @@ export default function IntelligencePane({
               </div>
             </div>
 
-            {/* Similar Policy & Risk Movements link segment with note-like icon in front of links */}
-            <div className="flex flex-col gap-2 mt-4 select-text">
-              <h3 className="text-[13.5px] font-bold tracking-tight text-zinc-900 font-sans select-text">
+            {/* Similar Policy & Risk Movements section */}
+            <div className="flex flex-col gap-1.5 mt-4 select-text">
+              <h3 className="text-[12.5px] font-medium tracking-tight text-zinc-900 font-sans select-text">
                 Similar Policy & Risk Movements
               </h3>
-              <div className="flex flex-col gap-2 ml-1">
+              <div className="flex flex-col gap-1.5 ml-1">
                 {isFetchingSimilar ? (
-                  <div className="text-[12px] text-zinc-500 animate-pulse py-1">
+                  <div className="text-[12px] text-zinc-500 animate-pulse py-1 font-sans">
                     Fetching similar movements...
                   </div>
                 ) : externalSimilarArticles.length > 0 ? (
                   externalSimilarArticles.map((article, idx) => (
-                    <div className="flex items-start gap-2 py-0.5" key={idx}>
-                      <FileText className="w-3.5 h-3.5 text-zinc-400 mt-[2px] shrink-0 select-none" />
+                    <div className="flex items-start gap-2 py-0.5 text-[12px]" key={idx}>
+                      <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
                       <button
                         onClick={() => {
                           if (article.signal_id) {
@@ -1504,47 +1722,55 @@ export default function IntelligencePane({
                             }
                           }
                         }}
-                        className="text-left text-[12px] text-zinc-700 hover:text-[#7c3aed] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer"
+                        className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
                       >
                         {article.title}
                       </button>
                     </div>
                   ))
                 ) : (
-                  <div className="text-[12px] text-zinc-400 py-1">
+                  <div className="text-[12px] text-zinc-400 py-1 font-sans">
                     No similar movements found
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Action buttons styled exactly like the provided reference image: White card, rounded border, left-aligned, sentence-case, purple icons */}
-            <div className="flex flex-col gap-2 w-full mt-5 select-none font-sans font-normal text-[13px]">
-              <button
-                onClick={() => {
-                  const query = "Show similar regulatory risks";
-                  setLeftChatInput(query);
-                  setActiveTab("ask_marketgenie");
-                  handleLeftChatSend(query);
-                }}
-                className="w-full h-12 border border-zinc-200 bg-white hover:bg-[#fafafa] rounded-[4px] flex items-center gap-3.5 px-4 text-zinc-800 hover:text-zinc-950 transition-colors cursor-pointer text-left font-sans shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-              >
-                <Sparkles className="w-4 h-4 text-[#7c3aed] fill-[#7c3aed]/10 shrink-0" />
-                <span>Show similar regulatory risks</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  const query = "Show other regulatory consultations";
-                  setLeftChatInput(query);
-                  setActiveTab("ask_marketgenie");
-                  handleLeftChatSend(query);
-                }}
-                className="w-full h-12 border border-zinc-200 bg-white hover:bg-[#fafafa] rounded-[4px] flex items-center gap-3.5 px-4 text-zinc-800 hover:text-zinc-950 transition-colors cursor-pointer text-left font-sans shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-              >
-                <BookOpen className="w-4 h-4 text-[#7c3aed] shrink-0" />
-                <span>Show other regulatory consultations</span>
-              </button>
+            {/* Explore Decision Intelligence section */}
+            <div className="flex flex-col gap-1.5 mt-4 select-text">
+              <h3 className="text-[12.5px] font-medium tracking-tight text-zinc-900 font-sans select-text">
+                Explore Decision Intelligence
+              </h3>
+              <div className="flex flex-col gap-1.5 ml-1">
+                <div className="flex items-start gap-2 py-0.5 text-[12px]">
+                  <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
+                  <button
+                    onClick={() => {
+                      const query = `What are the regulatory implications and compliance risks of ${selectedAlert.signal_title}?`;
+                      if (onSwitchToDecisionIntelligence) {
+                        onSwitchToDecisionIntelligence(query, "policy_risk_monitor", "Policy & Risk Monitor", "Policy & Risk Monitor");
+                      }
+                    }}
+                    className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
+                  >
+                    Evaluate regulatory implications and compliance risks
+                  </button>
+                </div>
+                <div className="flex items-start gap-2 py-0.5 text-[12px]">
+                  <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
+                  <button
+                    onClick={() => {
+                      const query = `Provide case studies of regulatory enforcement related to ${selectedAlert.signal_title}.`;
+                      if (onSwitchToDecisionIntelligence) {
+                        onSwitchToDecisionIntelligence(query, "policy_risk_monitor", "Policy & Risk Monitor", "Policy & Risk Monitor");
+                      }
+                    }}
+                    className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
+                  >
+                    Show regulatory enforcement & precedents
+                  </button>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -1613,7 +1839,7 @@ export default function IntelligencePane({
                                             onSelectAlert(alert);
                                             setActiveTab("insights");
                                           }}
-                                          className="text-[11px] text-[#7c3aed] flex items-center gap-1 font-medium hover:underline self-start"
+                                          className="text-[11px] text-[#2d39d2] flex items-center gap-1 font-medium hover:underline self-start"
                                         >
                                           View Insight &rarr;
                                         </button>
@@ -1664,7 +1890,7 @@ export default function IntelligencePane({
                           }}
                           className="bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-700 text-[11.5px] px-3 py-1.5 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all cursor-pointer text-left flex items-center gap-1.5"
                         >
-                          <Sparkles className="w-3 h-3 text-[#7c3aed]/70 shrink-0" />
+                          <Sparkles className="w-3 h-3 text-[#2d39d2]/70 shrink-0" />
                           <span className="truncate">{suggestion}</span>
                         </button>
                       );
@@ -1680,7 +1906,7 @@ export default function IntelligencePane({
                   onFocus={() => { setIsChatFocused(true); }}
                   onBlur={() => setTimeout(() => setIsChatFocused(false), 200)}
                   onKeyDown={handleLeftKeyDown}
-                  className="w-full bg-[#fcfbf9]/40 text-[13px] pl-3.5 pr-26 py-3 border border-zinc-200 rounded-[6px] focus:outline-none focus:border-[#7c3aed] focus:ring-2 focus:ring-[#7c3aed]/20 placeholder:text-zinc-400 font-sans transition-all duration-150"
+                  className="w-full bg-[#fcfbf9]/40 text-[13px] pl-3.5 pr-26 py-3 border border-zinc-200 rounded-[6px] focus:outline-none focus:border-[#2d39d2] focus:ring-2 focus:ring-[#2d39d2]/20 placeholder:text-zinc-400 font-sans transition-all duration-150"
                 />
                  <div className="absolute right-2 top-2.5 flex items-center gap-0.5">
                   <button
@@ -1770,7 +1996,7 @@ export default function IntelligencePane({
                         <span className="text-zinc-500 font-medium">
                           Bookmarked on {alert.bookmark_created_at ? formatDateHuman(alert.bookmark_created_at) : "N/A"}
                         </span>
-                        <span className="text-[#7c3aed] font-medium hover:underline flex items-center gap-0.5">
+                        <span className="text-[#2d39d2] font-medium hover:underline flex items-center gap-0.5">
                           Read Insight &rarr;
                         </span>
                       </div>
@@ -1789,7 +2015,7 @@ export default function IntelligencePane({
             className="absolute bottom-5 right-5 bg-zinc-900 text-white text-xs py-2 px-4 rounded shadow-lg transition-all duration-300 transform translate-y-0 flex items-center gap-3 border border-zinc-800 animate-in fade-in slide-in-from-bottom-2"
           >
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#7c3aed] animate-ping" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#2d39d2] animate-ping" />
               <span>{toastMessage}</span>
             </div>
             {lastHiddenAlert && (
@@ -1825,6 +2051,7 @@ export default function IntelligencePane({
         )}
 
       </div>
+      )}
 
     </div>
   );

@@ -9,7 +9,7 @@ export default function SettingsPane({ onReturn }: SettingsPaneProps) {
   return (
     <div className="flex-1 h-full bg-zinc-50 flex items-center justify-center p-8 select-none">
       <div className="max-w-md w-full bg-white border border-zinc-200 p-6 rounded-[4px] shadow-[0_1px_3px_rgba(0,0,0,0.01)] text-center flex flex-col items-center">
-        <Sliders className="w-8 h-8 text-[#7c3aed] mb-4" />
+        <Sliders className="w-8 h-8 text-[#2d39d2] mb-4" />
         <h3 className="text-base font-medium text-zinc-900 mb-1">Workspace configurations</h3>
         <p className="text-[12.5px] text-zinc-500 leading-relaxed mb-6">
           Define regulatory alerts triggers, SLA limits threshold controls, and API access bindings.
@@ -25,7 +25,7 @@ export default function SettingsPane({ onReturn }: SettingsPaneProps) {
           </div>
           <div className="flex items-center justify-between text-xs py-2">
             <span className="text-zinc-500 font-normal">AI server model</span>
-            <span className="text-[#7c3aed] font-medium font-mono text-[10.5px]">gemini-3.5-flash</span>
+            <span className="text-[#2d39d2] font-medium font-mono text-[10.5px]">gemini-3.5-flash</span>
           </div>
         </div>
         <button 

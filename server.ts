@@ -164,6 +164,34 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
+app.get("/api/credit-usage/:clientId", async (req, res) => {
+  const { clientId } = req.params;
+  const rawUserId = (req.query.userId as string) || "";
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const validUserId = uuidRegex.test(rawUserId) ? rawUserId : (uuidRegex.test(clientId) ? clientId : "b61b4d3b-caeb-457b-9971-636c83688ee4");
+
+  const defaultUsage = { used: 0, total: 10000, remaining: 10000 };
+
+  try {
+    const upstreamUrl = `https://test.152-228-233-227.sslip.io/credit-usage/${clientId}?userId=${validUserId}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const upstreamRes = await fetch(upstreamUrl, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (upstreamRes.ok) {
+      const data: any = await upstreamRes.json();
+      if (data && typeof data.used === "number" && typeof data.total === "number") {
+        return res.json(data);
+      }
+    }
+  } catch {
+    // Fail silently to default usage
+  }
+
+  return res.json(defaultUsage);
+});
+
 // Setup Vite Dev server middleware or static assets in production
 async function setupVite() {
   if (process.env.NODE_ENV !== "production") {

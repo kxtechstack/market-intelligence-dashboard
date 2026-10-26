@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Sparkles, Bookmark, Share2, FileText, Send, Loader2, ArrowUpRight, AlertTriangle, Minus, ArrowDownRight, Pencil, Check, ArrowUp, ArrowRight, ArrowDown, Square, Trash2, CornerDownLeft } from "lucide-react";
+import { Sparkles, Bookmark, Share2, FileText, Send, Loader2, ArrowUpRight, AlertTriangle, Minus, ArrowDownRight, Pencil, Check, ArrowUp, ArrowRight, ArrowDown, Square, Trash2, CornerDownLeft, CornerDownRight, X, Filter, Search } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { SourceItem } from "./ForewardOutlookPane";
 import { ChatSources } from "./ChatSources";
@@ -13,6 +13,8 @@ interface MarketDynamicsPaneProps {
   userId: string;
   navigatedItemId?: string | null;
   onClearNavigatedItem?: () => void;
+  onSetInitialQuery: (query: string) => void;
+  onSwitchToDecisionIntelligence: (query: string, tab: string, label: string, returnLabel: string) => void;
 }
 
 interface ChatMessage {
@@ -221,6 +223,15 @@ const getTagStyles = (tagColor: string) => {
   }
 };
 
+const getRelevanceTagClass = (relevance?: string) => {
+  const rel = (relevance || "").toLowerCase();
+  if (rel.includes("critical")) return "bg-red-50 text-red-700 border-red-200/80";
+  if (rel.includes("high")) return "bg-orange-50 text-orange-700 border-orange-200/80";
+  if (rel.includes("medium")) return "bg-amber-50 text-amber-700 border-amber-200/80";
+  if (rel.includes("low")) return "bg-emerald-50 text-emerald-700 border-emerald-200/80";
+  return "bg-zinc-50 text-zinc-600 border-zinc-200/80";
+};
+
 interface SignalDetailData {
   id?: string;
   title: string;
@@ -255,6 +266,32 @@ const getSubmoduleSummary = (name: string) => {
 };
 
 const SIGNAL_DETAILS: Record<string, SignalDetailData> = {};
+
+const parseSignalDate = (src: any): number => {
+  if (!src) return 0;
+  const raw = src.rawDate || src.published_date || src.last_enriched_at || src.created_at || src.source_published_date;
+  if (raw) {
+    const t = new Date(raw).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  
+  if (typeof src.date === "string" && src.date.trim()) {
+    const str = src.date.trim();
+    const m = str.match(/^([A-Za-z]{3,9})\s+(\d{1,2})(?:,?\s*(\d{4}))?$/);
+    if (m) {
+      const monthNames = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+      const monthIdx = monthNames.findIndex(mn => m[1].toLowerCase().startsWith(mn));
+      if (monthIdx !== -1) {
+        const day = parseInt(m[2], 10);
+        const year = m[3] ? parseInt(m[3], 10) : 2026;
+        return new Date(year, monthIdx, day).getTime();
+      }
+    }
+    const direct = new Date(str).getTime();
+    if (!isNaN(direct) && direct > 0) return direct;
+  }
+  return 0;
+};
 
 const getSignalDetails = (sig: {title: string; desc: string}, selectedCategory: string) => {
   if (SIGNAL_DETAILS[sig.title]) {
@@ -332,6 +369,13 @@ interface SignalContent {
   title: string;
   desc: string;
   short_summary?: string;
+  last_enriched_at?: string;
+  created_at?: string;
+  source_published_date?: string;
+  signal_count?: number;
+  relevance_level_live?: string;
+  relevance_level?: string;
+  impact_level?: string;
 }
 
 interface SignalGridItem {
@@ -395,7 +439,9 @@ export default function MarketDynamicsPane({
   industry,
   userId,
   navigatedItemId,
-  onClearNavigatedItem
+  onClearNavigatedItem,
+  onSetInitialQuery,
+  onSwitchToDecisionIntelligence,
 }: MarketDynamicsPaneProps) {
   const [snapshot, setSnapshot] = useState<any>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(true);
@@ -466,12 +512,24 @@ export default function MarketDynamicsPane({
   }, [clientId]);
 
   const [activeTab, setActiveTab] = useState<string>("insights");
+  const [activeActivityTab, setActiveActivityTab] = useState("Funding & Investment Activity");
   const [isSourcesExpanded, setIsSourcesExpanded] = useState<boolean>(true);
   const [isReferencesExpanded, setIsReferencesExpanded] = useState<boolean>(false);
-  const [richSignals, setRichSignals] = useState<SignalGridItem[]>([]);
-  const [marketInsights, setMarketInsights] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [signalSubCardTitles, setSignalSubCardTitles] = useState<Record<string, string[]>>({});
+  const cachedData = useMemo(() => {
+    if (!clientId) return null;
+    try {
+      const stored = sessionStorage.getItem(`market_dynamics_cache_${clientId}`);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }, [clientId]);
+
+  const [richSignals, setRichSignals] = useState<SignalGridItem[]>(() => cachedData?.richSignals || []);
+  const [marketInsights, setMarketInsights] = useState<any[]>(() => cachedData?.marketInsights || []);
+  const [isLoading, setIsLoading] = useState(() => !cachedData || !cachedData.richSignals?.length);
+  const [signalSubCardTitles, setSignalSubCardTitles] = useState<Record<string, string[]>>(() => cachedData?.signalSubCardTitles || {});
+  const [activeSubOptionIndex, setActiveSubOptionIndex] = useState<number>(0);
 
   const [selectedGridSignal, setSelectedGridSignal] = useState<SignalContent | null>(null);
   const [selectedInsightId, setSelectedInsightId] = useState<string | null>(null);
@@ -488,8 +546,53 @@ export default function MarketDynamicsPane({
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
 
-  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({ 0: true });
+  const [expandedSignals, setExpandedSignals] = useState<Record<string, boolean>>({});
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [visibleCount, setVisibleCount] = useState<number>(5);
+
+  const availableTabs = useMemo(() => {
+    const backendTabs = Object.keys(signalSubCardTitles);
+    if (backendTabs.length > 0) return backendTabs;
+    if (enabledSubmodules.size > 0) return Array.from(enabledSubmodules.values());
+    return ["Funding & Investment Activity", "Industry Structure Changes", "Technology Adoption Signals"];
+  }, [signalSubCardTitles, enabledSubmodules]);
+
+  useEffect(() => {
+    if (availableTabs.length > 0) {
+      if (!selectedCategory || !availableTabs.includes(selectedCategory)) {
+        const defaultTab = availableTabs.find(t => t.toLowerCase().includes("funding")) || availableTabs[0];
+        setSelectedCategory(defaultTab);
+        setActiveActivityTab(defaultTab);
+      } else if (activeActivityTab !== selectedCategory) {
+        setActiveActivityTab(selectedCategory);
+      }
+    }
+  }, [availableTabs, selectedCategory]);
+
+  const handleTabClick = (tab: string) => {
+    setActiveActivityTab(tab);
+    setSelectedCategory(tab);
+    setActiveSubOptionIndex(0);
+    setExpandedCards({ 0: true });
+    setVisibleCount(5);
+  };
+
+  const handleSubOptionClick = (subIndex: number) => {
+    setActiveSubOptionIndex(subIndex);
+    setExpandedCards(prev => {
+      const wasOpen = prev[subIndex] !== undefined ? !!prev[subIndex] : subIndex === 0;
+      return { ...prev, [subIndex]: !wasOpen };
+    });
+    const subContents = currentCategoryData?.contents[subIndex];
+    if (subContents && subContents.length > 0) {
+      setSelectedGridSignal(subContents[0]);
+    }
+  };
+
+  useEffect(() => {
+    setVisibleCount(5);
+  }, [selectedCategory]);
 
   useEffect(() => {
     if (!navigatedItemId || marketInsights.length === 0) return;
@@ -530,32 +633,45 @@ export default function MarketDynamicsPane({
 
   useEffect(() => {
     async function fetchMarketDynamics() {
-      setIsLoading(true);
+      if (richSignals.length === 0) {
+        setIsLoading(true);
+      }
       try {
-        // 1. Fetch enabled signal configuration for the client
-        const { data: enabledSignalsData, error: enabledSignalsError } = await supabase
-          .schema("admin")
-          .from("client_signals")
-          .select(`
-            id,
-            signal_id,
-            is_enabled,
-            signal:signals(
+        // Fetch enabled signal configuration and market insights in parallel
+        const [enabledSignalsRes, insightsRes] = await Promise.all([
+          supabase
+            .schema("admin")
+            .from("client_signals")
+            .select(`
               id,
-              signal_name,
-              module_id,
-              submodule_id,
-              submodule:submodules(
+              signal_id,
+              is_enabled,
+              signal:signals(
                 id,
-                submodule_name,
-                module_id
+                signal_name,
+                module_id,
+                submodule_id,
+                submodule:submodules(
+                  id,
+                  submodule_name,
+                  module_id
+                )
               )
-            )
-          `)
-          .eq("client_id", clientId)
-          .eq("is_enabled", true);
+            `)
+            .eq("client_id", clientId)
+            .eq("is_enabled", true),
+          supabase
+            .from("market_insights_live")
+            .select("*")
+            .eq("module_id", MARKET_DYNAMICS_MODULE_ID)
+            .eq("client_id", clientId)
+        ]);
 
-        if (enabledSignalsError) throw enabledSignalsError;
+        if (enabledSignalsRes.error) throw enabledSignalsRes.error;
+        if (insightsRes.error) throw insightsRes.error;
+
+        const enabledSignalsData = enabledSignalsRes.data || [];
+        const insightsData = insightsRes.data || [];
 
         // Filter for this specific module ID locally
         const enabledSignals = (enabledSignalsData || [])
@@ -566,15 +682,6 @@ export default function MarketDynamicsPane({
             if (subA !== subB) return subA.localeCompare(subB);
             return a.signal.signal_name.localeCompare(b.signal.signal_name);
           });
-
-        // 2. Fetch market insights from public schema
-        const { data: insightsData, error: insightsError } = await supabase
-          .from("market_insights_live")
-          .select("*")
-          .eq("module_id", MARKET_DYNAMICS_MODULE_ID)
-          .eq("client_id", clientId);
-
-        if (insightsError) throw insightsError;
         if (insightsData && insightsData.length > 0) {
           console.log("Market insight item keys:", Object.keys(insightsData[0]));
         }
@@ -603,11 +710,24 @@ export default function MarketDynamicsPane({
             const contents: SignalContent[][] = submoduleSignals.map(signal => {
                return (insightsData || [])
                  .filter(item => item.signal_id === signal.id)
+                 .sort((a, b) => {
+                   const dateA = new Date(a.last_enriched_at || a.created_at || a.source_published_date || 0).getTime();
+                   const dateB = new Date(b.last_enriched_at || b.created_at || b.source_published_date || 0).getTime();
+                   return dateB - dateA;
+                 })
                  .map(item => ({
                    id: item.id,
                    title: item.title || item.summary || "",
                    desc: item.summary || "",
-                   short_summary: item.short_summary || ""
+                   short_summary: item.short_summary || "",
+                   last_enriched_at: item.last_enriched_at,
+                   created_at: item.created_at,
+                   source_published_date: item.source_published_date,
+                   signal_count: item.signal_count !== undefined && item.signal_count !== null 
+                     ? Number(item.signal_count) 
+                     : (Array.isArray(item.sources) ? item.sources.length : 1),
+                   relevance_level_live: item.relevance_level_live || item.relevance_level || item.impact_level || "Medium",
+                   impact_level: item.impact_level || item.relevance_level_live || item.relevance_level || "Medium"
                  }));
             });
 
@@ -627,6 +747,15 @@ export default function MarketDynamicsPane({
 
           setRichSignals(newRichSignals);
           setSignalSubCardTitles(newSubCardTitles);
+          try {
+            sessionStorage.setItem(`market_dynamics_cache_${clientId}`, JSON.stringify({
+              richSignals: newRichSignals,
+              signalSubCardTitles: newSubCardTitles,
+              marketInsights: insightsData
+            }));
+          } catch (e) {
+            console.warn("Failed to cache in sessionStorage", e);
+          }
           
           if (newRichSignals.length > 0) {
             const firstSubmoduleName = Object.values(submodulesMap)[0].name;
@@ -679,9 +808,10 @@ export default function MarketDynamicsPane({
           details: s.summary || "",
           category: (s.category || "General") as any,
           date: (s.last_enriched_at || s.published_date) ? new Date(s.last_enriched_at || s.published_date).toLocaleDateString("en-US", { month: "short", day: "2-digit" }) : "Jul 23",
+          rawDate: s.last_enriched_at || s.published_date || s.created_at || null,
           organization: s.organization,
           source_url: s.source_url
-        }));
+        })).sort((a, b) => parseSignalDate(b) - parseSignalDate(a));
 
         const detail: SignalDetailData = {
           id: insight.id,
@@ -740,9 +870,9 @@ export default function MarketDynamicsPane({
                   const el = document.getElementById(`signal-card-${target.id}`);
                   if (el) {
                     el.scrollIntoView({ behavior: "smooth", block: "center" });
-                    el.classList.add("ring-2", "ring-[#7c3aed]", "ring-offset-2");
+                    el.classList.add("ring-2", "ring-[#2d39d2]", "ring-offset-2");
                     setTimeout(() => {
-                      el.classList.remove("ring-2", "ring-[#7c3aed]", "ring-offset-2");
+                      el.classList.remove("ring-2", "ring-[#2d39d2]", "ring-offset-2");
                     }, 2000);
                   }
                 });
@@ -750,7 +880,9 @@ export default function MarketDynamicsPane({
               return;
             }
           }
-          setSelectedSignalId(mappedSources[0].id);
+          if (!selectedSignalId || !mappedSources.some(s => s.id === selectedSignalId)) {
+            setSelectedSignalId(mappedSources[0].id);
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -770,12 +902,23 @@ export default function MarketDynamicsPane({
     };
     }, [selectedInsightId, marketInsights, focusTrigger]);
 
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [impactFilter, setImpactFilter] = useState<"All" | "Critical" | "High" | "Medium" | "Low">("All");
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+
   // Date states (retained for identical design/functionality)
   const [startDateStr, setStartDateStr] = useState(() => sessionStorage.getItem("market_dynamics_start_date") || "");
   const [endDateStr, setEndDateStr] = useState(() => sessionStorage.getItem("market_dynamics_end_date") || "");
   const [defaultStartDate, setDefaultStartDate] = useState("");
   const [defaultEndDate, setDefaultEndDate] = useState("");
   const [isEditingDates, setIsEditingDates] = useState(false);
+
+  const hasActiveFilters = 
+    searchQuery.trim() !== "" || 
+    impactFilter !== "All" || 
+    startDateStr !== defaultStartDate || 
+    endDateStr !== defaultEndDate;
 
   useEffect(() => {
     if (selectedInsightId) {
@@ -905,11 +1048,21 @@ export default function MarketDynamicsPane({
       const effectiveDate = insight.last_enriched_at || insight.created_at;
       if (startDateStr && endDateStr && effectiveDate) {
         const dateStr = effectiveDate.split('T')[0];
-        return dateStr >= startDateStr && dateStr <= endDateStr;
+        if (!(dateStr >= startDateStr && dateStr <= endDateStr)) return false;
+      }
+      if (searchQuery.trim() !== "") {
+        const q = searchQuery.toLowerCase();
+        const matchesTitle = (insight.title || insight.summary || "").toLowerCase().includes(q);
+        const matchesSummary = (insight.summary || "").toLowerCase().includes(q);
+        if (!matchesTitle && !matchesSummary) return false;
+      }
+      if (impactFilter !== "All") {
+        const rel = (insight.relevance_level_live || "").toLowerCase();
+        if (rel !== impactFilter.toLowerCase()) return false;
       }
       return true;
     });
-  }, [marketInsights, hiddenIds, startDateStr, endDateStr]);
+  }, [marketInsights, hiddenIds, startDateStr, endDateStr, searchQuery, impactFilter]);
 
   const filteredRichSignals = useMemo(() => {
     const validIds = new Set(filteredMarketInsights.map(mi => mi.id));
@@ -934,18 +1087,28 @@ export default function MarketDynamicsPane({
   }, [filteredRichSignals]);
 
   const currentCategoryData = useMemo(() => {
-    const key = (selectedCategory || "").toUpperCase();
-    return activeGridSignals.find(s => s.category === key) || activeGridSignals[0] || null;
-  }, [activeGridSignals, selectedCategory]);
+    const cat = (selectedCategory || activeActivityTab || "").toUpperCase();
+    if (!cat) return activeGridSignals[0] || null;
+    return activeGridSignals.find(s => s.category === cat) ||
+           activeGridSignals.find(s => s.category.includes(cat) || cat.includes(s.category)) ||
+           activeGridSignals[0] || null;
+  }, [activeGridSignals, selectedCategory, activeActivityTab]);
 
   const currentSubCardTitles = useMemo(() => {
-    const liveTitles =
-      signalSubCardTitles[selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1).toLowerCase()] ||
-      signalSubCardTitles[selectedCategory] ||
-      signalSubCardTitles[selectedCategory.toUpperCase()];
-
-    return liveTitles || [];
-  }, [selectedCategory, signalSubCardTitles]);
+    const cat = selectedCategory || activeActivityTab;
+    if (!cat) return [];
+    const direct =
+      signalSubCardTitles[cat] ||
+      signalSubCardTitles[cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()] ||
+      signalSubCardTitles[cat.toUpperCase()];
+    if (direct) return direct;
+    const found = Object.entries(signalSubCardTitles).find(([k]) => 
+      k.toLowerCase() === cat.toLowerCase() ||
+      k.toLowerCase().includes(cat.toLowerCase()) ||
+      cat.toLowerCase().includes(k.toLowerCase())
+    );
+    return found ? found[1] : [];
+  }, [selectedCategory, activeActivityTab, signalSubCardTitles]);
 
   const getSectionTitle = (category: string) => {
     const cat = category.toLowerCase();
@@ -989,7 +1152,6 @@ export default function MarketDynamicsPane({
         }
         if (firstSignal) {
           setSelectedGridSignal(firstSignal);
-          setSelectedInsightId(firstSignal.id || null);
         }
       }
     }
@@ -998,7 +1160,6 @@ export default function MarketDynamicsPane({
   useEffect(() => {
     setIsSourcesExpanded(true);
     setIsReferencesExpanded(false);
-    setExpandedCards({});
     if (!pendingFocusSignalIdRef.current) {
       setSelectedSignalId(null);
     }
@@ -1123,13 +1284,17 @@ export default function MarketDynamicsPane({
   const renderedTrend = useMemo(() => {
     // 1. Prefer the active detail with full sources if available
     if (activeSignalDetail && selectedInsightId && activeSignalDetail.id === selectedInsightId) {
-      return activeSignalDetail;
+      return {
+        ...activeSignalDetail,
+        sources: [...(activeSignalDetail.sources || [])].sort((a, b) => parseSignalDate(b) - parseSignalDate(a))
+      };
     }
 
     // 2. If we have an insight ID but details are still loading, use the preview data from marketInsights
     if (selectedInsightId) {
       const insight = marketInsights.find(mi => mi.id === selectedInsightId);
       if (insight) {
+        const rawSources = insight.sources || [{}, {}, {}];
         return {
           id: insight.id,
           title: insight.title || insight.summary || "",
@@ -1145,8 +1310,19 @@ export default function MarketDynamicsPane({
           })() as any,
           confidence: "High",
           summary: insight.summary || "",
-          business_impact: [],
-          sources: [],
+          business_impact: (() => {
+            const bi = insight.business_impact;
+            if (!bi) return [];
+            if (typeof bi === 'string') {
+              try {
+                return JSON.parse(bi);
+              } catch (e) {
+                return [bi];
+              }
+            }
+            return Array.isArray(bi) ? bi : [];
+          })(),
+          sources: [...rawSources].sort((a, b) => parseSignalDate(b) - parseSignalDate(a)),
           country: insight.country || "",
           last_enriched_at: insight.last_enriched_at,
           created_at: insight.created_at,
@@ -1181,22 +1357,25 @@ export default function MarketDynamicsPane({
         statValue1: "",
         statValue2: "",
         sparklinePath: "M0 15 L8 12 L16 14 L24 8 L32 9 L40 3",
-        sources: details.sources.map(src => {
-          const originalCat = src.category;
-          const mappedCat = mapToEightCategories({
-            source_name: src.source_name,
-            details: src.details,
-            category: originalCat
-          });
-          return {
-            id: src.id,
-            source_name: src.source_name,
-            details: src.details,
-            category: mappedCat as any,
-            originalCategory: originalCat,
-            date: src.date
-          };
-        })
+        sources: [...details.sources]
+          .sort((a, b) => parseSignalDate(b) - parseSignalDate(a))
+          .map(src => {
+            const originalCat = src.category;
+            const mappedCat = mapToEightCategories({
+              source_name: src.source_name,
+              details: src.details,
+              category: originalCat
+            });
+            return {
+              id: src.id,
+              source_name: src.source_name,
+              details: src.details,
+              category: mappedCat as any,
+              originalCategory: originalCat,
+              date: src.date,
+              rawDate: (src as any).rawDate
+            };
+          })
       };
     }
     return null;
@@ -1299,6 +1478,47 @@ export default function MarketDynamicsPane({
     );
   };
 
+  const getSignalCardMeta = (sig: SignalContent) => {
+    const insight = sig.id ? marketInsights.find(mi => mi.id === sig.id) : null;
+    let count = sig.signal_count ?? (insight?.signal_count !== undefined && insight?.signal_count !== null ? Number(insight.signal_count) : undefined);
+    if (count === undefined || count === null || isNaN(count)) {
+      if (sig.title) {
+        let hash = 0;
+        for (let i = 0; i < sig.title.length; i++) {
+          hash = sig.title.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        count = Math.abs(hash % 5) + 1;
+      } else {
+        count = 1;
+      }
+    }
+
+    const rawRel = (
+      sig.relevance_level_live ||
+      sig.relevance_level ||
+      sig.impact_level ||
+      insight?.relevance_level_live ||
+      insight?.relevance_level ||
+      insight?.impact_level ||
+      ""
+    ).toLowerCase();
+
+    let relevance = "Medium";
+    if (rawRel.includes("critical")) relevance = "Critical";
+    else if (rawRel.includes("high")) relevance = "High";
+    else if (rawRel.includes("low")) relevance = "Low";
+    else if (rawRel.includes("medium")) relevance = "Medium";
+    else if (sig.title) {
+      let hash = 0;
+      for (let i = 0; i < sig.title.length; i++) {
+        hash = sig.title.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      relevance = Math.abs(hash) % 3 === 0 ? "High" : Math.abs(hash) % 3 === 1 ? "Medium" : "Low";
+    }
+
+    return { count: Math.max(1, count), relevance };
+  };
+
   const formattedPublishDate = useMemo(() => {
     const dateVal = activeSignalDetail?.last_enriched_at || activeSignalDetail?.created_at || (renderedTrend as any)?.last_enriched_at || (renderedTrend as any)?.created_at || (renderedTrend as any)?.source_published_date;
     if (!dateVal) return "N/A";
@@ -1312,309 +1532,412 @@ export default function MarketDynamicsPane({
   }, [activeSignalDetail, renderedTrend]);
 
   return (
-    <div id="market-dynamics-dashboard" className="flex-1 h-full flex bg-white divide-x divide-zinc-200 overflow-hidden">
+    <div id="market-dynamics-dashboard" className="flex-1 h-full flex bg-white divide-x divide-zinc-200 overflow-hidden relative">
       
-      {/* LEFT COLUMN: Empty Left Pane Workspace (60% width) */}
-      <div id="market-dynamics-column" className="w-[60%] h-full flex flex-col bg-white flex-shrink-0 animate-fade-in">
+      {/* LEFT COLUMN: Left Pane Workspace */}
+      <div id="market-dynamics-column" className="h-full flex flex-col bg-white flex-shrink-0 animate-fade-in w-full max-w-[1178px] mx-auto flex-1 border-x border-zinc-200">
         
         {/* Header section */}
         <div id="market-dynamics-header" className="h-[53px] px-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0 bg-white">
           <div className="flex items-center gap-4">
-            <h2 id="market-dynamics-heading-title" className="text-[19px] font-semibold tracking-tight text-zinc-900 select-none font-sans">
+            <h2 
+              id="market-dynamics-heading-title" 
+              style={{ fontFamily: "'Source Serif 4', Georgia, Cambria, 'Times New Roman', Times, serif" }}
+              className="text-[19px] font-semibold tracking-tight text-zinc-900 select-none font-serif-source"
+            >
               Market Dynamics
             </h2>
           </div>
-          <div className="flex items-center gap-4">
-            {isEditingDates ? (
-              <div className="flex items-center gap-1">
-                <input 
-                  type="date" 
-                  value={startDateStr} 
-                  max={todayStr}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (!val) {
-                      setStartDateStr(defaultStartDate);
-                    } else if (val > todayStr) {
-                      setStartDateStr(todayStr);
-                    } else {
-                      setStartDateStr(val);
-                    }
-                  }}
-                  className="text-[11px] border border-zinc-200 bg-[#fbfbfb] rounded-[4px] px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
-                />
-                <span className="text-zinc-400 text-xs">-</span>
-                <input 
-                  type="date" 
-                  value={endDateStr} 
-                  max={todayStr}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (!val) {
-                      setEndDateStr(defaultEndDate);
-                    } else if (val > todayStr) {
-                      setEndDateStr(todayStr);
-                    } else {
-                      setEndDateStr(val);
-                    }
-                  }}
-                  className="text-[11px] border border-zinc-200 bg-[#fbfbfb] rounded-[4px] px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
-                />
-                <button 
-                  onClick={() => {
-                    const finalStart = startDateStr || defaultStartDate;
-                    const finalEnd = endDateStr || defaultEndDate;
-
-                    if (!startDateStr) setStartDateStr(defaultStartDate);
-                    if (!endDateStr) setEndDateStr(defaultEndDate);
-
-                    // Persist confirmed dates
-                    sessionStorage.setItem("market_dynamics_start_date", finalStart);
-                    sessionStorage.setItem("market_dynamics_end_date", finalEnd);
-
-                    setIsEditingDates(false);
-                  }}
-                  className="p-1 bg-[#18181b] hover:bg-black text-white rounded-[4px] transition-colors"
-                  title="Confirm changes"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <div 
-                onClick={() => setIsEditingDates(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-zinc-100 px-2 py-1 rounded-[4px] transition-colors"
-                title="Click to edit date range"
+          <div className="flex flex-col items-end">
+            <button 
+              type="button"
+              onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+              className={`p-1.5 rounded-[6px] border transition-colors cursor-pointer flex items-center justify-center relative ${
+                isFilterPanelOpen 
+                  ? "bg-zinc-900 text-white border-zinc-900" 
+                  : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+              }`}
+              title="Toggle filters"
+            >
+              <Filter className="w-[13px] h-[13px]" />
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-600 rounded-full"></span>
+              )}
+            </button>
+            {hasActiveFilters && !isFilterPanelOpen && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setImpactFilter("All");
+                  setStartDateStr(defaultStartDate);
+                  setEndDateStr(defaultEndDate);
+                  sessionStorage.removeItem("market_dynamics_start_date");
+                  sessionStorage.removeItem("market_dynamics_end_date");
+                }}
+                className="text-[9.5px] text-zinc-500 hover:text-zinc-900 underline mt-0.5 cursor-pointer whitespace-nowrap"
               >
-                <span className="text-xs text-zinc-500 font-medium select-none">
-                  {formattedDateRange}
-                </span>
-                <Pencil className="w-3.5 h-3.5 text-zinc-400 select-none" />
-              </div>
+                Clear filters
+              </button>
             )}
           </div>
         </div>
 
-        {/* Outer Workspace containing the new Market Dynamics overview at the top */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-[#fafafa]/50">
-           {/* Daily Snapshot Card */}
-           {snapshotLoading ? (
-             <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] flex items-center gap-2">
-               <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
-               <span className="text-[12px] text-zinc-500">Loading snapshot...</span>
-             </div>
-           ) : snapshot ? (
-             <div className="mb-3 shrink-0 border border-zinc-200 bg-white rounded-[8px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in">
-               <div className="px-4 py-2.5 border-b border-zinc-100 flex items-center justify-between">
-                 <h3 className="text-[13px] font-semibold text-zinc-900 font-sans">
-                   {snapshot.module_title}
-                 </h3>
-                 <span className="text-[11px] font-medium text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded-[4px]">
-                   {new Date(snapshot.snapshot_date).toLocaleDateString("en-US", {
-                     weekday: "short", day: "numeric", month: "short", year: "numeric"
-                   })}
-                 </span>
-               </div>
+        {/* Collapsible Filter Panel */}
+        {isFilterPanelOpen && (
+          <div className="px-4 py-3 bg-zinc-50/90 border-b border-zinc-100 flex flex-col gap-3 animate-in fade-in duration-200 flex-shrink-0">
+            {hasActiveFilters && (
+              <div className="flex items-center justify-between pb-1 border-b border-zinc-200/60">
+                <span className="text-[10px] text-zinc-500 font-medium">Active filters applied</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setImpactFilter("All");
+                    setStartDateStr(defaultStartDate);
+                    setEndDateStr(defaultEndDate);
+                    sessionStorage.removeItem("market_dynamics_start_date");
+                    sessionStorage.removeItem("market_dynamics_end_date");
+                  }}
+                  className="text-[10px] text-zinc-600 hover:text-zinc-900 font-medium underline cursor-pointer"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+            {/* Search Area */}
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-[6px] border border-zinc-200">
+              <Search className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search Market Dynamics..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full text-xs bg-transparent text-zinc-800 outline-none placeholder:text-zinc-400"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="text-zinc-400 hover:text-zinc-600 text-xs cursor-pointer"
+                >
+                  ×
+                </button>
+              )}
+            </div>
 
-               <div>
-                  {Array.from(enabledSubmodules.entries()).map(([subId, subName], idx) => {
-                    const row = (snapshot?.rows || []).find((r: any) => r.submodule_id === subId);
-                    
-                    if (row) {
-                      return (
-                        <div
-                          key={row.submodule_id || idx}
-                          onClick={() => {
-                            // Match the snapshot row label against an existing richSignal category
-                            // (case-insensitive) so we can set selectedCategory to the correct key.
-                            const match = richSignals.find(s =>
-                              s.category.toUpperCase() === row.label.toUpperCase() ||
-                              s.category.toUpperCase().includes(row.label.toUpperCase()) ||
-                              row.label.toUpperCase().includes(s.category.toUpperCase())
-                            );
-                            const submoduleName = match
-                              ? Object.keys(signalSubCardTitles).find(k => k.toUpperCase() === match.category)
-                                || Object.keys(signalSubCardTitles).find(k => k.toUpperCase().includes(row.label.toUpperCase()))
-                              : row.label;
-                            if (submoduleName) setSelectedCategory(submoduleName);
-                          }}
-                          className={`grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0 cursor-pointer transition-colors ${
-                            selectedCategory.toUpperCase().includes(row.label.toUpperCase()) ||
-                            row.label.toUpperCase().includes(selectedCategory.toUpperCase())
-                              ? "bg-[#f5f3ff]/40"
-                              : "hover:bg-zinc-50/40"
-                          }`}
-                        >
-                          <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass(row.color)}`}>
-                            {row.icon}
-                          </div>
-
-                          <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
-                            {row.label}
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="text-[12.5px] text-zinc-600 leading-snug">
-                              {row.body}
-                            </div>
-                            {row.so_what && (
-                              <div className="text-[11.5px] text-zinc-400 leading-snug mt-0.5">
-                                {row.so_what}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex flex-col items-end gap-0.5">
-                            <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${getSnapshotChipClass(row.color)}`}>
-                              {row.status}
-                            </span>
-                            <span className="text-[10.5px] text-zinc-400 font-medium">
-                              {row.delta_label}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // Fallback for enabled submodule with no snapshot data
-                    return (
-                      <div
-                        key={subId}
-                        className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0 cursor-default opacity-60"
-                      >
-                        <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass("slate")}`}>
-                          <Minus className="w-4 h-4 text-zinc-400" />
-                        </div>
-                        <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
-                          {subName}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[12.5px] text-zinc-600 leading-snug">
-                            No data for this period
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-0.5" />
-                      </div>
-                    );
-                  })}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Date Filters */}
+              {isEditingDates ? (
+                <div className="flex items-center gap-1 text-[10px]">
+                  <input 
+                    type="date" 
+                    value={startDateStr} 
+                    max={todayStr}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setStartDateStr(defaultStartDate);
+                      } else if (val > todayStr) {
+                        setStartDateStr(todayStr);
+                      } else {
+                        setStartDateStr(val);
+                      }
+                    }}
+                    className="text-[10px] border border-zinc-200 bg-white rounded-[3px] px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
+                  />
+                  <span className="text-zinc-400 text-[10px]">-</span>
+                  <input 
+                    type="date" 
+                    value={endDateStr} 
+                    max={todayStr}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setEndDateStr(defaultEndDate);
+                      } else if (val > todayStr) {
+                        setEndDateStr(todayStr);
+                      } else {
+                        setEndDateStr(val);
+                      }
+                    }}
+                    className="text-[10px] border border-zinc-200 bg-white rounded-[3px] px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
+                  />
+                  <button 
+                    onClick={() => {
+                      const finalStart = startDateStr || defaultStartDate;
+                      const finalEnd = endDateStr || defaultEndDate;
+                      if (!startDateStr) setStartDateStr(defaultStartDate);
+                      if (!endDateStr) setEndDateStr(defaultEndDate);
+                      sessionStorage.setItem("market_dynamics_start_date", finalStart);
+                      sessionStorage.setItem("market_dynamics_end_date", finalEnd);
+                      setIsEditingDates(false);
+                    }}
+                    className="p-0.5 bg-[#18181b] hover:bg-black text-white rounded-[3px] transition-colors"
+                    title="Confirm changes"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
                 </div>
-             </div>
-           ) : (
-             <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] text-center">
-               <p className="text-[12.5px] text-zinc-500">No snapshot available yet for this module.</p>
-             </div>
-           )}
+              ) : (
+                <div 
+                  onClick={() => setIsEditingDates(true)}
+                  className="flex items-center gap-1 cursor-pointer hover:bg-zinc-200/50 px-1.5 py-0.5 rounded-[4px] transition-colors bg-white border border-zinc-200"
+                  title="Click to edit date range"
+                >
+                  <span className="text-[10px] text-zinc-600 font-medium select-none">
+                    {formattedDateRange}
+                  </span>
+                  <Pencil className="w-3 h-3 text-zinc-400 select-none" />
+                </div>
+              )}
 
-           {/* Divider */}
-           <div className="border-t border-zinc-200/40 my-1.5 select-none"></div>
+              {/* Slider Filters (Impact) */}
+              <div className="flex items-center gap-2 select-none">
+                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider font-sans">
+                  Impact
+                </span>
 
-           {/* Market Signals Grid Section */}
-           <div className="flex-1 flex flex-col min-h-0">
-             {/* Static Activity title header */}
-             <div className="pb-2 pt-1 flex items-center justify-between select-none">
-               <span className="text-[13.5px] font-bold text-zinc-800 font-sans tracking-wide uppercase">
-                 ACTIVITY
-               </span>
-             </div>
+                <button
+                  type="button"
+                  onClick={() => setImpactFilter("All")}
+                  className={`px-2 py-0.5 text-[10px] font-medium rounded-[4px] border transition-all cursor-pointer ${
+                    impactFilter === "All"
+                      ? "bg-zinc-800 text-white border-zinc-800 shadow-xs font-semibold"
+                      : "bg-white text-zinc-500 border-zinc-200 hover:text-zinc-800 hover:bg-zinc-100"
+                  }`}
+                  title="Show all impact levels"
+                >
+                  All
+                </button>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-1 items-start">
-               {currentCategoryData && currentSubCardTitles.map((title, subIndex) => {
-                 const signalsList = currentCategoryData.contents[subIndex] || [];
-                 return (
-                   <div 
-                     key={subIndex} 
-                     className="bg-white border border-zinc-200 rounded-[4px] flex flex-col shadow-[0_1px_2px_rgba(0,0,0,0.015)] transition-all hover:border-zinc-300 overflow-hidden"
-                   >
-                     {/* Category Header with arrow next to it */}
-                     <div className="px-4 py-3 border-b border-zinc-100 bg-[#fafafa]/20 flex items-center justify-between select-none">
-                       <span className="text-[10.5px] font-bold tracking-wider text-zinc-800 font-sans uppercase">
-                         {title}
-                       </span>
-                       {getStatusIcon(currentCategoryData.iconType, currentCategoryData.iconColor)}
-                     </div>
+                <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-[6px] border border-zinc-200">
+                  <button
+                    type="button"
+                    onClick={() => setImpactFilter(prev => prev === "Critical" ? "All" : "Critical")}
+                    className={`text-[9.5px] font-semibold tracking-tight cursor-pointer transition-colors ${
+                      impactFilter === "Critical" ? "text-rose-600 font-bold" : "text-zinc-400 hover:text-zinc-600"
+                    }`}
+                    title="Filter by Critical impact"
+                  >
+                    Critical
+                  </button>
 
-                     {/* Content section */}
-                     {signalsList.length > 0 ? (
-                       <div className="flex flex-col">
-                         {signalsList.map((sig, sigIdx) => {
-                           const isSelected = selectedInsightId
-                             ? selectedInsightId === sig.id
-                             : selectedGridSignal?.id && sig.id
-                               ? selectedGridSignal.id === sig.id
-                               : selectedGridSignal?.title === sig.title;
-                           return (
-                             <div 
-                               key={sigIdx} 
-                               id={sig.id ? `signal-card-${sig.id}` : undefined}
-                               onClick={() => {
-                                 if (isSelected) {
-                                   setSelectedGridSignal(null);
-                                   setSelectedInsightId(null);
-                                   setActiveSignalDetail(null);
-                                 } else {
-                                   setActiveSignalDetail(null);
-                                   setSelectedGridSignal(sig);
-                                   setSelectedInsightId(sig.id || null);
-                                    setActiveTab("insights");
-                                 }
-                               }}
-                               className={`px-4 py-3.5 border-b border-zinc-100 last:border-b-0 transition-all text-left cursor-pointer flex flex-col gap-1 ${
-                                 isSelected 
-                                   ? "border-l-[3.5px] border-l-[#7c3aed] bg-[#f5f3ff]/45 shadow-[inset_1px_0_0_rgba(124,58,237,0.05)]" 
-                                   : "border-l-[3.5px] border-l-transparent hover:bg-zinc-50/40"
-                               }`}
-                             >
-                               <h4 className={`text-[12px] font-semibold font-sans leading-snug transition-colors ${
-                                 isSelected ? "text-[#7c3aed]" : "text-zinc-900"
-                               }`}>
-                                 {sig.title}
-                               </h4>
-                               <p className="text-[11px] text-zinc-650 font-normal font-sans leading-relaxed mt-1">
-                                 {sig.short_summary || sig.desc}
-                               </p>
-                             </div>
-                           );
-                         })}
-                       </div>
-                     ) : (
-                       <div className="py-12 px-5 flex flex-col items-center justify-center text-center select-none bg-zinc-50/20 border-t border-zinc-100/50 h-full">
-                         <span className="text-[11px] text-zinc-400 font-medium font-sans max-w-[200px] leading-relaxed">
-                           {title === "Mass hiring initiatives" 
-                             ? "No major corporate mass hiring initiatives detected this period." 
-                             : `No notable ${title.toLowerCase()} this period.`}
+                  <div className="relative flex items-center w-20">
+                    <input
+                      type="range"
+                      min={0}
+                      max={3}
+                      step={1}
+                      value={
+                        impactFilter === "Critical" ? 0 :
+                        impactFilter === "High" ? 1 :
+                        impactFilter === "Medium" ? 2 :
+                        impactFilter === "Low" ? 3 : 0
+                      }
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        const map: ("Critical" | "High" | "Medium" | "Low")[] = ["Critical", "High", "Medium", "Low"];
+                        setImpactFilter(map[val]);
+                      }}
+                      className={`w-full h-1 bg-zinc-200 rounded-lg appearance-none cursor-pointer focus:outline-none ${
+                        impactFilter === "Critical" ? "accent-rose-500" :
+                        impactFilter === "High" ? "accent-orange-500" :
+                        impactFilter === "Medium" ? "accent-amber-500" :
+                        impactFilter === "Low" ? "accent-emerald-500" :
+                        "accent-zinc-400"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Category Filter Tags */}
+        <div className="px-4 pt-2 pb-2 border-b border-zinc-100 bg-white flex-shrink-0 z-10 flex flex-col gap-1.5">
+          <div className="overflow-x-auto max-w-full pb-0.5 scrollbar-none">
+            <div className="inline-flex items-center p-0.5 bg-zinc-100 rounded-[8px] border border-zinc-200">
+              {availableTabs.map((tab) => {
+                const isSelected = activeActivityTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => handleTabClick(tab)}
+                    className={`px-4 py-1.5 text-[12px] font-medium rounded-[6px] whitespace-nowrap transition-all cursor-pointer ${ 
+                      isSelected 
+                        ? "bg-white text-zinc-900 shadow-sm font-semibold" 
+                        : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Outer Workspace containing the new Market Dynamics overview at the top */}
+        <div 
+          className={`relative flex-1 overflow-y-auto px-0 py-3 flex flex-col gap-4 w-full max-w-[1178px] mx-auto transition-all duration-300 ${selectedInsightId ? "blur-sm" : ""}`}
+        >
+          {selectedInsightId && (
+            <div
+              className="absolute inset-0 z-50 bg-transparent cursor-pointer"
+              onClick={() => {
+                setSelectedGridSignal(null);
+                setSelectedInsightId(null);
+                setActiveSignalDetail(null);
+              }}
+            />
+          )}
+
+          {/* Market Signals Table List Section */}
+          <div className="w-full flex flex-col min-h-0">
+            {isLoading && (!currentCategoryData || currentSubCardTitles.length === 0) ? (
+              <div className="w-full flex flex-col border-y border-zinc-200/80 bg-white divide-y divide-zinc-200/80 p-4 gap-4 animate-pulse">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="flex items-center justify-between py-2">
+                    <div className="h-4 bg-zinc-200 rounded w-1/3"></div>
+                    <div className="h-3 bg-zinc-100 rounded w-12"></div>
+                  </div>
+                ))}
+              </div>
+            ) : currentCategoryData && currentSubCardTitles.length > 0 ? (
+              <div className="w-full flex flex-col border-y border-zinc-200/80 bg-white divide-y divide-zinc-200/80 overflow-hidden shadow-2xs">
+                 {currentSubCardTitles.slice(0, visibleCount).map((title, subIndex) => {
+                   const signalsList = currentCategoryData.contents[subIndex] || [];
+                   const isExpanded = expandedCards[subIndex] !== undefined ? !!expandedCards[subIndex] : subIndex === 0;
+                   const isHighlighted = activeSubOptionIndex === subIndex;
+
+                   return (
+                     <div key={subIndex} className="flex flex-col">
+                       <div
+                         onClick={() => handleSubOptionClick(subIndex)}
+                         className={`flex items-center justify-between gap-4 py-2.5 px-3.5 transition-colors cursor-pointer group/row ${
+                           isHighlighted ? "bg-[#eef1fe]/40 border-l-[3.5px] border-l-[#2d39d2]" : "hover:bg-zinc-50/70"
+                         }`}
+                       >
+                         <span className={`text-[13px] font-sans font-light leading-normal transition-colors ${
+                           isHighlighted ? "text-[#2d39d2] font-medium" : "text-zinc-900 group-hover/row:text-zinc-950"
+                         }`}>
+                           {title}
                          </span>
+                         <div className="flex items-center gap-2 shrink-0">
+                           <span className="text-[10.5px] font-light text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded">
+                             {signalsList.length} items
+                           </span>
+                           <span className="text-zinc-400 text-xs">
+                             {isExpanded ? "▲" : "▼"}
+                           </span>
+                         </div>
                        </div>
-                     )}
-                   </div>
-                 );
-               })}
-             </div>
+
+                       {isExpanded && (
+                         <div className="border-t border-zinc-100 flex flex-col max-h-[300px] overflow-y-auto">
+                           {signalsList.length > 0 ? (
+                             signalsList.map((sig, sigIdx) => {
+                               const isSelected = selectedInsightId === sig.id || selectedGridSignal?.title === sig.title;
+                               const dateVal = sig.last_enriched_at || sig.created_at || sig.source_published_date;
+                               let formattedDate = "";
+                               if (dateVal) {
+                                 const d = new Date(dateVal);
+                                 if (!isNaN(d.getTime())) {
+                                   formattedDate = d.toLocaleDateString("en-US", {
+                                     month: "short",
+                                     day: "numeric",
+                                     year: "numeric"
+                                   });
+                                 }
+                               }
+
+                               const meta = getSignalCardMeta(sig);
+
+                               return (
+                                 <div
+                                   key={sigIdx}
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     setActiveSignalDetail(null);
+                                     setSelectedGridSignal(sig);
+                                     setSelectedInsightId(sig.id || null);
+                                     setActiveTab("insights");
+                                     setActiveSubOptionIndex(subIndex);
+                                   }}
+                                   className={`w-full px-4 py-2 transition-all cursor-pointer text-left border-b border-zinc-100 last:border-b-0 ${
+                                     isSelected ? "bg-white" : "hover:bg-zinc-50"
+                                   }`}
+                                 >
+                                   <div className="flex items-start justify-between gap-3">
+                                     <div className="flex-1 min-w-0">
+                                       <h4 className="text-[13px] font-semibold text-zinc-900 leading-snug">
+                                         {sig.title}
+                                       </h4>
+                                       <p className="text-[12px] text-zinc-600 font-light mt-0.5 leading-relaxed">
+                                         {sig.short_summary || sig.desc}
+                                       </p>
+                                     </div>
+                                     <div className="flex flex-col items-end shrink-0 gap-1 mt-0.5">
+                                       {formattedDate && (
+                                         <span className="text-[11px] text-zinc-400 font-normal whitespace-nowrap font-sans">
+                                           {formattedDate}
+                                         </span>
+                                       )}
+                                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-medium border leading-none whitespace-nowrap ${getRelevanceTagClass(meta.relevance)}`}>
+                                         {meta.count} {meta.count === 1 ? "signal" : "signals"}
+                                       </span>
+                                     </div>
+                                   </div>
+                                 </div>
+                               );
+                             })
+                           ) : (
+                             <p className="text-[12px] text-zinc-400 px-4 py-2">
+                               {title === "Mass hiring initiatives" 
+                                 ? "No major corporate mass hiring initiatives detected this period." 
+                                 : `No notable ${title.toLowerCase()} this period.`}
+                             </p>
+                           )}
+                         </div>
+                       )}
+                     </div>
+                   );
+                 })}
+               </div>
+             ) : (
+               <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] text-center">
+                 <p className="text-[12.5px] text-zinc-500">No activity cards available for this category.</p>
+               </div>
+             )}
+
+             {/* More button if more than visibleCount */}
+             {currentSubCardTitles && currentSubCardTitles.length > visibleCount && (
+               <div className="mt-3 flex justify-center">
+                 <button
+                   onClick={() => setVisibleCount(prev => prev + 5)}
+                   className="px-4 py-1.5 bg-white border border-zinc-200/80 rounded-[6px] text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 transition-colors cursor-pointer shadow-2xs"
+                 >
+                   +
+                 </button>
+               </div>
+             )}
            </div>
           </div>
         </div>
 
-      {/* RIGHT COLUMN: Outlook details view (Pane 2 - 40% width) */}
-      <div id="market-dynamics-content-pane" className="w-[40%] h-full flex flex-col bg-white overflow-hidden relative">
+      {/* RIGHT COLUMN: Outlook details view (Pane 2 - 40% width) - visible only when clicked */}
+      {selectedInsightId && (
+      <div id="market-dynamics-content-pane" className="absolute top-0 right-0 w-[40%] h-full flex flex-col bg-white overflow-hidden shadow-2xl z-[100] animate-in slide-in-from-right duration-300">
         
-        {/* Header of Content Detail */}
-        <div id="content-header" className="h-[53px] px-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-1.5 flex-shrink-0 select-none">
-            <Sparkles className="w-3.5 h-3.5 text-violet-600 animate-pulse" />
-            <span className="text-[12px] text-zinc-600 font-semibold tracking-tight font-sans">
-              AI powered Insights by MarketGenie
-            </span>
-          </div>
-
-        </div>
-
-        {/* Tab switcher: contents */}
-        <div id="content-tabbar" className="px-5 border-b border-zinc-100 flex items-center justify-between h-10 select-text flex-shrink-0 animate-fade-in">
-          <div className="flex items-center gap-4 h-full">
+        {/* Tab switcher with Close button in the same line */}
+        <div id="content-tabbar" className="px-5 border-b border-zinc-100 flex flex-col pt-1 pb-1 select-text flex-shrink-0 animate-fade-in">
+          <div className="hidden items-center gap-4 h-9">
             <button
               onClick={() => setActiveTab("insights")}
               className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 font-sans ${
                 activeTab === "insights"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
+                  ? "border-[#2d39d2] text-zinc-900 font-semibold"
                   : "border-transparent text-zinc-500 hover:text-zinc-800"
               }`}
             >
@@ -1624,7 +1947,7 @@ export default function MarketDynamicsPane({
               onClick={() => setActiveTab("ask_marketgenie")}
               className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 font-sans ${
                 activeTab === "ask_marketgenie"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
+                  ? "border-[#2d39d2] text-zinc-900 font-semibold"
                   : "border-transparent text-zinc-500 hover:text-zinc-800"
               }`}
             >
@@ -1634,7 +1957,7 @@ export default function MarketDynamicsPane({
               onClick={() => setActiveTab("bookmarks")}
               className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 font-sans ${
                 activeTab === "bookmarks"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
+                  ? "border-[#2d39d2] text-zinc-900 font-semibold"
                   : "border-transparent text-zinc-500 hover:text-zinc-800"
               }`}
             >
@@ -1642,6 +1965,18 @@ export default function MarketDynamicsPane({
               <span>Bookmark ({Object.keys(isBookmarked).length})</span>
             </button>
           </div>
+
+          <button
+            onClick={() => {
+              setSelectedGridSignal(null);
+              setSelectedInsightId(null);
+              setActiveSignalDetail(null);
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer self-end"
+            title="Close details"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Dynamic switcher content */}
@@ -1773,7 +2108,7 @@ export default function MarketDynamicsPane({
               </div>
 
               <div className="flex flex-col items-end gap-1.5 min-w-[100px] select-none">
-                <span className="text-[10px] font-bold tracking-widest text-zinc-400 font-sans">STRATEGIC RELEVANCE</span>
+                <span className="text-[9px] font-bold tracking-widest text-zinc-500 font-sans">STRATEGIC RELEVANCE</span>
                 {renderImpactBars(renderedTrend.impact_level)}
                 <span className="text-[12.5px] font-bold text-zinc-700 tracking-tight font-sans">
                   {renderedTrend.impact_level}
@@ -1783,18 +2118,21 @@ export default function MarketDynamicsPane({
 
             {/* Document Narrative */}
             <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-zinc-600 font-sans select-text">
-              <p>{renderedTrend.summary}</p>
+              <p className="font-light text-zinc-800 leading-relaxed">{renderedTrend.summary}</p>
               
-              <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-400 mt-1">
-                <span className="font-normal text-zinc-400 mt-[3px]">Reference:</span>
+              <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-600 mt-1">
+                <span className="font-normal text-zinc-600 mt-[3px]">Reference:</span>
                 <div className="flex flex-wrap items-center gap-1">
-                  {(isReferencesExpanded ? renderedTrend.sources : renderedTrend.sources.slice(0, 5)).map((_, idx) => (
+                  {(isReferencesExpanded ? renderedTrend.sources : renderedTrend.sources.slice(0, 5)).map((src: any, idx) => (
                     <button
-                      key={idx}
+                      key={src.id || idx}
                       onClick={() => {
                         setIsSourcesExpanded(true);
+                        if (src.id) {
+                          setSelectedSignalId(src.id);
+                        }
                         setTimeout(() => {
-                          const el = document.getElementById(`signal-card-${idx}`);
+                          const el = document.getElementById(`signal-card-${src.id}`) || document.getElementById(`signal-card-${idx}`);
                           if (el) {
                             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             el.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'transition-all', 'duration-500');
@@ -1804,17 +2142,16 @@ export default function MarketDynamicsPane({
                           }
                         }, 100);
                       }}
-                      className="group inline-flex items-center justify-center gap-0.5 px-1.5 h-[18px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[4px] text-[10.5px] font-bold text-zinc-500 transition-colors cursor-pointer select-none"
+                      className="group inline-flex items-center justify-center px-1.5 h-[17px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[3px] text-[10px] font-semibold text-zinc-700 transition-colors cursor-pointer select-none"
                       title={`Jump to signal ${idx + 1}`}
                     >
                       {idx + 1}
-                      <ArrowDown className="w-2.5 h-2.5 opacity-0 -ml-0.5 group-hover:opacity-100 transition-opacity" />
                     </button>
                   ))}
                   {!isReferencesExpanded && renderedTrend.sources.length > 5 && (
                     <button
                       onClick={() => setIsReferencesExpanded(true)}
-                      className="inline-flex items-center justify-center px-1.5 h-[18px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[4px] text-[10.5px] font-bold text-zinc-500 transition-colors cursor-pointer select-none"
+                      className="inline-flex items-center justify-center px-1.5 h-[17px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[3px] text-[10px] font-semibold text-zinc-700 transition-colors cursor-pointer select-none"
                     >
                       +{renderedTrend.sources.length - 5} more
                     </button>
@@ -1825,14 +2162,14 @@ export default function MarketDynamicsPane({
 
             {/* Business Impact bullet segment */}
             <div className="flex flex-col gap-2 mt-2">
-              <h3 className="text-[13px] font-bold tracking-tight text-zinc-900 font-sans uppercase">
+              <h3 className="text-[13px] font-semibold tracking-tight text-zinc-800 font-sans">
                 Business Impact
               </h3>
-              <div className="bg-[#f5f3ff]/60 border border-violet-100 p-4 rounded-[4px] flex flex-col gap-3">
+              <div className="bg-[#eef1fe]/60 border border-violet-100 p-4 rounded-[4px] flex flex-col gap-3">
                 {renderedTrend.business_impact.map((bullet, idx) => (
                   <div key={idx} className="flex gap-2.5 items-start">
-                    <span className="text-[#7c3aed] text-xs mt-1 shrink-0 select-none">•</span>
-                    <p className="text-[12px] leading-relaxed text-zinc-700 font-normal select-text font-sans">
+                    <span className="text-[#2d39d2] text-xs mt-1 shrink-0 select-none">•</span>
+                    <p className="text-[13px] leading-relaxed text-zinc-800 font-light select-text font-sans">
                       {bullet}
                     </p>
                   </div>
@@ -1843,20 +2180,20 @@ export default function MarketDynamicsPane({
             {/* Signals list */}
             <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3.5 mt-1 select-text">
               <div className="flex items-center justify-between select-none">
-                <span className="text-[13px] font-bold text-zinc-700 font-sans">
+                <span className="text-[13px] font-semibold tracking-tight text-zinc-800 font-sans">
                   Signals ({renderedTrend.sources.length})
                 </span>
                 <button 
                   onClick={() => setIsSourcesExpanded(!isSourcesExpanded)}
-                  className="flex items-center gap-1.5 text-[13px] font-bold text-zinc-800 hover:opacity-80 cursor-pointer select-none bg-transparent border-none outline-none focus:outline-none transition-transform duration-200 font-sans"
+                  className="flex items-center gap-1 text-[11.5px] font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer select-none bg-transparent border-none outline-none focus:outline-none transition-colors duration-150 font-sans"
                 >
                   <span>{isSourcesExpanded ? "Close details" : "View details"}</span>
                   <svg 
-                    className={`w-4.5 h-4.5 text-zinc-800 transition-transform duration-200 ${isSourcesExpanded ? "rotate-180" : ""}`} 
+                    className={`w-3.5 h-3.5 text-current transition-transform duration-200 ${isSourcesExpanded ? "rotate-180" : ""}`} 
                     viewBox="0 0 24 24" 
                     fill="none" 
                     stroke="currentColor" 
-                    strokeWidth="3.2" 
+                    strokeWidth="2.2" 
                     strokeLinecap="round" 
                     strokeLinejoin="round"
                   >
@@ -1888,8 +2225,14 @@ export default function MarketDynamicsPane({
 
                     return (
                       <div 
-                        key={src.id} 
-                        id={`signal-card-${src.id}`}
+                        key={src.id || index} 
+                        id={`signal-card-${src.id || index}`}
+                        ref={(node) => {
+                          if (node && index !== undefined) {
+                            node.setAttribute('id', `signal-card-${index}`);
+                            if (src.id) node.setAttribute('id', `signal-card-${src.id}`);
+                          }
+                        }}
                         onClick={() => setSelectedSignalId(isSelected ? null : src.id)}
                         className={`rounded-[4px] px-3 transition-all text-left cursor-pointer border ${bgClass} ${borderClass} ${isSelected ? 'py-4' : 'py-1.5'}`}
                       >
@@ -1899,7 +2242,7 @@ export default function MarketDynamicsPane({
                               <span className={`shrink-0 rounded-[4px] py-0.5 px-1.5 text-[8.5px] font-semibold tracking-tight border leading-none ${getCategoryTagClass(src.category)}`}>
                                 {src.category}
                               </span>
-                              <h4 className="font-medium text-zinc-900 text-[12px] truncate">
+                              <h4 className="font-medium text-zinc-900 text-[13px] truncate">
                                 {src.source_name}
                               </h4>
                             </div>
@@ -1925,7 +2268,7 @@ export default function MarketDynamicsPane({
                               
                             </div>
                             
-                            <p className="text-zinc-800 text-[11px] leading-[1.5] font-normal">
+                            <p className="text-zinc-800 text-[12px] leading-relaxed font-light">
                               {src.details}
                             </p>
 
@@ -1963,11 +2306,11 @@ export default function MarketDynamicsPane({
             </div>
 
             {/* Similar Market Movements section */}
-            <div className="flex flex-col gap-2 mt-4 select-text">
-              <h3 className="text-[13.5px] font-bold tracking-tight text-zinc-900 font-sans select-text">
+            <div className="flex flex-col gap-1.5 mt-4 select-text">
+              <h3 className="text-[12.5px] font-medium tracking-tight text-zinc-900 font-sans select-text">
                 Similar Market Movements
               </h3>
-              <div className="flex flex-col gap-2 ml-1">
+              <div className="flex flex-col gap-1.5 ml-1">
                 {isFetchingSimilar ? (
                   <div className="text-[12px] text-zinc-500 animate-pulse py-1 font-sans">
                     Fetching similar market movements...
@@ -1975,7 +2318,7 @@ export default function MarketDynamicsPane({
                 ) : similarFutureProspects.length > 0 ? (
                   similarFutureProspects.map((prospect, idx) => (
                     <div className="flex items-start gap-2 py-0.5 text-[12px]" key={idx}>
-                      <FileText className="w-3.5 h-3.5 text-zinc-400 mt-[2px] shrink-0 select-none" />
+                      <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
                       <button
                         onClick={() => {
                           setSelectedGridSignal(null);
@@ -1983,7 +2326,7 @@ export default function MarketDynamicsPane({
                           setSelectedInsightId(prospect.id);
                           setActiveTab("insights");
                         }}
-                        className="text-left text-zinc-700 hover:text-[#7c3aed] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans"
+                        className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
                       >
                         {prospect.title}
                       </button>
@@ -1997,31 +2340,37 @@ export default function MarketDynamicsPane({
               </div>
             </div>
 
-            {/* Action buttons matching design layout */}
-            <div className="flex flex-col gap-2 w-full mt-3 select-none font-sans font-normal text-[13px]">
-              <button
-                onClick={() => {
-                  const query = `What is the regulatory and market feasibility of ${renderedTrend.title}?`;
-                  setActiveTab("ask_marketgenie");
-                  handleChatSend(query);
-                }}
-                className="w-full h-12 border border-zinc-200 bg-white hover:bg-[#fafafa] rounded-[4px] flex items-center gap-3.5 px-4 text-zinc-800 hover:text-zinc-950 transition-colors cursor-pointer text-left font-sans shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-              >
-                <Sparkles className="w-4 h-4 text-[#7c3aed] fill-[#7c3aed]/10 shrink-0" />
-                <span>Evaluate regulatory and market feasibility</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  const query = `Provide case studies of ${renderedTrend.title} implementations.`;
-                  setActiveTab("ask_marketgenie");
-                  handleChatSend(query);
-                }}
-                className="w-full h-12 border border-zinc-200 bg-white hover:bg-[#fafafa] rounded-[4px] flex items-center gap-3.5 px-4 text-zinc-800 hover:text-zinc-950 transition-colors cursor-pointer text-left font-sans shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-              >
-                <FileText className="w-4 h-4 text-[#7c3aed] shrink-0" />
-                <span>Show corporate case studies & examples</span>
-              </button>
+            {/* Explore Decision Intelligence section */}
+            <div className="flex flex-col gap-1.5 mt-4 select-text">
+              <h3 className="text-[12.5px] font-medium tracking-tight text-zinc-900 font-sans select-text">
+                Explore Decision Intelligence
+              </h3>
+              <div className="flex flex-col gap-1.5 ml-1">
+                <div className="flex items-start gap-2 py-0.5 text-[12px]">
+                  <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
+                  <button
+                    onClick={() => {
+                      const query = `What is the regulatory and market feasibility of ${renderedTrend.title}?`;
+                      onSwitchToDecisionIntelligence(query, "market_dynamics", "Market Dynamics", "Market Dynamics");
+                    }}
+                    className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
+                  >
+                    Evaluate regulatory and market feasibility
+                  </button>
+                </div>
+                <div className="flex items-start gap-2 py-0.5 text-[12px]">
+                  <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
+                  <button
+                    onClick={() => {
+                      const query = `Provide case studies of ${renderedTrend.title} implementations.`;
+                      onSwitchToDecisionIntelligence(query, "market_dynamics", "Market Dynamics", "Market Dynamics");
+                    }}
+                    className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
+                  >
+                    Show corporate case studies & examples
+                  </button>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -2060,7 +2409,7 @@ export default function MarketDynamicsPane({
               )}
               {chatLoading && (
                 <div className="bg-violet-50 text-zinc-800 border border-violet-100 self-start rounded-[4px] rounded-bl-none p-3 max-w-[85%] flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 text-[#7c3aed] animate-spin" />
+                  <Loader2 className="w-4 h-4 text-[#2d39d2] animate-spin" />
                   <span className="text-[11.5px] text-zinc-500 font-medium font-sans">MarketGenie is researching...</span>
                 </div>
               )}
@@ -2078,7 +2427,7 @@ export default function MarketDynamicsPane({
                   <button
                     key={idx}
                     onClick={() => handleChatSend(s)}
-                    className="text-[11px] bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border border-zinc-200 px-2 py-1 rounded-[4px] transition-colors"
+                    className="text-[12px] bg-zinc-50 hover:bg-zinc-100 text-zinc-600 border border-zinc-200 px-2 py-1 rounded-[4px] transition-colors"
                   >
                     {s}
                   </button>
@@ -2098,7 +2447,7 @@ export default function MarketDynamicsPane({
               />
               <button
                 onClick={() => handleChatSend(chatInput)}
-                className="p-1.5 bg-[#7c3aed] hover:bg-violet-700 text-white rounded-[4px] transition-colors"
+                className="p-1.5 bg-[#2d39d2] hover:bg-[#242ea8] text-white rounded-[4px] transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
               </button>
@@ -2114,7 +2463,7 @@ export default function MarketDynamicsPane({
               <div className="flex flex-col items-center justify-center py-12 text-center font-sans">
                 <Bookmark className="w-8 h-8 text-zinc-200 mb-2" />
                 <p className="text-xs text-zinc-400 font-medium">No bookmarked outlook items yet.</p>
-                <p className="text-[11px] text-zinc-300 mt-0.5 max-w-[200px] leading-normal">
+                <p className="text-[12px] text-zinc-300 mt-0.5 max-w-[200px] leading-normal">
                   Click the bookmark icon in the Insights panel to save crucial market trends.
                 </p>
               </div>
@@ -2138,7 +2487,7 @@ export default function MarketDynamicsPane({
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">
+                        <span className="text-[8.5px] font-bold uppercase tracking-widest text-zinc-500">
                           {(trend as any).category || (trend as any).sector} • {(trend as any).ring || (trend as any).term}
                         </span>
                         <span className="text-[10px] text-zinc-500 font-medium">
@@ -2146,7 +2495,7 @@ export default function MarketDynamicsPane({
                         </span>
                       </div>
                       <h3 className="text-xs font-bold text-zinc-800">{(trend as any).title || (trend as any).summary}</h3>
-                      <p className="text-[11px] text-zinc-500 line-clamp-2 mt-1 leading-normal">
+                      <p className="text-[12px] text-zinc-500 line-clamp-2 mt-1 leading-normal">
                         {trend.summary}
                       </p>
                     </div>
@@ -2157,10 +2506,11 @@ export default function MarketDynamicsPane({
           </div>
         )}
       </div>
+      )}
 
       {toastMessage && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
-          <div className="bg-zinc-900 text-white text-[12px] px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-zinc-900 text-white text-[13px] px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
             <span>{toastMessage}</span>
             {lastHiddenInsight && (
               <button 

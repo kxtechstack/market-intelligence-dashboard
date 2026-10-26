@@ -1,22 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Building2, 
-  Globe, 
-  ShieldCheck, 
-  Users, 
-  History,
-  Layers,
-  ChevronRight,
-  Shield,
-  Activity,
-  Mail,
-  MapPin,
-  Clock,
-  UserCheck,
-  UserX,
-  Lock,
-  ExternalLink
-} from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 interface WorkspaceConfigPaneProps {
@@ -128,25 +110,22 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
   }, [clientId]);
 
   const menuItems = [
-    { id: "profile", label: "Organization Profile", icon: Building2 },
-    { id: "subscription", label: "Subscription & Modules", icon: Layers },
-    { id: "audit", label: "Access Logs", icon: History },
+    { id: "profile", label: "Organization Profile" },
+    { id: "subscription", label: "Subscription & Modules" },
+    { id: "audit", label: "Access Logs" },
   ];
 
   const SectionHeader = ({ title, description }: { title: string; description?: string }) => (
     <div className="mb-3">
-      <h3 className="text-[18px] font-bold text-zinc-900 tracking-tight mb-0.5">{title}</h3>
-      {description && <p className="text-[12.5px] text-zinc-500 font-medium">{description}</p>}
+      <h3 className="text-[17px] font-semibold text-zinc-900 tracking-tight mb-0.5 font-sans">{title}</h3>
+      {description && <p className="text-[12.5px] text-zinc-500 font-medium font-sans">{description}</p>}
     </div>
   );
 
-  const InfoCard = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
+  const InfoCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="bg-white border border-zinc-200 rounded-[8px] overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.03)] h-fit">
       <div className="px-3.5 py-2 border-b border-zinc-100 bg-[#fbfbfb] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {Icon && <Icon className="w-3.5 h-3.5 text-zinc-900" />}
-          <span className="text-[11.5px] font-bold text-zinc-800 uppercase tracking-wider">{title}</span>
-        </div>
+        <span className="text-[11.5px] font-semibold text-zinc-700 uppercase tracking-wider font-sans">{title}</span>
       </div>
       <div className="p-3.5">
         {children}
@@ -156,8 +135,8 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
 
   const InfoRow = ({ label, value, isFullWidth = false }: { label: string; value: string | React.ReactNode; isFullWidth?: boolean }) => (
     <div className={`flex flex-col gap-0.5 ${isFullWidth ? "col-span-full" : ""}`}>
-      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{label}</span>
-      <div className="text-[13px] text-zinc-800 font-medium leading-relaxed">
+      <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider font-sans">{label}</span>
+      <div className="text-[13px] text-zinc-800 font-medium leading-relaxed font-sans">
         {value || <span className="text-zinc-300 italic">Not specified</span>}
       </div>
     </div>
@@ -168,7 +147,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
       <div className="flex-1 flex items-center justify-center bg-white h-full">
         <div className="flex flex-col items-center gap-3">
           <div className="w-6 h-6 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin" />
-          <span className="text-[13px] font-medium text-zinc-500">Loading configuration...</span>
+          <span className="text-[13px] font-medium text-zinc-500 font-sans">Loading configuration...</span>
         </div>
       </div>
     );
@@ -178,20 +157,20 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
 
   return (
     <div className="flex-1 h-full flex flex-col bg-white overflow-hidden animate-fade-in font-sans">
-      {/* Header - Consistent with other panes */}
-      <div className="h-[48px] px-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0 bg-white">
+      {/* Header - Consistent with Market Dynamics and Forward Outlook */}
+      <div className="h-[53px] px-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0 bg-white">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-[4px] bg-zinc-900 flex items-center justify-center text-white">
-            <Building2 className="w-4 h-4" />
-          </div>
-          <h2 className="text-[17px] font-bold tracking-tight text-zinc-900 select-none">
+          <h2 
+            style={{ fontFamily: "'Source Serif 4', Georgia, Cambria, 'Times New Roman', Times, serif" }}
+            className="text-[19px] font-semibold tracking-tight text-zinc-900 select-none font-serif-source"
+          >
             Workspace Configuration
           </h2>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-100 rounded-[4px]">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">System Operational</span>
+            <span className="text-[9px] font-semibold text-emerald-700 uppercase tracking-wider font-sans">System Operational</span>
           </div>
         </div>
       </div>
@@ -200,27 +179,21 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
         {/* Local Sidebar */}
         <div className="w-64 border-r border-zinc-100 bg-[#fbfbfb] flex flex-col p-3 gap-0.5">
           <div className="px-3 mb-2 mt-1">
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Configuration Sections</span>
+            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider font-sans">Configuration Sections</span>
           </div>
           {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
-              className={`flex items-center justify-between px-3 py-2 rounded-[6px] transition-all group ${
+              className={`w-full text-left px-3 py-2 rounded-[6px] transition-all text-[13px] font-sans ${
                 activeSection === item.id 
                   ? "bg-zinc-100 text-zinc-900 font-semibold" 
                   : "text-zinc-600 hover:bg-zinc-100/50 hover:text-zinc-900 font-medium"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <item.icon className={`w-3.5 h-3.5 ${activeSection === item.id ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-600"}`} />
-                <span className="text-[13px]">{item.label}</span>
-              </div>
-              <ChevronRight className={`w-3.5 h-3.5 transition-opacity ${activeSection === item.id ? "opacity-100" : "opacity-0"}`} />
+              <span>{item.label}</span>
             </button>
           ))}
-
-          {/* Removed Support Tier Card */}
         </div>
 
         {/* Content Area */}
@@ -234,17 +207,12 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                   <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl -ml-24 -mb-24" />
                   
                   <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-[8px] border border-white/20 flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h1 className="text-[18px] font-bold tracking-tight mb-0.5">{client?.company_name || "Internal Workspace"}</h1>
-                        <div className="flex items-center gap-3 text-[11px] text-zinc-400 font-medium">
-                          <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {client?.location}</span>
-                          <span className="w-1 h-1 bg-zinc-700 rounded-full" />
-                          <span>{client?.industry}</span>
-                        </div>
+                    <div>
+                      <h1 className="text-[18px] font-bold tracking-tight mb-1">{client?.company_name || "Internal Workspace"}</h1>
+                      <div className="flex items-center gap-2 text-[11px] text-zinc-400 font-medium font-sans">
+                        <span>{client?.location}</span>
+                        {client?.location && client?.industry && <span className="w-1 h-1 bg-zinc-600 rounded-full" />}
+                        <span>{client?.industry}</span>
                       </div>
                     </div>
                   </div>
@@ -252,7 +220,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
 
                 <div className="grid grid-cols-1 gap-3.5">
                   {/* Client Identity */}
-                  <InfoCard title="Client Identity" icon={Building2}>
+                  <InfoCard title="Client Identity">
                     <div className="grid grid-cols-2 gap-y-3 gap-x-12">
                       <InfoRow label="Client Name" value={client?.company_name} />
                       <InfoRow label="Industry / Sector" value={client?.industry} />
@@ -262,7 +230,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                   </InfoCard>
 
                   {/* Offerings */}
-                  <InfoCard title="Offerings & Market Position" icon={Layers}>
+                  <InfoCard title="Offerings & Market Position">
                     <div className="grid grid-cols-2 gap-y-3 gap-x-12">
                       <InfoRow label="Focus Products or Services" value={icp?.focus_products_services?.join(', ')} isFullWidth />
                       <InfoRow label="Competitors" value={icp?.competitors?.join(', ')} isFullWidth />
@@ -270,7 +238,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                   </InfoCard>
 
                   {/* ICP Definition */}
-                  <InfoCard title="ICP Definition" icon={Activity}>
+                  <InfoCard title="ICP Definition">
                     <div className="grid grid-cols-2 gap-y-3 gap-x-12">
                       <InfoRow label="Core Sectors" value={icp?.core_sectors?.join(', ')} />
                       <InfoRow label="Geographic Focus" value={icp?.geographic_focus?.join(', ')} />
@@ -280,8 +248,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                   </InfoCard>
 
                   {/* Manage Info Text */}
-                  <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-[8px] flex items-center gap-3 text-zinc-500">
-                    <ShieldCheck className="w-4 h-4 text-zinc-400" />
+                  <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-[8px] text-zinc-500 font-sans">
                     <p className="text-[12px] font-medium leading-relaxed">
                       This information is managed by Inside Market. To request a change, please contact your account representative.
                     </p>
@@ -299,36 +266,31 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div className="p-4 border border-zinc-200 rounded-[8px] bg-zinc-50/50">
-                    <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Account Status</div>
+                    <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider font-sans mb-1.5">Account Status</div>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                      <div className="text-[17px] font-bold text-zinc-800">Active</div>
+                      <div className="text-[17px] font-bold text-zinc-800 font-sans">Active</div>
                     </div>
                   </div>
                   <div className="p-4 border border-zinc-200 rounded-[8px] bg-zinc-50/50">
-                    <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Enabled Modules</div>
-                    <div className="text-[17px] font-bold text-zinc-800">{enabledModules.length} Active Modules</div>
+                    <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider font-sans mb-1.5">Enabled Modules</div>
+                    <div className="text-[17px] font-bold text-zinc-800 font-sans">{enabledModules.length} Active Modules</div>
                   </div>
                 </div>
 
-                <InfoCard title="Intelligent System Modules" icon={Layers}>
+                <InfoCard title="Intelligent System Modules">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {enabledModules.length > 0 ? (
                       enabledModules.map((module) => (
                         <div key={module.id} className="flex items-center justify-between p-3 bg-zinc-50/50 border border-zinc-100 rounded-[6px] transition-all group cursor-default">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 bg-white border border-zinc-200 rounded-full flex items-center justify-center">
-                              <Activity className="w-3 h-3 text-zinc-900" />
-                            </div>
-                            <span className="text-[13px] font-semibold text-zinc-800">{module.module_name}</span>
-                          </div>
-                          <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-bold uppercase tracking-wider rounded border border-emerald-100">
+                          <span className="text-[13px] font-semibold text-zinc-800 font-sans">{module.module_name}</span>
+                          <div className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-semibold uppercase tracking-wider rounded border border-emerald-100 font-sans">
                             Active
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="col-span-full py-8 text-center text-zinc-400 text-[13px] italic">
+                      <div className="col-span-full py-8 text-center text-zinc-400 text-[13px] italic font-sans">
                         No active intelligence modules enabled.
                       </div>
                     )}
@@ -345,13 +307,13 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                 />
                 
                 <div className="border border-zinc-200 rounded-[8px] overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                  <table className="w-full text-left border-collapse table-fixed">
+                  <table className="w-full text-left border-collapse table-fixed font-sans">
                     <thead>
                       <tr className="bg-[#fbfbfb] border-b border-zinc-100">
-                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest !text-left">Name</th>
-                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest !text-left">Designation</th>
-                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest !text-left">Email</th>
-                        <th className="w-[10%] px-3.5 py-2.5 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right">Status</th>
+                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider font-sans !text-left">Name</th>
+                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider font-sans !text-left">Designation</th>
+                        <th className="w-[30%] px-3.5 py-2.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider font-sans !text-left">Email</th>
+                        <th className="w-[10%] px-3.5 py-2.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider font-sans text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
@@ -362,7 +324,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                             <td className="px-3.5 py-2.5 text-[12.5px] text-zinc-600 font-medium truncate text-left">{user.designation}</td>
                             <td className="px-3.5 py-2.5 text-[12.5px] text-zinc-500 truncate text-left">{user.email}</td>
                             <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${user.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-zinc-100 text-zinc-500 border border-zinc-200"}`}>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider ${user.is_active ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-zinc-100 text-zinc-500 border border-zinc-200"}`}>
                                 {user.is_active ? "Active" : "Inactive"}
                               </span>
                             </td>
@@ -380,8 +342,7 @@ export default function WorkspaceConfigPane({ onReturn, clientId }: WorkspaceCon
                 </div>
 
                 <div className="flex flex-col gap-2.5">
-                  <div className="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[8px] flex items-center gap-3 text-zinc-500">
-                    <UserCheck className="w-4 h-4 text-zinc-400" />
+                  <div className="p-2.5 bg-zinc-50 border border-zinc-200 rounded-[8px] text-zinc-500 font-sans">
                     <p className="text-[12px] font-medium leading-relaxed">
                       To add, remove, or update team access, please contact your account representative.
                     </p>

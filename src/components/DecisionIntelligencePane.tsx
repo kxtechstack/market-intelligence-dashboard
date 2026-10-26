@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -19,7 +19,6 @@ import {
 } from "recharts";
 import {
   ArrowUp,
-  ArrowLeft,
   Loader2,
   Sparkles,
   Bot,
@@ -48,17 +47,21 @@ import {
   Layers,
   Target,
   Zap,
+  CornerDownRight,
   Compass,
   Bookmark,
   Share2,
   FileDown,
   Trash2,
+  ShieldAlert,
+  ExternalLink,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { ChatMessage } from "../types";
 import { ChatSources } from "./ChatSources";
 import ReportView from "./ReportView";
-import { API_URL } from "../constants";
+import { API_URL, MARKET_DYNAMICS_MODULE_ID, POLICY_RISK_MODULE_ID, FORWARD_OUTLOOK_MODULE_ID } from "../constants";
+import { supabase } from "../lib/supabase";
 
 interface ChatSession {
   id: string;
@@ -90,12 +93,147 @@ const CATEGORY_TO_TAB: Record<string, "Decision Intelligence" | "Inference" | "L
   "list": "List",
 };
 
+const STAGED_LOADING_MESSAGES = [
+  "Understanding your question…",
+  "Searching the knowledge base…",
+  "Pulling relevant data points…",
+  "Cross-checking across sources…",
+  "Analyzing patterns and gaps…",
+  "Drafting the insight…",
+];
+
 interface HomePrompt {
   icon_name?: string | null;
   title: string;
   description?: string | null;
   question: string;
 }
+
+interface HighlightRow {
+  moduleId: string;
+  moduleName: string;
+  tabId: string;
+  itemId?: string;
+  submoduleId?: string;
+  label: string;
+  body: string;
+  so_what?: string;
+  status?: string;
+  delta?: number;
+  delta_label?: string;
+  icon?: string;
+  color?: string;
+}
+
+const getSnapshotChipClass = (color: string) => {
+  switch (color) {
+    case "green":
+      return "bg-emerald-50 border border-emerald-200 text-emerald-700";
+    case "amber":
+      return "bg-amber-50 border border-amber-200 text-amber-700";
+    case "red":
+      return "bg-rose-50 border border-rose-200 text-rose-700";
+    case "blue":
+      return "bg-blue-50 border border-blue-200 text-blue-700";
+    default:
+      return "bg-zinc-50 border border-zinc-200 text-zinc-600";
+  }
+};
+
+const getSourceBadge = (moduleName: string) => {
+  if (moduleName.includes("Market")) {
+    return {
+      bg: "bg-purple-50/80 border-purple-200 text-[#2d39d2]",
+      dot: "bg-[#2d39d2]",
+      icon: TrendingUp,
+    };
+  }
+  if (moduleName.includes("Policy") || moduleName.includes("Risk")) {
+    return {
+      bg: "bg-rose-50/80 border-rose-200 text-rose-700",
+      dot: "bg-rose-500",
+      icon: ShieldAlert,
+    };
+  }
+  return {
+    bg: "bg-blue-50/80 border-blue-200 text-blue-700",
+    dot: "bg-blue-500",
+    icon: Compass,
+  };
+};
+
+const FALLBACK_HIGHLIGHTS: HighlightRow[] = [
+  {
+    moduleId: MARKET_DYNAMICS_MODULE_ID,
+    moduleName: "Market Dynamics",
+    tabId: "market_dynamics",
+    label: "Funding & Investment Activity",
+    body: "Biotech firms leverage covalent molecules for innovative treatments",
+  },
+  {
+    moduleId: MARKET_DYNAMICS_MODULE_ID,
+    moduleName: "Market Dynamics",
+    tabId: "market_dynamics",
+    label: "Industry Structure Changes",
+    body: "Independent Beauty Brands Can Compete with Conglomerates via Niche Strategies",
+  },
+  {
+    moduleId: POLICY_RISK_MODULE_ID,
+    moduleName: "Policy & Risk Monitor",
+    tabId: "policy_risk_monitor",
+    label: "Regulatory Consultation",
+    body: "Ghana Calls for Cosmetology Council to Regulate Beauty Industry",
+  },
+  {
+    moduleId: POLICY_RISK_MODULE_ID,
+    moduleName: "Policy & Risk Monitor",
+    tabId: "policy_risk_monitor",
+    label: "Regulatory Enforcement",
+    body: "Korea Deploys Task Force to Shield Cosmetics Industry from New Rules",
+  },
+  {
+    moduleId: FORWARD_OUTLOOK_MODULE_ID,
+    moduleName: "Future Outlook",
+    tabId: "foreward_outlook",
+    label: "Product",
+    body: "Opal Cosmetics files patent for Skin Care Composition Containing Tussilago Farfara Leaf Extract",
+  },
+  {
+    moduleId: FORWARD_OUTLOOK_MODULE_ID,
+    moduleName: "Future Outlook",
+    tabId: "foreward_outlook",
+    label: "Technology",
+    body: "Amorepacific Integrates 70 Years of Research Data Using AI",
+  },
+  {
+    moduleId: MARKET_DYNAMICS_MODULE_ID,
+    moduleName: "Market Dynamics",
+    tabId: "market_dynamics",
+    label: "Consumer Trends",
+    body: "Rising demand for microbiome-friendly personal care formulations across APAC",
+  },
+  {
+    moduleId: POLICY_RISK_MODULE_ID,
+    moduleName: "Policy & Risk Monitor",
+    tabId: "policy_risk_monitor",
+    label: "Compliance Update",
+    body: "EU Updates Guidelines on Nano-materials in Cosmetic Sunscreen Products",
+  },
+  {
+    moduleId: FORWARD_OUTLOOK_MODULE_ID,
+    moduleName: "Future Outlook",
+    tabId: "foreward_outlook",
+    label: "Sustainability",
+    body: "Major cosmetic brands commit to 100% recyclable PCR packaging by 2028",
+  },
+  {
+    moduleId: MARKET_DYNAMICS_MODULE_ID,
+    moduleName: "Market Dynamics",
+    tabId: "market_dynamics",
+    label: "Strategic Partnership",
+    body: "Global beauty conglomerates partner with biotech startups for sustainable actives",
+  },
+];
 
 const QUESTION_LIBRARY: QuestionLibraryItem[] = [];
 
@@ -596,6 +734,10 @@ interface DecisionIntelligencePaneProps {
   clientId?: string;
   industry?: string;
   userId?: string;
+  initialQuery?: {query: string, timestamp: number};
+  returnLabel?: string;
+  fetchCreditUsage?: () => void;
+  onCreditUsageUpdate?: () => void;
 }
 
 const MODULE_TO_TAB: Record<string, { tabId: string; tabLabel: string }> = {
@@ -621,6 +763,108 @@ const getTargetTabInfo = (item: { title?: string; category?: string; module?: st
     return { tabId: "foreward_outlook", tabLabel: "Forward Outlook" };
   }
   return { tabId: "policy_risk_monitor", tabLabel: "Policy & Risk Monitor" };
+};
+
+const convertReportToMarkdown = (report: any): string => {
+  if (!report) return "";
+  const parts: string[] = [];
+
+  if (report.title && typeof report.title === "string" && report.title.trim()) {
+    parts.push(`### ${report.title.trim()}`);
+  }
+
+  if (report.bodyText && typeof report.bodyText === "string" && report.bodyText.trim()) {
+    parts.push(report.bodyText.trim());
+  }
+
+  if (report.outlook) {
+    parts.push(`#### Outlook`);
+    if (Array.isArray(report.outlook)) {
+      parts.push(report.outlook.filter(Boolean).join("\n\n"));
+    } else if (typeof report.outlook === "string") {
+      parts.push(report.outlook);
+    }
+  }
+
+  if (report.analysis) {
+    parts.push(`#### Analysis`);
+    if (Array.isArray(report.analysis)) {
+      parts.push(report.analysis.filter(Boolean).join("\n\n"));
+    } else if (typeof report.analysis === "string") {
+      parts.push(report.analysis);
+    }
+  }
+
+  if (report.sections && Array.isArray(report.sections)) {
+    report.sections.forEach((sec: any) => {
+      if (sec.heading) {
+        parts.push(`#### ${sec.heading}`);
+      }
+      if (sec.points && Array.isArray(sec.points)) {
+        sec.points.forEach((pt: string) => {
+          if (pt) parts.push(`- ${pt}`);
+        });
+      }
+    });
+  }
+
+  if (report.blocks && Array.isArray(report.blocks)) {
+    report.blocks.forEach((blk: any) => {
+      if (blk.type === "heading" && blk.text) {
+        parts.push(`#### ${blk.text}`);
+      } else if (blk.type === "paragraph" && blk.text) {
+        parts.push(blk.text);
+      } else if (blk.type === "bullets" && Array.isArray(blk.items)) {
+        blk.items.forEach((it: string) => {
+          if (it) parts.push(`- ${it}`);
+        });
+      }
+    });
+  }
+
+  if (report.key_facts && Array.isArray(report.key_facts) && report.key_facts.length > 0) {
+    parts.push(`#### Key Facts`);
+    report.key_facts.forEach((fact: string) => {
+      if (fact) parts.push(`- ${fact}`);
+    });
+  }
+
+  if (report.driving_factors && Array.isArray(report.driving_factors) && report.driving_factors.length > 0) {
+    parts.push(`#### Driving Factors`);
+    report.driving_factors.forEach((f: string) => {
+      if (f) parts.push(`- ${f}`);
+    });
+  }
+
+  if (report.what_to_watch) {
+    parts.push(`#### What to Watch`);
+    if (Array.isArray(report.what_to_watch)) {
+      report.what_to_watch.forEach((w: string) => {
+        if (w) parts.push(`- ${w}`);
+      });
+    } else if (typeof report.what_to_watch === "string") {
+      parts.push(report.what_to_watch);
+    }
+  }
+
+  if (report.decision_implication && typeof report.decision_implication === "string" && report.decision_implication.trim()) {
+    parts.push(`#### Decision Implication\n${report.decision_implication.trim()}`);
+  }
+
+  if (report.bottom_line && typeof report.bottom_line === "string" && report.bottom_line.trim()) {
+    parts.push(`#### Bottom Line\n${report.bottom_line.trim()}`);
+  }
+
+  if (report.confidence_evidence && Array.isArray(report.confidence_evidence) && report.confidence_evidence.length > 0) {
+    parts.push(`#### Confidence & Evidence`);
+    report.confidence_evidence.forEach((ce: any) => {
+      if (ce.label && ce.value) {
+        parts.push(`- **${ce.label}:** ${ce.value}`);
+      }
+    });
+  }
+
+  return parts.join("\n\n");
 };
 
 const getSignalDetails = (titleText: string) => {
@@ -814,12 +1058,31 @@ export default function DecisionIntelligencePane({
   clientId = "",
   industry = "",
   userId = "",
+  initialQuery,
+  returnLabel,
+  fetchCreditUsage,
+  onCreditUsageUpdate,
 }: DecisionIntelligencePaneProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [savedMessageIds, setSavedMessageIds] = useState<Record<string, boolean>>({});
   const [sharedMessageIds, setSharedMessageIds] = useState<Record<string, boolean>>({});
   const [homeQuestions, setHomeQuestions] = useState<HomePrompt[]>([]);
   const [libraryQuestions, setLibraryQuestions] = useState<QuestionLibraryItem[]>([]);
+
+  // Persist conversationId in localStorage so it survives unmount/remount
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(
+    () => localStorage.getItem("di_current_conversation_id")
+  );
+
+  useEffect(() => {
+    localStorage.setItem("di_current_conversation_id", currentConversationId || "");
+  }, [currentConversationId]);
+
+  useEffect(() => {
+    if (initialQuery?.query) {
+      handleSend(initialQuery.query);
+    }
+  }, [initialQuery]);
 
   const handleSaveMessage = (id: string) => {
     setSavedMessageIds((prev) => {
@@ -857,7 +1120,7 @@ export default function DecisionIntelligencePane({
 
       const drawHeaderAndFooter = () => {
         // Draw top thin accent line (royal purple / indigo)
-        doc.setFillColor(124, 58, 237); // rgb of #7c3aed
+        doc.setFillColor(45, 57, 210); // rgb of #2d39d2
         doc.rect(0, 0, 210, 3, "F");
 
         // Header texts
@@ -924,7 +1187,7 @@ export default function DecisionIntelligencePane({
       doc.rect(20, y, 170, 22, "FD");
 
       // Vertical indicator bar
-      doc.setFillColor(124, 58, 237); // purple-600
+      doc.setFillColor(45, 57, 210); // purple-600
       doc.rect(20, y, 1.5, 22, "F");
 
       // Metadata text inside block
@@ -946,7 +1209,7 @@ export default function DecisionIntelligencePane({
       y += 28;
 
       // Question Brief
-      addText("QUERY BRIEF", 9, true, "#7c3aed");
+      addText("QUERY BRIEF", 9, true, "#2d39d2");
       y += 1;
       addText(questionText, 10.5, false, "#18181b");
       y += 5;
@@ -1008,7 +1271,7 @@ export default function DecisionIntelligencePane({
         } else if (line.startsWith("####")) {
           const heading = line.replace(/^####\s+/, "");
           y += 2;
-          addText(heading, 10, true, "#7c3aed");
+          addText(heading, 10, true, "#2d39d2");
           y += 1;
         } else if (line.startsWith("-") || line.startsWith("*")) {
           const itemText = line.replace(/^[-*]\s+/, "");
@@ -1066,7 +1329,7 @@ export default function DecisionIntelligencePane({
               drawHeaderAndFooter();
               y = 25;
             }
-            addText(sig, 9.5, true, "#7c3aed");
+            addText(sig, 9.5, true, "#2d39d2");
             y += 0.5;
             addText(details.text, 9, false, "#4b5563", 4);
             y += 2;
@@ -1082,10 +1345,30 @@ export default function DecisionIntelligencePane({
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStageIndex, setLoadingStageIndex] = useState(0);
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStageIndex(0);
+      return;
+    }
+
+    setLoadingStageIndex(0);
+    const interval = setInterval(() => {
+      setLoadingStageIndex((prev) => {
+        if (prev < STAGED_LOADING_MESSAGES.length - 1) {
+          return prev + 1;
+        }
+        return prev;
+      });
+    }, 1600);
+
+    return () => clearInterval(interval);
+  }, [loading]);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [previousSessions, setPreviousSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  /* Removed duplicate state definition */
   const [showPreviousChatsModal, setShowPreviousChatsModal] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1094,6 +1377,90 @@ export default function DecisionIntelligencePane({
   const [showQuestionLibraryModal, setShowQuestionLibraryModal] = useState(false);
   const [selectedLibraryTab, setSelectedLibraryTab] = useState<"Decision Intelligence" | "Inference" | "List">("Decision Intelligence");
   const [librarySearchQuery, setLibrarySearchQuery] = useState("");
+
+  const [highlightsData, setHighlightsData] = useState<HighlightRow[]>(FALLBACK_HIGHLIGHTS);
+  const [highlightsLoading, setHighlightsLoading] = useState(true);
+  const [highlightsDate, setHighlightsDate] = useState<string>("");
+
+  const todayFormattedDate = useMemo(() => {
+    const now = new Date();
+    const day = now.getDate();
+    const s = ["th", "st", "nd", "rd"];
+    const v = day % 100;
+    const ordinalDay = day + (s[(v - 20) % 10] || s[v] || s[0]);
+    const month = now.toLocaleDateString("en-US", { month: "long" });
+    const year = now.getFullYear();
+    return `${ordinalDay} ${month} ${year}`;
+  }, []);
+
+  useEffect(() => {
+    async function loadTodayHighlights() {
+      const targetClientId = clientId || "b61b4d3b-caeb-457b-9971-636c83688ee4";
+      setHighlightsLoading(true);
+
+      try {
+        const [mktRes, polRes, trdRes] = await Promise.all([
+          supabase.from("market_insights_live").select("id, title, category, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(4),
+          supabase.from("policy_signals").select("id, signal_title, category, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(4),
+          supabase.from("trend_signals").select("id, signal_title, sector, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(4)
+        ]);
+
+        const rows: HighlightRow[] = [];
+
+        if (mktRes.data) {
+          mktRes.data.forEach((r: any) => {
+            rows.push({
+              moduleId: MARKET_DYNAMICS_MODULE_ID,
+              moduleName: "Market Dynamics",
+              tabId: "market_dynamics",
+              itemId: r.id,
+              label: r.category || "Market Dynamics",
+              body: r.title || "",
+            });
+          });
+        }
+
+        if (polRes.data) {
+          polRes.data.forEach((r: any) => {
+            rows.push({
+              moduleId: POLICY_RISK_MODULE_ID,
+              moduleName: "Policy & Risk Monitor",
+              tabId: "policy_risk_monitor",
+              itemId: r.id,
+              label: r.category || "Policy & Risk",
+              body: r.signal_title || "",
+            });
+          });
+        }
+
+        if (trdRes.data) {
+          trdRes.data.forEach((r: any) => {
+            rows.push({
+              moduleId: FORWARD_OUTLOOK_MODULE_ID,
+              moduleName: "Future Outlook",
+              tabId: "foreward_outlook",
+              itemId: r.id,
+              label: r.sector || "Future Outlook",
+              body: r.signal_title || "",
+            });
+          });
+        }
+
+        if (rows.length > 0) {
+          setHighlightsData(rows);
+        } else {
+          setHighlightsData(FALLBACK_HIGHLIGHTS);
+        }
+      } catch (err) {
+        console.error("Failed to load today highlights:", err);
+        setHighlightsData(FALLBACK_HIGHLIGHTS);
+      } finally {
+        setHighlightsLoading(false);
+      }
+    }
+
+    loadTodayHighlights();
+  }, [clientId]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -1238,11 +1605,14 @@ export default function DecisionIntelligencePane({
       timestamp: new Date(),
     };
 
-    const modelMessage: ChatMessage = {
-      id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2),
+    const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+
+    const initialModelMessage: ChatMessage = {
+      id: modelId,
       role: "model",
       heading: item.title,
-      text: explanationText,
+      text: "",
+      isStreaming: true,
       timestamp: new Date(),
       linkInfo: {
         tabId: targetTab.tabId,
@@ -1251,11 +1621,40 @@ export default function DecisionIntelligencePane({
       },
     };
 
-    setMessages((prev) => {
-      const updated = [...prev, userMessage, modelMessage];
-      updateOrAddSession(`Provide further details on: ${item.title}`, updated);
-      return updated;
-    });
+    setMessages((prev) => [...prev, userMessage, initialModelMessage]);
+    setLoading(true);
+
+    const tokens = explanationText.match(/\S+\s*/g) || [explanationText];
+    let currentIndex = 0;
+    let accumulated = "";
+
+    const timer = setInterval(() => {
+      if (currentIndex >= tokens.length) {
+        clearInterval(timer);
+        setLoading(false);
+        setMessages((prev) => {
+          const finished = prev.map((msg) =>
+            msg.id === modelId
+              ? { ...msg, text: explanationText, isStreaming: false }
+              : msg
+          );
+          updateOrAddSession(`Provide further details on: ${item.title}`, finished);
+          return finished;
+        });
+        return;
+      }
+
+      accumulated += tokens[currentIndex];
+      currentIndex += 1;
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === modelId
+            ? { ...msg, text: accumulated, isStreaming: true }
+            : msg
+        )
+      );
+    }, 18);
   };
 
 const DecisionChart: React.FC<{
@@ -1280,7 +1679,7 @@ const DecisionChart: React.FC<{
           ) : isArea ? (
             <Layers className="w-3.5 h-3.5 text-[#06b6d4]" />
           ) : (
-            <BarChart2 className="w-3.5 h-3.5 text-[#7c3aed]" />
+            <BarChart2 className="w-3.5 h-3.5 text-[#2d39d2]" />
           )}
           <span>{title}</span>
         </div>
@@ -1345,7 +1744,7 @@ const DecisionChart: React.FC<{
               />
               <Bar dataKey={dataKey} radius={[4, 4, 0, 0]}>
                 {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill || '#7c3aed'} />
+                  <Cell key={`cell-${index}`} fill={entry.fill || '#2d39d2'} />
                 ))}
               </Bar>
             </RechartsBarChart>
@@ -1511,7 +1910,7 @@ Scalp-care search demand across KSA and UAE has surged 34% YoY, driven by desali
   "dataKey": "value",
   "unit": "M",
   "data": [
-    {"name": "Barrier Serums", "value": 25, "fill": "#7c3aed"},
+    {"name": "Barrier Serums", "value": 25, "fill": "#2d39d2"},
     {"name": "Microbiome Tonics", "value": 15, "fill": "#10b981"},
     {"name": "Anti-Dandruff Premium", "value": 10, "fill": "#f59e0b"},
     {"name": "Soothing Oils", "value": 8, "fill": "#3b82f6"}
@@ -1568,7 +1967,7 @@ Saudi Arabia's Vision 2030 retail expansion offers high potential for Halal-cert
   "unit": " wks",
   "data": [
     {"name": "Ingredient Audit", "weeks": 3.5, "fill": "#3b82f6"},
-    {"name": "SFDA E-Filing", "weeks": 7.0, "fill": "#7c3aed"},
+    {"name": "SFDA E-Filing", "weeks": 7.0, "fill": "#2d39d2"},
     {"name": "Door Clearance", "weeks": 5.0, "fill": "#10b981"}
   ]
 }
@@ -1677,7 +2076,7 @@ Traditional synthetic variants face increasing consumer scrutiny on social chann
   "dataKey": "score",
   "unit": "%",
   "data": [
-    {"name": "Bio-Fermented", "score": 84, "fill": "#7c3aed"},
+    {"name": "Bio-Fermented", "score": 84, "fill": "#2d39d2"},
     {"name": "Plant-Derived", "score": 71, "fill": "#10b981"},
     {"name": "Traditional Synthetic", "score": 38, "fill": "#ef4444"}
   ]
@@ -1732,7 +2131,7 @@ Evaluating this query reveals actionable strategic opportunities and risk mitiga
   "dataKey": "score",
   "unit": " pts",
   "data": [
-    {"name": "Market Growth", "score": 85, "fill": "#7c3aed"},
+    {"name": "Market Growth", "score": 85, "fill": "#2d39d2"},
     {"name": "Margin Uplift", "score": 72, "fill": "#10b981"},
     {"name": "Risk Exposure", "score": 38, "fill": "#f59e0b"},
     {"name": "ROI Velocity", "score": 78, "fill": "#3b82f6"}
@@ -1816,6 +2215,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
 
       // Refresh conversations list immediately so the new chat history item is visible without a page refresh
       loadConversations();
+      (fetchCreditUsage || onCreditUsageUpdate)?.();
 
       const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
 
@@ -1853,19 +2253,22 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
         report = data.report || null;
         reportSources = data.reportSources || data.sources || [];
         // Fallback text for old-style responses (should not happen with new backend)
-        modelText = data.answer || "";
+        modelText = data.answer || convertReportToMarkdown(report);
       } else if (data.type === "decision") {
         // NEW: structured report + sources + optional chart
         report = data.report || null;
         reportSources = data.reportSources || data.sources || [];
-        modelText = data.answer || "";
+        modelText = data.answer || convertReportToMarkdown(report);
         chartBase64 = data.chart || null;
         chartMeta = data.chartMeta || null;
       } else {
         modelText = data.answer || data.text || "";
+        if (!modelText && report) {
+          modelText = convertReportToMarkdown(report);
+        }
       }
 
-      const words = modelText.split(/(\s+)/);
+      const tokens = modelText.match(/\S+\s*/g) || (modelText ? [modelText] : []);
       let currentIndex = 0;
       let streamedText = "";
 
@@ -1873,44 +2276,62 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
         id: modelId,
         role: "model",
         text: "",
+        isStreaming: tokens.length > 0,
         sources,
-        listItems,
+        listItems: tokens.length === 0 ? listItems : undefined,
         chartBase64,
         chartMeta,
         report,
         reportSources,
-        noDataSuggestions,
+        noDataSuggestions: tokens.length === 0 ? noDataSuggestions : undefined,
         timestamp: new Date(),
       } as any;
 
       setMessages((prev) => [...prev.filter((m) => m.id !== modelId), initialModelMessage]);
-      // If the response is a structured report, skip fake streaming -- ReportView
-// renders directly from the report object, so the typewriter timer just
-// adds latency for no visual benefit.
-if (report) {
-  setLoading(false);
-  loadConversations();
-  return;
-}
 
-      const wordsPerTick = 12;
-      const intervalTime = 25;
+      if (tokens.length === 0) {
+        setLoading(false);
+        loadConversations();
+        return;
+      }
+
+      const intervalTime = tokens.length > 400 ? 12 : tokens.length > 200 ? 16 : 18;
 
       const timer = setInterval(() => {
-        if (currentIndex >= words.length) {
+        if (currentIndex >= tokens.length) {
           clearInterval(timer);
           setLoading(false);
           setMessages((prev) =>
-            prev.map((msg) => (msg.id === modelId ? { ...msg, text: modelText } : msg))
+            prev.map((msg) =>
+              msg.id === modelId
+                ? {
+                    ...msg,
+                    text: modelText,
+                    isStreaming: false,
+                    listItems,
+                    noDataSuggestions,
+                  }
+                : msg
+            )
           );
           loadConversations();
           return;
         }
-        const nextWords = words.slice(currentIndex, currentIndex + wordsPerTick).join("");
-        currentIndex += wordsPerTick;
-        streamedText += nextWords;
+
+        const nextWord = tokens[currentIndex];
+        currentIndex += 1;
+        streamedText += nextWord;
+
         setMessages((prev) =>
-          prev.map((msg) => (msg.id === modelId ? { ...msg, text: streamedText } : msg))
+          prev.map((msg) =>
+            msg.id === modelId
+              ? {
+                  ...msg,
+                  text: streamedText,
+                  isStreaming: true,
+                }
+              : msg
+          )
         );
       }, intervalTime);
     } catch (err) {
@@ -2029,92 +2450,119 @@ if (report) {
       {/* 100% Full Width Column */}
       <div className="w-full h-full flex flex-col justify-between relative bg-white overflow-hidden">
         
-        {/* Back to Home Button - Only shown when in a chat session */}
-        {messages.length > 0 && (
-          <div className="absolute top-6 left-6 z-20">
-            <button
-              onClick={handleNewChat}
-              className="flex items-center justify-center w-8 h-8 text-zinc-500 hover:text-zinc-900 bg-white border border-zinc-200 rounded-[4px] shadow-2xs hover:bg-zinc-50 transition-all cursor-pointer group"
-              title="Back to Home"
-            >
-              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-            </button>
-          </div>
-        )}
 
         {/* Main Content / Chat Stream Area */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 flex flex-col justify-between">
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 flex flex-col">
           {messages.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center my-auto text-center px-2 w-full overflow-hidden">
-              <div className="w-12 h-12 bg-zinc-900/5 border border-zinc-200/60 rounded-full flex items-center justify-center mb-4 shadow-2xs">
-                <Sparkles className="w-5 h-5 text-zinc-700" />
-              </div>
-              <h1 className="text-2xl md:text-3xl font-medium text-zinc-900 tracking-tight font-sans">
-                What decision can I help you think through?
-              </h1>
-              <p className="text-sm text-zinc-600 font-normal mt-2.5 max-w-lg leading-relaxed">
-                Bringing together the intelligence you need to evaluate your options and move forward.
-              </p>
-
-              {/* Horizontal Scrollable Prompt Cards */}
-              <div className="w-full max-w-5xl mt-6 relative">
-                <div className="flex items-stretch gap-3 overflow-x-auto pb-3 pt-1 px-1 scrollbar-thin scroll-smooth w-full">
-                  {homeQuestions.length === 0 ? (
-                    <div className="text-center py-6 text-[11px] text-zinc-400 font-sans">
-                      Loading suggested questions…
-                    </div>
-                  ) : (
-                    homeQuestions.map((item, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSend(item.question)}
-                        className="w-52 md:w-56 shrink-0 bg-white border border-[#7c3aed] rounded-[4px] p-2.5 text-left flex flex-col justify-center transition-all cursor-pointer shadow-2xs hover:shadow-sm hover:-translate-y-0.5 font-sans group/card"
-                      >
-                        <div>
-                          <h3 className="text-xs font-semibold text-zinc-900 group-hover/card:text-[#7c3aed] tracking-tight leading-snug font-sans transition-colors">
-                            {item.title}
-                          </h3>
-                          <p className="text-[11px] text-zinc-500 font-normal mt-1 leading-snug line-clamp-2 font-sans">
-                            {item.description}
-                          </p>
-                        </div>
-                      </button>
-                    ))
-                  )}
+            <div className="w-full max-w-[1178px] mx-auto flex flex-col items-center justify-center flex-1 my-auto px-4 py-8">
+              <div className="w-full max-w-[680px] flex flex-col items-center justify-center text-center my-auto">
+                <div className="mb-6">
+                  <h1 className="text-2xl md:text-3xl lg:text-[34px] font-normal text-zinc-900 tracking-tight font-serif text-center leading-tight">
+                    What decision can I help you think through?
+                  </h1>
                 </div>
+
+                {/* Centered Chat Box with lesser width & slight shadow */}
+                <div className="w-full">
+                  {/* Action links */}
+                  <div className="flex justify-end items-center gap-4 mb-2">
+                    <button
+                      onClick={() => setShowQuestionLibraryModal(true)}
+                      className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-600 hover:text-zinc-900 transition-colors font-sans cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-zinc-500" />
+                      <span>Suggested Questions</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        loadConversations();
+                        setShowPreviousChatsModal(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-600 hover:text-zinc-900 transition-colors font-sans cursor-pointer"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                      <span>Previous Chats</span>
+                    </button>
+                  </div>
+
+                  <div className="relative flex items-end bg-white border border-[#2d39d2] rounded-[8px] shadow-[0_4px_20px_rgba(45,57,210,0.08),0_1px_4px_rgba(0,0,0,0.04)] focus-within:ring-2 focus-within:ring-[#2d39d2]/20 transition-all p-3 text-left">
+                    <textarea
+                      rows={2}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                      placeholder="Ask a question or describe a decision..."
+                      className="flex-1 bg-transparent px-2 py-1 text-sm text-zinc-900 font-light placeholder:text-zinc-400 placeholder:font-light focus:outline-none resize-none font-sans leading-relaxed max-h-28"
+                    />
+                    <button
+                      onClick={() => handleSend()}
+                      disabled={loading || !input.trim()}
+                      className="w-8 h-8 bg-zinc-900 text-white rounded-full flex items-center justify-center hover:bg-black disabled:opacity-30 transition-all shrink-0 ml-2 mb-0.5 cursor-pointer shadow-2xs"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <ArrowUp className="w-4 h-4" strokeWidth={2.2} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Questions under the chat box in enter arrow format with soft slow scroll */}
+                {homeQuestions.length > 0 && (
+                  <div className="w-full relative mt-5 overflow-hidden py-1 group select-none">
+                    <div className="absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
+                    <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
+
+                    <div className="animate-soft-scroll-ticker flex items-center gap-6">
+                      {[...homeQuestions, ...homeQuestions].map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 shrink-0">
+                          <CornerDownRight className="w-3.5 h-3.5 text-zinc-400 shrink-0 select-none" />
+                          <button
+                            onClick={() => handleSend(item.question)}
+                            className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12.5px] whitespace-nowrap"
+                          >
+                            {item.title || item.question}
+                          </button>
+                          <span className="text-zinc-300 ml-4 select-none">•</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
-            <div className="w-full max-w-5xl mx-auto flex flex-col gap-6 py-4">
+            <div className="w-full max-w-[1178px] mx-auto flex flex-col gap-6 py-4">
               {messages.map((msg, msgIndex) => (
                 <div
                   key={msg.id}
-                  className={`flex gap-3.5 ${
+                  className={`flex ${
                     msg.role === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
-                  {msg.role === "model" && (
-                    <div className="w-7 h-7 bg-zinc-900 text-white rounded-[4px] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                      <Bot className="w-3.5 h-3.5" />
-                    </div>
-                  )}
 
                   <div
-                    className={`max-w-[92%] rounded-[10px] px-4 py-3 text-[13px] leading-relaxed font-sans ${
+                    className={`max-w-[92%] rounded-[10px] px-4 py-3 text-[13px] leading-relaxed tracking-normal ${
                       msg.role === "user"
-                        ? "bg-[#f3f3f4] text-zinc-900 border border-zinc-200/70"
-                        : "bg-[#fafafa] border border-zinc-200/80 text-zinc-800 shadow-2xs w-full"
+                        ? "bg-[#f3f3f4] text-zinc-900 border border-zinc-200/70 font-sans"
+                        : "bg-white border border-zinc-200/80 text-slate-700 shadow-2xs w-full font-normal"
                     }`}
                   >
                     {msg.heading && (
-                      <h3 className="text-[14px] font-bold text-zinc-900 mb-2.5 font-sans border-b border-zinc-200/80 pb-2">
+                      <h3 className="text-[14.5px] font-semibold text-zinc-900 mb-2.5 font-serif border-b border-zinc-200/80 pb-2">
                         {msg.heading}
                       </h3>
                     )}
 
                     {msg.role === "user" ? (
                       <div className="whitespace-pre-wrap">{msg.text}</div>
-                    ) : msg.report ? (
+                    ) : !msg.isStreaming && msg.report ? (
                       <ReportView
                         report={msg.report as any}
                         sources={msg.reportSources}
@@ -2123,26 +2571,46 @@ if (report) {
                         onSourceClick={handleSourceOpen}
                       />
                     ) : (
-                      <div className="markdown-body text-[13px] leading-relaxed font-sans text-zinc-800 space-y-3">
+                      <div className="markdown-body text-[13px] leading-relaxed text-slate-700 space-y-2.5 font-normal tracking-normal">
                         <Markdown
                           remarkPlugins={[remarkGfm]}
                           components={{
+                            h1: ({ children }) => (
+                              <h1 className="text-[15.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif border-b border-zinc-200/80 pb-1.5">
+                                {children}
+                              </h1>
+                            ),
+                            h2: ({ children }) => (
+                              <h2 className="text-[14.5px] font-semibold text-zinc-900 mt-3.5 mb-1.5 font-serif border-b border-zinc-200/60 pb-1">
+                                {children}
+                              </h2>
+                            ),
                             h3: ({ children }) => (
-                              <h3 className="text-[15px] font-bold text-zinc-900 mt-4 mb-2 font-sans border-b border-zinc-200/80 pb-1.5">
+                              <h3 className="text-[14px] font-semibold text-zinc-900 mt-4 mb-2 font-serif border-b border-zinc-200/80 pb-1.5">
                                 {children}
                               </h3>
                             ),
                             h4: ({ children }) => (
-                              <h4 className="text-[13.5px] font-bold text-zinc-900 mt-3.5 mb-1.5 font-sans">
+                              <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-3.5 mb-1.5 font-serif">
                                 {children}
                               </h4>
                             ),
-                            p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
+                            h5: ({ children }) => (
+                              <h5 className="text-[13px] font-semibold text-zinc-900 mt-2.5 mb-1 font-serif">
+                                {children}
+                              </h5>
+                            ),
+                            h6: ({ children }) => (
+                              <h6 className="text-[12.5px] font-semibold text-zinc-900 mt-2 mb-1 font-serif">
+                                {children}
+                              </h6>
+                            ),
+                            p: ({ children }) => <p className="mb-1.5 last:mb-0 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</p>,
                             ul: ({ children }) => (
-                              <ul className="list-disc pl-5 my-2 space-y-1 text-zinc-700">{children}</ul>
+                              <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</ul>
                             ),
                             ol: ({ children }) => (
-                              <ol className="list-decimal pl-5 my-2 space-y-1 text-zinc-700">{children}</ol>
+                              <ol className="list-decimal pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</ol>
                             ),
                             li: ({ children }) => {
                               const childrenArray = React.Children.toArray(children);
@@ -2188,8 +2656,8 @@ if (report) {
                                       }}
                                       className="flex items-center gap-2 py-0.5 cursor-pointer group select-none"
                                     >
-                                      <FileText className={`w-3.5 h-3.5 shrink-0 transition-colors ${isExpanded ? "text-[#7c3aed]" : "text-[#8a8d98] group-hover:text-[#7c3aed]"}`} />
-                                      <span className={`text-[11.5px] font-sans font-medium transition-colors ${isExpanded ? "text-[#7c3aed]" : "text-[#2d2f36] group-hover:text-[#7c3aed]"}`}>
+                                      <FileText className={`w-3.5 h-3.5 shrink-0 transition-colors ${isExpanded ? "text-[#2d39d2]" : "text-[#8a8d98] group-hover:text-[#2d39d2]"}`} />
+                                      <span className={`text-[11.5px] font-sans font-medium transition-colors ${isExpanded ? "text-[#2d39d2]" : "text-[#2d2f36] group-hover:text-[#2d39d2]"}`}>
                                         {linkText}
                                       </span>
                                     </div>
@@ -2206,7 +2674,7 @@ if (report) {
                                                 onTabChange(signalDetails.tabId);
                                               }
                                             }}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 hover:bg-purple-100 text-[#7c3aed] border border-purple-200/50 rounded-[3px] text-[10px] font-medium font-sans transition-colors cursor-pointer"
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 hover:bg-purple-100 text-[#2d39d2] border border-purple-200/50 rounded-[3px] text-[10px] font-medium font-sans transition-colors cursor-pointer"
                                           >
                                             <span>Read more in {signalDetails.tabLabel}</span>
                                             <ArrowUp className="w-2.5 h-2.5 rotate-45" />
@@ -2218,7 +2686,7 @@ if (report) {
                                 );
                               }
 
-                              return <li className="leading-normal text-[12px] py-0.5 text-zinc-600">{children}</li>;
+                              return <li className="leading-relaxed text-[13px] py-0.5 text-slate-700 font-normal tracking-normal">{children}</li>;
                             },
                             a: ({ href, children }) => (
                               <a
@@ -2230,7 +2698,7 @@ if (report) {
                                     e.preventDefault();
                                   }
                                 }}
-                                className="text-[#2d2f36] hover:text-[#7c3aed] font-medium transition-colors hover:underline decoration-zinc-300"
+                                className="text-[#2d2f36] hover:text-[#2d39d2] font-medium transition-colors hover:underline decoration-zinc-300"
                               >
                                 {children}
                               </a>
@@ -2250,15 +2718,15 @@ if (report) {
                               </thead>
                             ),
                             tbody: ({ children }) => (
-                              <tbody className="divide-y divide-zinc-200/70 text-zinc-800">{children}</tbody>
+                              <tbody className="divide-y divide-zinc-200/70 text-slate-700 text-[13px] font-normal leading-relaxed tracking-normal">{children}</tbody>
                             ),
                             tr: ({ children }) => (
                               <tr className="hover:bg-zinc-50/80 transition-colors">{children}</tr>
                             ),
                             th: ({ children }) => <th className="px-3.5 py-2.5 font-semibold text-zinc-900">{children}</th>,
-                            td: ({ children }) => <td className="px-3.5 py-2.5 text-zinc-800">{children}</td>,
+                            td: ({ children }) => <td className="px-3.5 py-2.5 text-slate-700 font-normal text-[13px] leading-relaxed tracking-normal">{children}</td>,
                             blockquote: ({ children }) => (
-                              <blockquote className="border-l-3 border-[#7c3aed] pl-3 py-1 my-2 text-zinc-700 bg-purple-50/50 rounded-r-[4px]">
+                              <blockquote className="border-l-3 border-[#2d39d2] pl-3 py-1 my-2 text-slate-700 bg-purple-50/50 rounded-r-[4px] text-[13px] font-normal leading-relaxed tracking-normal">
                                 {children}
                               </blockquote>
                             ),
@@ -2290,6 +2758,9 @@ if (report) {
                         >
                           {msg.text}
                         </Markdown>
+                        {msg.isStreaming && (
+                          <span className="inline-block w-1.5 h-3.5 bg-[#2d39d2] animate-pulse ml-0.5 align-middle rounded-[1px]" />
+                        )}
                       </div>
                     )}
 
@@ -2304,7 +2775,7 @@ if (report) {
                               onReturn();
                             }
                           }}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-[#7c3aed] border border-purple-200/80 rounded-[6px] text-[12px] font-medium font-sans transition-colors cursor-pointer shadow-2xs"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-[#2d39d2] border border-purple-200/80 rounded-[6px] text-[12px] font-medium font-sans transition-colors cursor-pointer shadow-2xs"
                         >
                           <span>Read more in {msg.linkInfo.tabLabel}</span>
                           <ArrowUp className="w-3.5 h-3.5 rotate-45" />
@@ -2313,48 +2784,38 @@ if (report) {
                     )}
 
                     {msg.listItems && msg.listItems.length > 0 && (
-                      <div className="mt-3 flex flex-col">
+                      <div className="mt-3 flex flex-col border border-zinc-200/80 rounded-[6px] bg-white divide-y divide-zinc-200/80 overflow-hidden shadow-2xs">
                         {msg.listItems.map((item, idx) => {
                           const itemKey = item.id || `${msg.id}-${idx}`;
 
-                          return (
-                            <React.Fragment key={itemKey}>
-                              {idx > 0 && <div className="border-t border-black my-2.5 w-full" />}
-                              <div
-                                onClick={() => handleListItemClick(item)}
-                                className="bg-[#f8fafc] border border-blue-200/80 rounded-[6px] p-3 shadow-2xs hover:border-blue-400 transition-all cursor-pointer flex items-center justify-between gap-4 group/card"
-                              >
-                                <div className="flex flex-col gap-1.5 min-w-0">
-                                  <h4 className="text-[13px] font-semibold text-zinc-900 font-sans leading-snug group-hover/card:text-[#7c3aed] transition-colors">
-                                    {item.title}
-                                  </h4>
-                                  {item.category && (
-                                    <span className="self-start px-2 py-0.5 text-[10px] font-sans font-medium bg-red-50 border border-red-200/80 text-red-800 rounded-[3px]">
-                                      {item.category}
-                                    </span>
-                                  )}
-                                  {item.parentLabel && (
-                                    <span className="self-start px-2 py-0.5 text-[10px] font-sans font-medium bg-zinc-100 border border-zinc-200 text-zinc-600 rounded-[3px]">
-                                      {item.parentLabel}
-                                    </span>
-                                  )}
-                                </div>
+                          const categoryTag = item.category && item.category.trim() !== "" && item.category !== "General / Signal" ? item.category : null;
+                          const impactTag = item.impact && item.impact.trim() !== "" && item.impact !== "Enabled" ? item.impact : null;
 
+                          return (
+                            <div
+                              key={itemKey}
+                              onClick={() => handleListItemClick(item)}
+                              className="flex items-center justify-between gap-4 py-2 px-3.5 hover:bg-zinc-50/70 transition-colors cursor-pointer group/row"
+                            >
+                              <span className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal group-hover/row:text-zinc-950">
+                                {item.title}
+                              </span>
+
+                              {(categoryTag || impactTag) && (
                                 <div className="flex items-center gap-3 shrink-0">
-                                  {item.impact && (
-                                    <div className="flex flex-col items-end justify-center text-right">
-                                      <span className="text-[9px] font-bold text-zinc-400 tracking-wider uppercase font-sans">
-                                        IMPACT
-                                      </span>
-                                      <span className="text-[11px] font-medium text-amber-700 font-sans mt-0.5">
-                                        {item.impact}
-                                      </span>
-                                    </div>
+                                  {categoryTag && (
+                                    <span className="border border-zinc-200/90 bg-white px-2.5 py-0.5 rounded-[6px] text-[9.2px] text-zinc-800 font-light whitespace-nowrap">
+                                      {categoryTag}
+                                    </span>
                                   )}
-                                  <ChevronRight className="w-4 h-4 text-zinc-400 group-hover/card:text-[#7c3aed] group-hover/card:translate-x-0.5 transition-all" />
+                                  {impactTag && (
+                                    <span className="bg-[#ecfdf5] text-[#065f46] px-2.5 py-0.5 rounded-[4px] text-[9.2px] font-light whitespace-nowrap">
+                                      {impactTag}
+                                    </span>
+                                  )}
                                 </div>
-                              </div>
-                            </React.Fragment>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -2366,9 +2827,9 @@ if (report) {
                           <button
                             key={idx}
                             onClick={() => handleSend(suggestion)}
-                            className="text-left w-full bg-white border border-[#7c3aed]/60 rounded-[4px] p-2.5 hover:border-[#7c3aed] hover:bg-purple-50/20 transition-all cursor-pointer group/card"
+                            className="text-left w-full bg-white border border-[#2d39d2]/60 rounded-[4px] p-2.5 hover:border-[#2d39d2] hover:bg-purple-50/20 transition-all cursor-pointer group/card"
                           >
-                            <p className="text-[12px] font-sans text-zinc-800 font-medium group-hover/card:text-[#7c3aed] leading-snug">
+                            <p className="text-[12px] font-sans text-zinc-800 font-medium group-hover/card:text-[#2d39d2] leading-snug">
                               {suggestion}
                             </p>
                           </button>
@@ -2381,18 +2842,10 @@ if (report) {
                         or the List item-detail flow), preserving backward compatibility. */}
                     {msg.role === "model" && !msg.report && msg.chartBase64 && (
                       <div className="mt-3 pt-3 border-t border-zinc-200/60">
-                        <div className="text-[11.5px] font-semibold text-zinc-700 mb-2 flex items-center gap-1.5">
-                          <BarChart2 className="w-3.5 h-3.5 text-[#7c3aed]" />
-                          <span>
-                            {msg.chartMeta?.chartType
-                              ? `${msg.chartMeta.chartType.charAt(0).toUpperCase() + msg.chartMeta.chartType.slice(1)} Chart`
-                              : "Chart"}
-                          </span>
-                        </div>
                         <img
                           src={`data:image/png;base64,${msg.chartBase64}`}
                           alt="Data visualization"
-                          className="w-full max-w-lg rounded-[4px] border border-zinc-200 bg-white"
+                          className="w-full max-w-lg"
                         />
                       </div>
                     )}
@@ -2405,46 +2858,10 @@ if (report) {
 
                     {msg.role === "model" && (
                       <div className="mt-2.5 pt-2 border-t border-zinc-200/40 flex items-center justify-end gap-2 text-zinc-400">
-                        {savedMessageIds[msg.id] && (
-                          <span className="text-[10px] text-amber-700 font-sans font-medium mr-1 animate-pulse">
-                            Saved to workspace
-                          </span>
-                        )}
-                        {sharedMessageIds[msg.id] && (
-                          <span className="text-[10px] text-emerald-600 font-sans font-medium mr-1">
-                            Copied!
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleSaveMessage(msg.id)}
-                          className={`p-1 hover:bg-zinc-200/50 rounded transition-colors cursor-pointer flex items-center justify-center group relative ${
-                            savedMessageIds[msg.id] ? "text-amber-600" : "hover:text-zinc-700"
-                          }`}
-                          aria-label="Save answer"
-                        >
-                          <Bookmark className={`w-3.5 h-3.5 ${savedMessageIds[msg.id] ? "fill-amber-600" : ""}`} />
-                          <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                            {savedMessageIds[msg.id] ? "Saved" : "Save answer"}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleShareMessage(msg.id, msg.text)}
-                          className={`p-1 hover:bg-zinc-200/50 rounded transition-colors cursor-pointer flex items-center justify-center group relative ${
-                            sharedMessageIds[msg.id] ? "text-emerald-600" : "hover:text-zinc-700"
-                          }`}
-                          aria-label="Share answer"
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                          <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-zinc-900 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                            {sharedMessageIds[msg.id] ? "Copied!" : "Share answer"}
-                          </span>
-                        </button>
                         <button
                           type="button"
                           onClick={() => handleDownloadPDF(msg.id, msg.text, msgIndex)}
-                          className="p-1 hover:bg-zinc-200/50 rounded transition-colors cursor-pointer flex items-center justify-center group relative hover:text-[#7c3aed]"
+                          className="p-1 hover:bg-zinc-200/50 rounded transition-colors cursor-pointer flex items-center justify-center group relative hover:text-[#2d39d2]"
                           aria-label="Download report PDF"
                         >
                           <FileDown className="w-3.5 h-3.5" />
@@ -2456,22 +2873,21 @@ if (report) {
                     )}
                   </div>
 
-                  {msg.role === "user" && (
-                    <div className="w-7 h-7 bg-zinc-200/70 text-zinc-700 rounded-[4px] flex items-center justify-center shrink-0 mt-0.5">
-                      <User className="w-3.5 h-3.5" />
-                    </div>
-                  )}
+
                 </div>
               ))}
 
-              {loading && (
-                <div className="flex gap-3.5 justify-start">
-                  <div className="w-7 h-7 bg-zinc-900 text-white rounded-[4px] flex items-center justify-center shrink-0 mt-0.5">
-                    <Bot className="w-3.5 h-3.5 animate-pulse" />
-                  </div>
-                  <div className="bg-[#fafafa] border border-zinc-200/80 rounded-[6px] px-4 py-3 text-xs text-zinc-500 flex items-center gap-2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Evaluating strategic decision tradeoffs...</span>
+              {loading && !messages.some((m) => m.isStreaming) && (
+                <div className="flex justify-start">
+
+                  <div className="bg-white border border-zinc-200/80 rounded-[6px] px-4 py-3 text-xs text-zinc-600 flex items-center gap-2.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400 shrink-0" />
+                    <span 
+                      key={loadingStageIndex}
+                      className="text-shimmer font-medium tracking-normal transition-all duration-300"
+                    >
+                      {STAGED_LOADING_MESSAGES[loadingStageIndex]}
+                    </span>
                   </div>
                 </div>
               )}
@@ -2480,68 +2896,65 @@ if (report) {
           )}
         </div>
 
-        {/* Center Bottom Chat Box */}
-        <div className="w-full max-w-5xl mx-auto px-4 pb-6 pt-2 shrink-0">
-          {/* Action links outside top right of text area */}
-          <div className="flex justify-end items-center gap-4 mb-2">
-            {messages.length > 0 && (
+        {/* Center Bottom Chat Box - Only rendered when in active chat conversation */}
+        {messages.length > 0 && (
+          <div className="w-full max-w-[1178px] mx-auto px-4 pb-6 pt-2 shrink-0">
+            {/* Action links outside top right of text area */}
+            <div className="flex justify-end items-center gap-4 mb-2">
               <button
                 onClick={handleNewChat}
-                className="inline-flex items-center gap-1.5 text-[11.5px] text-[#7c3aed] hover:text-[#5b21b6] transition-colors font-sans cursor-pointer font-medium"
+                className="inline-flex items-center gap-1.5 text-[11.5px] text-[#2d39d2] hover:text-[#242ea8] transition-colors font-sans cursor-pointer font-medium"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Chat</span>
               </button>
-            )}
-            <button
-              onClick={() => setShowQuestionLibraryModal(true)}
-              className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-600 hover:text-zinc-900 transition-colors font-sans cursor-pointer"
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Suggested Questions</span>
-            </button>
-            <button
-              onClick={() => {
-                loadConversations();
-                setShowPreviousChatsModal(true);
-              }}
-              className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-600 hover:text-zinc-900 transition-colors font-sans cursor-pointer"
-            >
-              <Clock className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Previous Chats</span>
-            </button>
-          </div>
+              <button
+                onClick={() => setShowQuestionLibraryModal(true)}
+                className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-600 hover:text-zinc-900 transition-colors font-sans cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-zinc-500" />
+                <span>Suggested Questions</span>
+              </button>
+              <button
+                onClick={() => {
+                  loadConversations();
+                  setShowPreviousChatsModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 text-[11.5px] text-zinc-600 hover:text-zinc-900 transition-colors font-sans cursor-pointer"
+              >
+                <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                <span>Previous Chats</span>
+              </button>
+            </div>
 
-          <div className="relative flex items-end bg-white border border-[#7c3aed] rounded-[8px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] focus-within:ring-1 focus-within:ring-[#7c3aed]/30 transition-all p-2.5">
-            <textarea
-              rows={3}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Ask a question or describe a decision..."
-              className="flex-1 bg-transparent px-2 py-1 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none resize-none font-sans leading-relaxed"
-            />
-            <button
-              onClick={() => handleSend()}
-              disabled={loading || !input.trim()}
-              className="w-8 h-8 bg-zinc-900 text-white rounded-full flex items-center justify-center hover:bg-black disabled:opacity-30 transition-all shrink-0 ml-2 mb-0.5 cursor-pointer shadow-2xs"
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ArrowUp className="w-4 h-4" strokeWidth={2.2} />
-              )}
-            </button>
+            <div className="relative flex items-end bg-white border border-[#2d39d2] rounded-[8px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] focus-within:ring-1 focus-within:ring-[#2d39d2]/30 transition-all p-2">
+              <textarea
+                rows={2}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Ask a question or describe a decision..."
+                className="flex-1 bg-transparent px-2 py-1 text-sm text-zinc-900 font-light placeholder:text-zinc-400 placeholder:font-light focus:outline-none resize-none font-sans leading-relaxed max-h-24"
+              />
+              <button
+                onClick={() => handleSend()}
+                disabled={loading || !input.trim()}
+                className="w-8 h-8 bg-zinc-900 text-white rounded-full flex items-center justify-center hover:bg-black disabled:opacity-30 transition-all shrink-0 ml-2 mb-0.5 cursor-pointer shadow-2xs"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="w-4 h-4" strokeWidth={2.2} />
+                )}
+              </button>
+            </div>
           </div>
-          <p className="text-[10.5px] text-zinc-500 text-center mt-2 font-sans">
-            InsideMarkets Decision Intelligence is AI and can make mistakes. Please double-check responses.
-          </p>
-        </div>
+        )}
 
       </div>
 
@@ -2625,7 +3038,7 @@ if (report) {
                       {/* Line separator between each day */}
                       {gIdx > 0 && (
                         <div className="py-1">
-                          <div className="border-t border-[#7c3aed] w-full" />
+                          <div className="border-t border-[#2d39d2] w-full" />
                         </div>
                       )}
 
@@ -2737,7 +3150,7 @@ if (report) {
                     placeholder="Search library..."
                     value={librarySearchQuery}
                     onChange={(e) => setLibrarySearchQuery(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 text-[11px] font-sans bg-zinc-50 border border-zinc-200 rounded-[4px] focus:outline-none focus:border-[#7c3aed] text-zinc-800 w-48 md:w-64 transition-all"
+                    className="pl-8 pr-3 py-1.5 text-[11px] font-sans bg-zinc-50 border border-zinc-200 rounded-[4px] focus:outline-none focus:border-[#2d39d2] text-zinc-800 w-48 md:w-64 transition-all"
                   />
                 </div>
 
@@ -2762,12 +3175,12 @@ if (report) {
                     onClick={() => setSelectedLibraryTab(tab)}
                     className={`px-4 py-2 text-[12px] font-sans font-medium transition-all border-b-2 cursor-pointer flex items-center gap-2 ${
                       isActive
-                        ? "border-[#7c3aed] text-[#7c3aed] bg-white rounded-t-[4px]"
+                        ? "border-[#2d39d2] text-[#2d39d2] bg-white rounded-t-[4px]"
                         : "border-transparent text-zinc-500 hover:text-zinc-800 hover:border-zinc-200"
                     }`}
                   >
                     <span>{tab}</span>
-                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${isActive ? "bg-[#7c3aed]/10 text-[#7c3aed]" : "bg-zinc-200/60 text-zinc-600"}`}>
+                    <span className={`px-1.5 py-0.2 text-[10px] rounded-full ${isActive ? "bg-[#2d39d2]/10 text-[#2d39d2]" : "bg-zinc-200/60 text-zinc-600"}`}>
                       {count}
                     </span>
                   </button>
@@ -2811,10 +3224,10 @@ if (report) {
                           setShowQuestionLibraryModal(false);
                           handleSend(item.question, item.category);
                         }}
-                        className="p-2.5 border border-zinc-200/90 hover:border-[#7c3aed] rounded-[4px] bg-white hover:bg-purple-50/20 transition-all cursor-pointer group flex flex-col justify-center"
+                        className="p-2.5 border border-zinc-200/90 hover:border-[#2d39d2] rounded-[4px] bg-white hover:bg-purple-50/20 transition-all cursor-pointer group flex flex-col justify-center"
                       >
                         <div>
-                          <span className="text-[10px] font-sans font-medium text-[#7c3aed] uppercase tracking-wider">
+                          <span className="text-[10px] font-sans font-medium text-[#2d39d2] uppercase tracking-wider">
                             {item.title}
                           </span>
                           <p className="text-[12px] font-sans text-zinc-800 font-medium group-hover:text-black mt-0.5 leading-snug">

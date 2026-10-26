@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft, ArrowDown, Minus } from "lucide-react";
+import { Sparkles, Bookmark, Pencil, Check, Share2, FileText, Send, Loader2, HelpCircle, Compass, User, Cpu, Truck, Globe, Leaf, Square, Trash2, CornerDownLeft, CornerDownRight, ArrowDown, Minus, X, Filter, Search } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { ChatSources } from "./ChatSources";
 import { MarketGenieMarkdown } from "./ReportView";
 import { FORWARD_OUTLOOK_MODULE_ID, API_URL } from "../constants";
+import { BubbleMapSection } from "./BubbleMapSection";
 
 interface ForewardOutlookPaneProps {
   onReturn: () => void;
@@ -12,6 +13,7 @@ interface ForewardOutlookPaneProps {
   userId: string;
   navigatedItemId?: string | null;
   onClearNavigatedItem?: () => void;
+  onSwitchToDecisionIntelligence?: (query: string, tab: string, label: string, returnLabel: string) => void;
 }
 
 export interface SourceItem {
@@ -115,6 +117,56 @@ export const RADAR_TRENDS: TrendItem[] = [
         details: "Production launch of adaptive checkout journeys across 450 endpoints.",
         category: "Innovation",
         date: "May 30"
+      }
+    ]
+  },
+  {
+    id: "clean-fragrance",
+    title: "Clean Fragrance",
+    sector: "Consumer",
+    term: "Near-Term",
+    r: 145,
+    angle: 152,
+    summary: "Formulating hypoallergenic, non-toxic, and transparently sourced scent profiles that cater to growing consumer demand for clean wellness and eco-certified ingredients. Formulators are eliminating petrochemical fixatives in favor of green chemistry and ethically harvested botanicals. Consumers actively track batch traceability and allergen disclosures via interactive packaging QR codes.",
+    country: "Global",
+    source_type: "Market Intelligence",
+    source_published_date: "2026-07-14T00:00:00Z",
+    impact_level: "High",
+    business_impact: [
+      "Accelerates transition to bio-based and sustainable fragrance formulations.",
+      "Requires certification verification across entire botanical harvesting chains.",
+      "Attracts premium clean-wellness consumer cohorts with higher margin profiles."
+    ],
+    textAnchor: "end",
+    dx: -22,
+    dy: 4,
+    confidence: "High",
+    signalsCount: 9,
+    trendStatus: "Trending up",
+    statValue1: "9 active formulations",
+    statValue2: "$65M market cap",
+    sparklinePath: "M0 14 L8 10 L16 12 L24 6 L32 8 L40 2",
+    sources: [
+      {
+        id: "cf-s1",
+        source_name: "Clean Beauty Global Forum",
+        details: "Surge in clean fragrance adoption among Gen Z and millennial consumer cohorts.",
+        category: "Research & Development",
+        date: "Jul 14"
+      },
+      {
+        id: "cf-s2",
+        source_name: "Botanical Chemistry Labs",
+        details: "Bio-synthesized fragrance molecules achieving 24-hour scent longevity without petrochemical phthalates.",
+        category: "Innovation",
+        date: "Jun 28"
+      },
+      {
+        id: "cf-s3",
+        source_name: "EcoScent Capital",
+        details: "$18.5M Series A funding for sustainable, traceable aroma supply chains.",
+        category: "Capital investment",
+        date: "Jun 10"
       }
     ]
   },
@@ -899,7 +951,8 @@ export default function ForewardOutlookPane({
   industry,
   userId,
   navigatedItemId,
-  onClearNavigatedItem
+  onClearNavigatedItem,
+  onSwitchToDecisionIntelligence
 }: ForewardOutlookPaneProps) {
   const [snapshot, setSnapshot] = useState<any>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(true);
@@ -987,6 +1040,8 @@ export default function ForewardOutlookPane({
   const [isSignalsLoading, setIsSignalsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("insights");
   const [selectedTrendId, setSelectedTrendId] = useState<string | null>(null);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // When a specific SIGNAL id is navigated to, find its parent trend,
   // select the trend, and remember which signal to focus once the
@@ -1072,6 +1127,24 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
 
         if (data && data.length > 0) {
           console.log("Trend item keys:", Object.keys(data[0]));
+
+          // Fetch all trend memberships to count signals per trend correctly on initial load
+          const { data: membershipData } = await supabase
+            .from("trend_membership")
+            .select("trend_id, signal_id, joined_at");
+
+          const signalCountMap: Record<string, number> = {};
+          const newInLastWeekMap: Record<string, number> = {};
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+          membershipData?.forEach(m => {
+            signalCountMap[m.trend_id] = (signalCountMap[m.trend_id] || 0) + 1;
+            if (m.joined_at && new Date(m.joined_at) >= oneWeekAgo) {
+              newInLastWeekMap[m.trend_id] = (newInLastWeekMap[m.trend_id] || 0) + 1;
+            }
+          });
+
           // Group trends by sector to distribute them within their respective segments
           const trendsBySector: Record<string, any[]> = {};
           data.forEach(item => {
@@ -1102,6 +1175,8 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
               if (item.ring === "long_term") r = 295;
 
               const confScore = (Array.isArray(item.trend_clusters) ? item.trend_clusters[0]?.confidence_score : item.trend_clusters?.confidence_score) ?? item.confidence_score ?? 0;
+              const actualCount = signalCountMap[item.trend_id] ?? item.dot_size ?? 0;
+              const newWeekCount = newInLastWeekMap[item.trend_id] ?? 0;
 
               mappedTrends.push({
                 id: item.trend_id,
@@ -1120,13 +1195,14 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 dx: angle > 100 ? -22 : angle < 80 ? 22 : 0,
                 dy: angle > 80 && angle < 100 ? -15 : 4,
                 confidence: confScore > 7 ? "High" : confScore > 4 ? "Medium" : "Low",
-                signalsCount: item.dot_size || 0, // Fallback to dot_size until signals are fetched
+                signalsCount: actualCount,
                 dotSize: item.dot_size || 0,
                 trendStatus: "Stable",
                 statValue1: "",
                 statValue2: "",
                 sparklinePath: "M0 14 L10 15 L20 11 L30 12 L40 8",
                 sources: [],
+                newInLastWeek: newWeekCount,
                 similar_trends: item.similar_trends || [] // We'll store this for later use
               } as any);
             });
@@ -1242,9 +1318,9 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
             const el = document.getElementById(`outlook-signal-card-${trend.sources.findIndex((s: any) => s.id === target.id)}`);
             if (el) {
               el.scrollIntoView({ behavior: "smooth", block: "center" });
-              el.classList.add("ring-2", "ring-[#7c3aed]", "ring-offset-2");
+              el.classList.add("ring-2", "ring-[#2d39d2]", "ring-offset-2");
               setTimeout(() => {
-                el.classList.remove("ring-2", "ring-[#7c3aed]", "ring-offset-2");
+                el.classList.remove("ring-2", "ring-[#2d39d2]", "ring-offset-2");
               }, 2000);
             }
           });
@@ -1433,17 +1509,51 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
     return `${formatDate(startDateStr)} – ${formatDate(endDateStr)}`;
   }, [startDateStr, endDateStr]);
 
+  const hasActiveFilters = searchQuery !== "" || startDateStr !== defaultStartDate || endDateStr !== defaultEndDate;
+
+  const [activeThemeFilter, setActiveThemeFilter] = useState<string>("All Themes");
+
   // Selected Trend Item
+  const baseTrends = useMemo(() => {
+    return trends.length > 0 ? trends : RADAR_TRENDS;
+  }, [trends]);
+
+  const availableThemes = useMemo(() => {
+    const dynamicSectors = Array.from(new Set(baseTrends.map(t => t.sector).filter(Boolean)));
+    const preferredOrder = ["Consumer", "Technology", "Supply chain", "Product", "Sustainability"];
+    const ordered = preferredOrder.filter(sec => dynamicSectors.includes(sec as any));
+    dynamicSectors.forEach(sec => {
+      if (!ordered.includes(sec)) ordered.push(sec);
+    });
+    return ["All Themes", ...(ordered.length > 0 ? ordered : preferredOrder)];
+  }, [baseTrends]);
+
   const filteredTrends = useMemo(() => {
-    return trends.filter(t => {
+    return baseTrends.filter(t => {
       if (hiddenIds[t.id]) return false;
+      if (searchQuery.trim() !== "") {
+        const q = searchQuery.toLowerCase().trim();
+        const words = q.split(/\s+/).filter(Boolean);
+        const textToSearch = [
+          t.title,
+          t.summary,
+          t.sector,
+          t.term,
+          ...(Array.isArray(t.business_impact) ? t.business_impact : []),
+          ...(Array.isArray(t.sources) ? t.sources.map(s => `${s?.source_name || ""} ${s?.details || ""}`) : [])
+        ].filter(Boolean).join(" ").toLowerCase();
+
+        const matchPhrase = textToSearch.includes(q);
+        const matchAllWords = words.length > 0 && words.every(w => textToSearch.includes(w));
+        if (!matchPhrase && !matchAllWords) return false;
+      }
       if (startDateStr && endDateStr && t.source_published_date) {
         const dateStr = t.source_published_date.split('T')[0];
         return dateStr >= startDateStr && dateStr <= endDateStr;
       }
       return true;
     });
-  }, [trends, hiddenIds, startDateStr, endDateStr]);
+  }, [baseTrends, hiddenIds, startDateStr, endDateStr, searchQuery]);
 
   const selectedTrend = useMemo(() => {
     return filteredTrends.find(t => t.id === selectedTrendId) || null;
@@ -1452,14 +1562,8 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
   useEffect(() => {
     if (filteredTrends.length > 0) {
       const currentExists = filteredTrends.find(t => t.id === selectedTrendId);
-      if (!currentExists) {
-        // Sort filteredTrends by date descending to find the most recent
-        const sorted = [...filteredTrends].sort((a, b) => {
-          const dateA = a.source_published_date ? new Date(a.source_published_date).getTime() : 0;
-          const dateB = b.source_published_date ? new Date(b.source_published_date).getTime() : 0;
-          return dateB - dateA;
-        });
-        setSelectedTrendId(sorted[0].id);
+      if (!currentExists && selectedTrendId !== null) {
+        setSelectedTrendId(null);
       }
     } else {
       setSelectedTrendId(null);
@@ -1587,420 +1691,273 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
     });
   }, [selectedTrend]);
 
+  const sortedSources = useMemo(() => {
+    if (!selectedTrend || !selectedTrend.sources) return [];
+    return [...selectedTrend.sources].sort((a: any, b: any) => {
+      const dateA = new Date(a.date || a.source_published_date || 0).getTime();
+      const dateB = new Date(b.date || b.source_published_date || 0).getTime();
+      if (!isNaN(dateA) && !isNaN(dateB) && dateA !== dateB) {
+        return dateB - dateA; // latest first (descending)
+      }
+      return 0;
+    });
+  }, [selectedTrend]);
+
   return (
     <div id="outlook-dashboard" className="flex-1 h-full flex bg-white divide-x divide-zinc-200 overflow-hidden">
       
-      {/* LEFT COLUMN: Radar and Left Pane Workspace (60% width) */}
-      <div id="outlook-column" className="w-[60%] h-full flex flex-col bg-white flex-shrink-0 animate-fade-in">
+      {/* LEFT COLUMN: Radar and Left Pane Workspace */}
+      <div id="outlook-column" className="h-full flex flex-col bg-white flex-shrink-0 animate-fade-in w-full max-w-[1178px] mx-auto flex-1 border-x border-zinc-200">
         
-        {/* Header section (retaining exact dates layout) */}
+        {/* Header section */}
         <div id="outlook-header" className="h-[53px] px-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0 bg-white">
           <div className="flex items-center gap-4">
-            <h2 id="outlook-heading-title" className="text-[19px] font-semibold tracking-tight text-zinc-900 select-none">
+            <h2 
+              id="outlook-heading-title" 
+              style={{ fontFamily: "'Source Serif 4', Georgia, Cambria, 'Times New Roman', Times, serif" }}
+              className="text-[19px] font-semibold tracking-tight text-zinc-900 select-none font-serif-source"
+            >
               Forward Outlook
             </h2>
           </div>
-          {isEditingDates ? (
-            <div className="flex items-center gap-1">
-              <input 
-                type="date" 
-                value={startDateStr} 
-                max={todayStr}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) {
-                    setStartDateStr(defaultStartDate);
-                  } else if (val > todayStr) {
-                    setStartDateStr(todayStr);
-                  } else {
-                    setStartDateStr(val);
-                  }
-                }}
-                className="text-[11px] border border-zinc-200 bg-[#fbfbfb] rounded px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
-              />
-              <span className="text-zinc-400 text-xs">-</span>
-              <input 
-                type="date" 
-                value={endDateStr} 
-                max={todayStr}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (!val) {
-                    setEndDateStr(defaultEndDate);
-                  } else if (val > todayStr) {
-                    setEndDateStr(todayStr);
-                  } else {
-                    setEndDateStr(val);
-                  }
-                }}
-                className="text-[11px] border border-zinc-200 bg-[#fbfbfb] rounded px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
-              />
-              <button 
-                onClick={() => {
-                  const finalStart = startDateStr || defaultStartDate;
-                  const finalEnd = endDateStr || defaultEndDate;
-
-                  if (!startDateStr) setStartDateStr(defaultStartDate);
-                  if (!endDateStr) setEndDateStr(defaultEndDate);
-
-                  // Persist confirmed dates
-                  sessionStorage.setItem("foreward_outlook_start_date", finalStart);
-                  sessionStorage.setItem("foreward_outlook_end_date", finalEnd);
-
-                  setIsEditingDates(false);
-                }}
-                className="p-1 bg-[#18181b] hover:bg-black text-white rounded transition-colors"
-                title="Confirm changes"
-              >
-                <Check className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div 
-              onClick={() => setIsEditingDates(true)}
-              className="flex items-center gap-1.5 cursor-pointer hover:bg-zinc-100 px-2 py-1 rounded transition-colors"
-              title="Click to edit date range"
+          <div className="flex flex-col items-end">
+            <button 
+              type="button"
+              onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+              className={`p-1.5 rounded-[6px] border transition-colors cursor-pointer flex items-center justify-center relative ${
+                isFilterPanelOpen 
+                  ? "bg-zinc-900 text-white border-zinc-900" 
+                  : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+              }`}
+              title="Toggle filters"
             >
-              <span className="text-xs text-zinc-500 font-medium select-none">
-                {formattedDateRange}
-              </span>
-              <Pencil className="w-3.5 h-3.5 text-zinc-400 select-none" />
+              <Filter className="w-[13px] h-[13px]" />
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-600 rounded-full"></span>
+              )}
+            </button>
+            {hasActiveFilters && !isFilterPanelOpen && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setStartDateStr(defaultStartDate);
+                  setEndDateStr(defaultEndDate);
+                  setActiveThemeFilter("All Themes");
+                  sessionStorage.removeItem("foreward_outlook_start_date");
+                  sessionStorage.removeItem("foreward_outlook_end_date");
+                }}
+                className="text-[9.5px] text-zinc-500 hover:text-zinc-900 underline mt-0.5 cursor-pointer whitespace-nowrap"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Collapsible Filter Panel */}
+        {isFilterPanelOpen && (
+          <div className="px-4 py-3 bg-zinc-50/90 border-b border-zinc-100 flex flex-col gap-3 animate-in fade-in duration-200 flex-shrink-0">
+            {hasActiveFilters && (
+              <div className="flex items-center justify-between pb-1 border-b border-zinc-200/60">
+                <span className="text-[10px] text-zinc-500 font-medium">Active filters applied</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStartDateStr(defaultStartDate);
+                    setEndDateStr(defaultEndDate);
+                    setActiveThemeFilter("All Themes");
+                    sessionStorage.removeItem("foreward_outlook_start_date");
+                    sessionStorage.removeItem("foreward_outlook_end_date");
+                  }}
+                  className="text-[10px] text-zinc-600 hover:text-zinc-900 font-medium underline cursor-pointer"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+            {/* Search Area */}
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-[6px] border border-zinc-200">
+              <Search className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Search Forward Outlook..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full text-xs bg-transparent text-zinc-800 outline-none placeholder:text-zinc-400"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="text-zinc-400 hover:text-zinc-600 text-xs cursor-pointer"
+                >
+                  ×
+                </button>
+              )}
             </div>
-          )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Date Filters */}
+              {isEditingDates ? (
+                <div className="flex items-center gap-1 text-[10px]">
+                  <input 
+                    type="date" 
+                    value={startDateStr} 
+                    max={todayStr}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setStartDateStr(defaultStartDate);
+                      } else if (val > todayStr) {
+                        setStartDateStr(todayStr);
+                      } else {
+                        setStartDateStr(val);
+                      }
+                    }}
+                    className="text-[10px] border border-zinc-200 bg-white rounded-[3px] px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
+                  />
+                  <span className="text-zinc-400 text-[10px]">-</span>
+                  <input 
+                    type="date" 
+                    value={endDateStr} 
+                    max={todayStr}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setEndDateStr(defaultEndDate);
+                      } else if (val > todayStr) {
+                        setEndDateStr(todayStr);
+                      } else {
+                        setEndDateStr(val);
+                      }
+                    }}
+                    className="text-[10px] border border-zinc-200 bg-white rounded-[3px] px-1.5 py-0.5 text-zinc-700 outline-none focus:border-zinc-300"
+                  />
+                  <button 
+                    onClick={() => {
+                      const finalStart = startDateStr || defaultStartDate;
+                      const finalEnd = endDateStr || defaultEndDate;
+                      if (!startDateStr) setStartDateStr(defaultStartDate);
+                      if (!endDateStr) setEndDateStr(defaultEndDate);
+                      sessionStorage.setItem("foreward_outlook_start_date", finalStart);
+                      sessionStorage.setItem("foreward_outlook_end_date", finalEnd);
+                      setIsEditingDates(false);
+                    }}
+                    className="p-1 bg-[#18181b] hover:bg-black text-white rounded transition-colors"
+                    title="Confirm changes"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => setIsEditingDates(true)}
+                  className="flex items-center gap-1.5 cursor-pointer hover:bg-zinc-200/50 px-2 py-1 rounded transition-colors"
+                  title="Click to edit date range"
+                >
+                  <span className="text-[11px] text-zinc-500 font-medium select-none">
+                    {formattedDateRange}
+                  </span>
+                  <Pencil className="w-3 h-3 text-zinc-400 select-none" />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Category Filter Tags */}
+        <div className="px-4 pt-2 pb-2 border-b border-zinc-100 bg-white flex-shrink-0 z-10 flex flex-col gap-1.5">
+          <div className="overflow-x-auto max-w-full pb-0.5 scrollbar-none">
+            <div className="inline-flex items-center p-0.5 bg-zinc-100 rounded-[8px] border border-zinc-200">
+              {availableThemes.map((tab) => {
+                const isSelected = activeThemeFilter === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveThemeFilter(tab)}
+                    className={`px-4 py-1.5 text-[12px] font-medium rounded-[6px] whitespace-nowrap transition-all cursor-pointer ${ 
+                      isSelected 
+                        ? "bg-white text-zinc-900 shadow-sm font-semibold" 
+                        : "text-zinc-500 hover:text-zinc-800"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Outer Workspace containing Only the Radar Chart on the left */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-[#fafafa]/50">
-          
-          {/* Daily Snapshot Card */}
-          {snapshotLoading ? (
-            <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] flex items-center gap-2">
-              <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
-              <span className="text-[12px] text-zinc-500">Loading snapshot...</span>
-            </div>
-          ) : snapshot ? (
-            <div className="mb-3 shrink-0 border border-zinc-200 bg-white rounded-[8px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.01)] animate-fade-in">
-              <div className="px-4 py-2.5 border-b border-zinc-100 flex items-center justify-between">
-                <h3 className="text-[13px] font-semibold text-zinc-900 font-sans">
-                  {snapshot.module_title}
-                </h3>
-                <span className="text-[11px] font-medium text-zinc-500 bg-zinc-50 px-2 py-0.5 rounded-[4px]">
-                  {new Date(snapshot.snapshot_date).toLocaleDateString("en-US", {
-                    weekday: "short", day: "numeric", month: "short", year: "numeric"
-                  })}
-                </span>
-              </div>
-
-              <div>
-                {Array.from(enabledSubmodules.entries()).map(([subId, subName], idx) => {
-                  const row = (snapshot?.rows || []).find((r: any) => r.submodule_id === subId);
-                  
-                  if (row) {
-                    return (
-                      <div
-                        key={row.submodule_id ? `${row.submodule_id}-${idx}` : `fo-row-${idx}`}
-                        className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0"
-                      >
-                        <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass(row.color)}`}>
-                          {row.icon}
-                        </div>
-
-                        <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
-                          {row.label}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="text-[12.5px] text-zinc-600 leading-snug">
-                            {row.body}
-                          </div>
-                          {row.so_what && (
-                            <div className="text-[11.5px] text-zinc-400 leading-snug mt-0.5">
-                              {row.so_what}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${getSnapshotChipClass(row.color)}`}>
-                            {row.status}
-                          </span>
-                          <span className="text-[10.5px] text-zinc-400 font-medium">
-                            {row.delta_label}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Fallback for enabled submodule with no snapshot data
-                  return (
-                    <div
-                      key={subId}
-                      className="grid grid-cols-[26px_172px_1fr_118px] gap-3 items-start px-4 py-2 border-b border-zinc-100 last:border-b-0 opacity-60"
-                    >
-                      <div className={`w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-[15px] font-bold mt-0.5 ${getSnapshotIconClass("slate")}`}>
-                        <Minus className="w-4 h-4 text-zinc-400" />
-                      </div>
-                      <div className="text-[12.5px] font-semibold text-zinc-900 leading-tight">
-                        {subName}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[12.5px] text-zinc-600 leading-snug">
-                          No data for this period
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-0.5" />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="mb-3 p-5 border border-zinc-200 bg-white rounded-[8px] text-center">
-              <p className="text-[12.5px] text-zinc-500">No snapshot available yet for this module.</p>
-            </div>
+        <div className={`relative flex-1 overflow-y-auto p-4 flex flex-col gap-2 bg-[#fafafa]/50 transition-all duration-300 ${selectedTrend ? "blur-sm" : ""}`}>
+          {selectedTrend && (
+            <div
+              className="absolute inset-0 z-50 bg-transparent cursor-pointer"
+              onClick={() => setSelectedTrendId(null)}
+            />
           )}
           
-          {/* TOP HALF: Trend Horizon Radar Chart */}
-          <div id="radar-visualizer-section" className="py-1 px-2 flex flex-col items-center relative select-none">
+          {/* New Bubble Map representation on top */}
+          <BubbleMapSection 
+            trends={filteredTrends} 
+            onSelectTrend={(t) => { setSelectedTrendId(t.id); }} 
+            selectedTrendId={selectedTrendId} 
+            searchQuery={searchQuery}
+            activeSectorFilter={activeThemeFilter === "All Themes" ? null : activeThemeFilter}
+          />
 
 
-            <svg 
-              id="trend-radar-svg"
-              width="100%" 
-              height="auto" 
-              viewBox="0 -15 800 395" 
-              className="max-w-[860px] w-full filter drop-shadow-[0_4px_12px_rgba(124,58,237,0.03)]"
-            >
-              <defs>
-                <radialGradient id="radar-grad" cx="400" cy="350" r="330" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.16" />
-                  <stop offset="45%" stopColor="#c084fc" stopOpacity="0.08" />
-                  <stop offset="80%" stopColor="#818cf8" stopOpacity="0.03" />
-                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                </radialGradient>
-              </defs>
-
-              {/* Main radar background semi-circle */}
-              <path 
-                d="M 70,350 A 330,330 0 0,1 730,350 Z" 
-                fill="url(#radar-grad)" 
-                stroke="#e4e4e7" 
-                strokeWidth="1.2" 
-              />
-
-              {/* Rings dividers */}
-              <path 
-                d="M 150,350 A 250,250 0 0,1 650,350" 
-                fill="none" 
-                stroke="#e4e4e7" 
-                strokeDasharray="4 4" 
-                strokeWidth="1.2" 
-              />
-              <path 
-                d="M 230,350 A 170,170 0 0,1 570,350" 
-                fill="none" 
-                stroke="#e4e4e7" 
-                strokeDasharray="4 4" 
-                strokeWidth="1.2" 
-              />
-
-              {/* Inner Cutout masking semi-circle */}
-              <path 
-                d="M 310,350 A 90,90 0 0,1 490,350 Z" 
-                fill="#ffffff" 
-                stroke="#e4e4e7" 
-                strokeWidth="1.2" 
-              />
-
-              {/* Radiating dividers (angles 144, 108, 72, 36) */}
-              {SECTOR_ORDER.slice(0, 4).map(key => sectorRanges[key].start).map((angle, i) => {
-                const innerPt = getCoords(90, angle);
-                const outerPt = getCoords(330, angle);
-                return (
-                  <line
-                    key={i}
-                    x1={innerPt.x}
-                    y1={innerPt.y}
-                    x2={outerPt.x}
-                    y2={outerPt.y}
-                    stroke="#ffffff"
-                    strokeWidth="1.5"
-                  />
-                );
-              })}
-
-              {/* Baseline divider */}
-              <line 
-                x1="40" 
-                y1="350" 
-                x2="760" 
-                y2="350" 
-                stroke="#d4d4d8" 
-                strokeWidth="1.5" 
-              />
-
-              {/* Sector Labels curved along the outer arch */}
-              {[
-                { label: "Consumer", key: "consumer" },
-                { label: "Technology", key: "technology" },
-                { label: "Supply chain", key: "supply chain" },
-                { label: "Product", key: "product" },
-                { label: "Sustainability", key: "sustainability" }
-              ].map((sector, idx) => {
-                const range = sectorRanges[sector.key];
-                const midAngle = (range.start + range.end) / 2;
-                const labelPt = getCoords(345, midAngle);
-                return (
-                  <text
-                    key={idx}
-                    x={labelPt.x}
-                    y={labelPt.y}
-                    textAnchor="middle"
-                    className="font-sans text-[11px] font-semibold text-zinc-600 fill-zinc-600 tracking-wider"
-                    transform={`rotate(${90 - midAngle}, ${labelPt.x}, ${labelPt.y})`}
-                  >
-                    {sector.label}
-                  </text>
-                );
-              })}
-
-              {/* Baseline horizon titles: Left and Right sides */}
-              {/* Left Baseline */}
-              <text x="100" y="370" textAnchor="middle" className="font-mono text-[9px] font-bold tracking-widest fill-zinc-600">LONG-TERM</text>
-              <text x="190" y="370" textAnchor="middle" className="font-mono text-[9px] font-bold tracking-widest fill-zinc-600">MID-TERM</text>
-              <text x="270" y="370" textAnchor="middle" className="font-mono text-[9px] font-bold tracking-widest fill-zinc-600">NEAR-TERM</text>
-
-              {/* Right Baseline */}
-              <text x="530" y="370" textAnchor="middle" className="font-mono text-[9px] font-bold tracking-widest fill-zinc-600">NEAR-TERM</text>
-              <text x="610" y="370" textAnchor="middle" className="font-mono text-[9px] font-bold tracking-widest fill-zinc-600">MID-TERM</text>
-              <text x="700" y="370" textAnchor="middle" className="font-mono text-[9px] font-bold tracking-widest fill-zinc-600">LONG-TERM</text>
-
-              {/* Trend Nodes/Dots */}
-              {isLoading ? (
-                <g>
-                  <text x="400" y="200" textAnchor="middle" className="text-zinc-400 text-sm animate-pulse">Syncing horizon data...</text>
-                </g>
-              ) : trends.length === 0 ? (
-                <g>
-                  <text x="400" y="200" textAnchor="middle" className="text-zinc-400 text-sm">No trends available for this client.</text>
-                </g>
-              ) : (
-                filteredTrends.map((trend) => {
-                  const pt = getCoords(trend.r, trend.angle);
-                  const isSelected = selectedTrendId === trend.id;
-                  const isHovered = hoveredNodeId === trend.id;
-                  const nodeRadius = getNodeRadius(trend, isSelected, isHovered);
-
-                  return (
-                    <g 
-                      key={trend.id} 
-                      className="group"
-                      onMouseEnter={() => setHoveredNodeId(trend.id)}
-                      onMouseLeave={() => setHoveredNodeId(null)}
-                    >
-                      {isSelected && (
-                        <circle
-                          cx={pt.x}
-                          cy={pt.y}
-                          r={nodeRadius + 3.5}
-                          fill="none"
-                          stroke="#7c3aed"
-                          strokeWidth="1.5"
-                          className="transition-all duration-150"
-                        />
-                      )}
-                      {/* Glowing hover circle (touch/click target) */}
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r="18"
-                        fill="transparent"
-                        className="cursor-pointer"
-                        onClick={() => { setSelectedTrendId(trend.id); setActiveTab("insights"); }}
-                      />
-                      {/* Solid node circle */}
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={nodeRadius}
-                        fill={isSelected || isHovered ? "#7c3aed" : "#18181b"}
-                        className="cursor-pointer transition-all duration-150"
-                        onClick={() => { setSelectedTrendId(trend.id); setActiveTab("insights"); }}
-                      />
-                      {/* Text labels adjacent to node */}
-                      <text
-                        x={pt.x + (trend.angle > 90 ? -12 : trend.angle < 90 ? 12 : 0)}
-                        y={pt.y + (trend.angle > 85 && trend.angle < 95 ? -14 : 4)}
-                        textAnchor={trend.angle > 90 ? "end" : trend.angle < 90 ? "start" : "middle"}
-                        onClick={() => { setSelectedTrendId(trend.id); setActiveTab("insights"); }}
-                        className={`font-sans text-[10px] cursor-pointer font-medium select-none tracking-tight transition-colors duration-150 ${
-                          isSelected || isHovered
-                            ? "fill-[#7c3aed] font-bold" 
-                            : "fill-zinc-700 hover:fill-[#7c3aed]"
-                        }`}
-                      >
-                        {trend.title}
-                      </text>
-                    </g>
-                  );
-                })
-              )}
-            </svg>
-          </div>
 
         </div>
       </div>
 
       {/* RIGHT COLUMN: Outlook details view (Pane 2 - 40% width) */}
-      <div id="outlook-content-pane" className="w-[40%] h-full flex flex-col bg-white overflow-hidden relative">
-        
-        {/* Header of Content Detail */}
-        <div id="content-header" className="h-[53px] px-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-1.5 flex-shrink-0 select-none">
-            <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-            <span className="text-[12px] text-zinc-600 font-semibold tracking-tight">
-              AI powered Insights by MarketGenie
-            </span>
-          </div>
-        </div>
-
-        {/* Tab switcher: contents */}
-        <div id="content-tabbar" className="px-5 border-b border-zinc-100 flex items-center justify-between h-10 select-text flex-shrink-0 animate-fade-in">
-          <div className="flex items-center gap-4 h-full">
+      {selectedTrend && (
+        <div id="outlook-content-pane" className="absolute top-0 right-0 w-[40%] h-full flex flex-col bg-white overflow-hidden shadow-2xl z-[100] animate-in slide-in-from-right duration-300">
+          <div id="content-tabbar" className="px-5 border-b border-zinc-100 flex flex-col pt-1 pb-1 select-text flex-shrink-0 animate-fade-in">
+            <div className="hidden items-center gap-4 h-9">
+              <button
+                onClick={() => setActiveTab("insights")}
+                className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
+                  activeTab === "insights"
+                    ? "border-[#2d39d2] text-zinc-900 font-semibold"
+                    : "border-transparent text-zinc-500 hover:text-zinc-800"
+                }`}
+              >
+                <span>≡ Insights</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("ask_marketgenie")}
+                className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
+                  activeTab === "ask_marketgenie"
+                    ? "border-[#2d39d2] text-zinc-900 font-semibold"
+                    : "border-transparent text-zinc-500 hover:text-zinc-800"
+                }`}
+              >
+                <span>Sparkles Ask MarketGenie</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("bookmarks")}
+                className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
+                  activeTab === "bookmarks"
+                    ? "border-[#2d39d2] text-zinc-900 font-semibold"
+                    : "border-transparent text-zinc-500 hover:text-zinc-800"
+                }`}
+              >
+                <Bookmark className={`w-3 h-3 ${Object.keys(isBookmarked).length > 0 ? "text-violet-600 fill-violet-600" : "text-current opacity-70"}`} />
+                <span>Bookmark ({Object.keys(isBookmarked).length})</span>
+              </button>
+            </div>
             <button
-              onClick={() => setActiveTab("insights")}
-              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
-                activeTab === "insights"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
-                  : "border-transparent text-zinc-500 hover:text-zinc-800"
-              }`}
+              onClick={() => setSelectedTrendId(null)}
+              className="w-6 h-6 flex items-center justify-center rounded hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer self-end"
+              title="Close details"
             >
-              <span>≡ Insights</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("ask_marketgenie")}
-              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
-                activeTab === "ask_marketgenie"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
-                  : "border-transparent text-zinc-500 hover:text-zinc-800"
-              }`}
-            >
-              <span>Sparkles Ask MarketGenie</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("bookmarks")}
-              className={`flex items-center gap-1.5 text-xs h-full px-1 border-b-2 transition-colors duration-150 ${
-                activeTab === "bookmarks"
-                  ? "border-[#7c3aed] text-zinc-900 font-semibold"
-                  : "border-transparent text-zinc-500 hover:text-zinc-800"
-              }`}
-            >
-              <Bookmark className={`w-3 h-3 ${Object.keys(isBookmarked).length > 0 ? "text-violet-600 fill-violet-600" : "text-current opacity-70"}`} />
-              <span>Bookmark ({Object.keys(isBookmarked).length})</span>
+              <X className="w-4 h-4" />
             </button>
           </div>
-        </div>
 
         {/* Dynamic switcher content */}
         {isLoading ? (
@@ -2060,7 +2017,11 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 </span>
               </h1>
 
-              <div className="flex items-center justify-end gap-4 mt-1 select-text">
+              <div className="flex items-center justify-between gap-4 mt-1 select-text">
+                <span className={`rounded-[3px] py-0.5 px-2 text-[9px] font-semibold tracking-tight inline-block font-sans border leading-none ${getTermTagClass(selectedTrend.term)}`}>
+                  Impact Horizon: {formatTerm(selectedTrend.term)}
+                </span>
+
                 <div className="flex items-center gap-1.5 shrink-0 select-none">
                     <button
                       id="not-interested-button"
@@ -2165,35 +2126,34 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                     <span className="font-semibold text-zinc-800 font-sans">Category:</span>{" "}
                     <span className="text-zinc-600 font-sans">{selectedTrend.sector}</span>
                   </div>
-                  <div>
-                    <span className="font-semibold text-zinc-800 font-sans">Impact Horizon:</span>{" "}
-                    <span className="text-zinc-600 font-sans">{formatTerm(selectedTrend.term)}</span>
-                  </div>
                 </div>
 
                 <div className="flex flex-col items-end gap-1.5 min-w-[100px] select-none">
-                  <span className="text-[10px] font-bold tracking-widest text-zinc-400">IMPACT</span>
+                  <span className="text-[9px] font-bold tracking-widest text-zinc-500 font-sans">IMPACT</span>
                   {renderImpactBars(selectedTrend.impact_level)}
                   <span className="text-[12.5px] font-bold text-zinc-700 tracking-tight font-sans">
-                    {selectedTrend.impact_level} Impact
+                    {selectedTrend.impact_level}
                   </span>
                 </div>
               </div>
 
               {/* Document Narrative */}
               <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-zinc-600 font-sans select-text">
-                <p>{selectedTrend.summary}</p>
+                <p className="font-light text-zinc-800 leading-relaxed">{selectedTrend.summary}</p>
                 
-                <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-400 mt-1">
-                  <span className="font-normal text-zinc-400 mt-[3px]">Reference:</span>
+                <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-600 mt-1">
+                  <span className="font-normal text-zinc-600 mt-[3px]">Reference:</span>
                   <div className="flex flex-wrap items-center gap-1">
-                    {(isReferencesExpanded ? selectedTrend.sources : selectedTrend.sources.slice(0, 5)).map((_, idx) => (
+                    {(isReferencesExpanded ? sortedSources : sortedSources.slice(0, 5)).map((src: any, idx) => (
                       <button
-                        key={idx}
+                        key={src.id || idx}
                         onClick={() => {
                           setIsSourcesExpanded(true);
+                          if (src.id) {
+                            setSelectedSignalId(src.id);
+                          }
                           setTimeout(() => {
-                            const el = document.getElementById(`outlook-signal-card-${idx}`);
+                            const el = document.getElementById(`outlook-signal-card-${src.id}`) || document.getElementById(`outlook-signal-card-${idx}`);
                             if (el) {
                               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                               el.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'transition-all', 'duration-500');
@@ -2203,19 +2163,18 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                             }
                           }, 100);
                         }}
-                        className="group inline-flex items-center justify-center gap-0.5 px-1.5 h-[18px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[4px] text-[10.5px] font-bold text-zinc-500 transition-colors cursor-pointer select-none"
+                        className="group inline-flex items-center justify-center px-1.5 h-[17px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[3px] text-[10px] font-semibold text-zinc-700 transition-colors cursor-pointer select-none"
                         title={`Jump to signal ${idx + 1}`}
                       >
                         {idx + 1}
-                        <ArrowDown className="w-2.5 h-2.5 opacity-0 -ml-0.5 group-hover:opacity-100 transition-opacity" />
                       </button>
                     ))}
-                    {!isReferencesExpanded && selectedTrend.sources.length > 5 && (
+                    {!isReferencesExpanded && sortedSources.length > 5 && (
                       <button
                         onClick={() => setIsReferencesExpanded(true)}
-                        className="inline-flex items-center justify-center px-1.5 h-[18px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[4px] text-[10.5px] font-bold text-zinc-500 transition-colors cursor-pointer select-none"
+                        className="inline-flex items-center justify-center px-1.5 h-[17px] bg-zinc-100 border border-zinc-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 rounded-[3px] text-[10px] font-semibold text-zinc-700 transition-colors cursor-pointer select-none"
                       >
-                        +{selectedTrend.sources.length - 5} more
+                        +{sortedSources.length - 5} more
                       </button>
                     )}
                   </div>
@@ -2224,14 +2183,14 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
 
               {/* Business Impact bullet segment */}
               <div className="flex flex-col gap-2 mt-2">
-                <h3 className="text-[13px] font-bold tracking-tight text-zinc-900 font-sans uppercase">
+                <h3 className="text-[13px] font-semibold tracking-tight text-zinc-800 font-sans">
                   Business Impact
                 </h3>
-                <div className="bg-[#f5f3ff]/60 border border-violet-100 p-4 rounded-[4px] flex flex-col gap-3">
+                <div className="bg-[#eef1fe]/60 border border-violet-100 p-4 rounded-[4px] flex flex-col gap-3">
                   {selectedTrend.business_impact.map((bullet, idx) => (
                     <div key={idx} className="flex gap-2.5 items-start">
-                      <span className="text-[#7c3aed] text-xs mt-1 shrink-0 select-none">•</span>
-                      <p className="text-[12px] leading-relaxed text-zinc-700 font-normal select-text">
+                      <span className="text-[#2d39d2] text-xs mt-1 shrink-0 select-none">•</span>
+                      <p className="text-[13px] leading-relaxed text-zinc-800 font-light select-text font-sans">
                         {bullet}
                       </p>
                     </div>
@@ -2243,7 +2202,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
               <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3.5 mt-1 select-text">
                 <div className="flex items-center justify-between select-none">
                   <span className="text-[13px] font-bold text-zinc-700 font-sans">
-                    Signals ({isSignalsLoading ? "..." : selectedTrend.sources.length})
+                    Signals ({isSignalsLoading ? "..." : sortedSources.length})
                   </span>
                   <button 
                     onClick={() => setIsSourcesExpanded(!isSourcesExpanded)}
@@ -2267,12 +2226,12 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 {/* List of source tags/pills directly - NO dots, NO categorization as requested, COLLAPSIBLE */}
                 {isSourcesExpanded && (
                   <div className="flex flex-col gap-2 mt-1 animate-fade-in">
-                    {selectedTrend.sources.length === 0 ? (
+                    {sortedSources.length === 0 ? (
                       <div className="text-[12px] text-zinc-400 py-4 text-center">
                         No signals associated with this horizon trend.
                       </div>
                     ) : (
-                      selectedTrend.sources.map((src, index) => {
+                      sortedSources.map((src, index) => {
                       const isSelected = selectedSignalId === src.id;
                       const cat = (src.category || "").toLowerCase();
                       
@@ -2294,8 +2253,14 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
 
                       return (
                         <div 
-                          key={src.id}
-                          id={`outlook-signal-card-${index}`}
+                          key={src.id || index}
+                          id={`outlook-signal-card-${src.id || index}`}
+                          ref={(node) => {
+                            if (node && index !== undefined) {
+                              node.setAttribute('id', `outlook-signal-card-${index}`);
+                              if (src.id) node.setAttribute('id', `outlook-signal-card-${src.id}`);
+                            }
+                          }}
                           onClick={() => setSelectedSignalId(isSelected ? null : src.id)}
                           className={`rounded-[4px] px-3 transition-all text-left cursor-pointer border ${bgClass} ${borderClass} ${isSelected ? 'py-4' : 'py-1.5'}`}
                         >
@@ -2378,19 +2343,19 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
               </div>
 
               {/* Similar Future Prospects section */}
-              <div className="flex flex-col gap-2 mt-4 select-text">
-                <h3 className="text-[13.5px] font-bold tracking-tight text-zinc-900 font-sans select-text">
+              <div className="flex flex-col gap-1.5 mt-4 select-text">
+                <h3 className="text-[12.5px] font-medium tracking-tight text-zinc-900 font-sans select-text">
                   Similar Future Prospects
                 </h3>
-                <div className="flex flex-col gap-2 ml-1">
+                <div className="flex flex-col gap-1.5 ml-1">
                   {isFetchingSimilar ? (
-                    <div className="text-[12px] text-zinc-500 animate-pulse py-1">
+                    <div className="text-[12px] text-zinc-500 animate-pulse py-1 font-sans">
                       Fetching similar prospects...
                     </div>
                   ) : similarFutureProspects.length > 0 ? (
                     similarFutureProspects.map((prospect: any, idx) => (
-                      <div className="flex items-start gap-2 py-0.5" key={idx}>
-                        <FileText className="w-3.5 h-3.5 text-zinc-400 mt-[2px] shrink-0 select-none" />
+                      <div className="flex items-start gap-2 py-0.5 text-[12px]" key={idx}>
+                        <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
                         <button
                           onClick={() => {
                             if (prospect.trend_id || prospect.id) {
@@ -2398,45 +2363,61 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                               setActiveTab("insights");
                             }
                           }}
-                          className="text-left text-[12px] text-zinc-700 hover:text-[#7c3aed] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer"
+                          className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
                         >
                           {prospect.name || prospect.title}
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="text-[12px] text-zinc-400 py-1">
+                    <div className="text-[12px] text-zinc-400 py-1 font-sans">
                       No similar prospects found
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Action buttons matching design layout */}
-              <div className="flex flex-col gap-2 w-full mt-3 select-none font-sans font-normal text-[13px]">
-                <button
-                  onClick={() => {
-                    const query = `What is the regulatory and market feasibility of ${selectedTrend.title}?`;
-                    setActiveTab("ask_marketgenie");
-                    handleChatSend(query);
-                  }}
-                  className="w-full h-12 border border-zinc-200 bg-white hover:bg-[#fafafa] rounded-[4px] flex items-center gap-3.5 px-4 text-zinc-800 hover:text-zinc-950 transition-colors cursor-pointer text-left font-sans shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-                >
-                  <Sparkles className="w-4 h-4 text-[#7c3aed] fill-[#7c3aed]/10 shrink-0" />
-                  <span>Evaluate regulatory and market feasibility</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    const query = `Provide case studies of ${selectedTrend.title} implementations.`;
-                    setActiveTab("ask_marketgenie");
-                    handleChatSend(query);
-                  }}
-                  className="w-full h-12 border border-zinc-200 bg-white hover:bg-[#fafafa] rounded-[4px] flex items-center gap-3.5 px-4 text-zinc-800 hover:text-zinc-950 transition-colors cursor-pointer text-left font-sans shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-                >
-                  <FileText className="w-4 h-4 text-[#7c3aed] shrink-0" />
-                  <span>Show corporate case studies & examples</span>
-                </button>
+              {/* Explore Decision Intelligence section */}
+              <div className="flex flex-col gap-1.5 mt-4 select-text">
+                <h3 className="text-[12.5px] font-medium tracking-tight text-zinc-900 font-sans select-text">
+                  Explore Decision Intelligence
+                </h3>
+                <div className="flex flex-col gap-1.5 ml-1">
+                  <div className="flex items-start gap-2 py-0.5 text-[12px]">
+                    <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
+                    <button
+                      onClick={() => {
+                        const query = `What is the regulatory and market feasibility of ${selectedTrend.title}?`;
+                        if (onSwitchToDecisionIntelligence) {
+                          onSwitchToDecisionIntelligence(query, "foreward_outlook", "Future Outlook", "Future Outlook");
+                        } else {
+                          setActiveTab("ask_marketgenie");
+                          handleChatSend(query);
+                        }
+                      }}
+                      className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
+                    >
+                      Evaluate regulatory and market feasibility
+                    </button>
+                  </div>
+                  <div className="flex items-start gap-2 py-0.5 text-[12px]">
+                    <CornerDownRight className="w-3 h-3 text-zinc-400 mt-[3px] shrink-0 select-none" />
+                    <button
+                      onClick={() => {
+                        const query = `Provide case studies of ${selectedTrend.title} implementations.`;
+                        if (onSwitchToDecisionIntelligence) {
+                          onSwitchToDecisionIntelligence(query, "foreward_outlook", "Future Outlook", "Future Outlook");
+                        } else {
+                          setActiveTab("ask_marketgenie");
+                          handleChatSend(query);
+                        }
+                      }}
+                      className="text-left text-zinc-700 hover:text-[#2d39d2] transition-colors leading-normal hover:underline select-text font-normal cursor-pointer font-sans text-[12px]"
+                    >
+                      Show corporate case studies & examples
+                    </button>
+                  </div>
+                </div>
               </div>
 
             </div>
@@ -2475,7 +2456,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 )}
                 {chatLoading && (
                   <div className="bg-violet-50 text-zinc-800 border border-violet-100 self-start rounded-[8px] rounded-bl-none p-3 max-w-[85%] flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 text-[#7c3aed] animate-spin" />
+                    <Loader2 className="w-4 h-4 text-[#2d39d2] animate-spin" />
                     <span className="text-[11.5px] text-zinc-500 font-medium font-sans">MarketGenie is researching...</span>
                   </div>
                 )}
@@ -2513,7 +2494,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                 />
                 <button
                   onClick={() => handleChatSend(chatInput)}
-                  className="p-1.5 bg-[#7c3aed] hover:bg-violet-700 text-white rounded-[4px] transition-colors"
+                  className="p-1.5 bg-[#2d39d2] hover:bg-[#242ea8] text-white rounded-[4px] transition-colors"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>
@@ -2568,11 +2549,11 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                   })}
                 </div>
               )}
-            </div>
-          )}
+          </div>
+        )}
       </div>
-
-      {toastMessage && (
+          )}
+          {toastMessage && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
           <div className="bg-zinc-900 text-white text-[12px] px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
             <span>{toastMessage}</span>

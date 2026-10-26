@@ -1,5 +1,5 @@
 {
-  "name": "Graceview Market Intelligence",
+  "name": "InsideMarkets AI",
   "description": "Executive market policy and prudential regulation dashboard with AI-driven compliance insights.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

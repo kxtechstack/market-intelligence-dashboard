@@ -23,6 +23,7 @@ export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
   timestamp: Date;
+  isStreaming?: boolean;
   isCustomResponse?: boolean;
   sources?: (string | { title: string; url: string })[];
   heading?: string;

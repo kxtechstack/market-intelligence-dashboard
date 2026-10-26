@@ -95,7 +95,7 @@ export function ChatSources({ sources }: ChatSourcesProps) {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-[#7c3aed] hover:underline break-all leading-normal text-left transition-colors"
+                  className="text-[11px] text-[#2d39d2] hover:underline break-all leading-normal text-left transition-colors"
                 >
                   {displayTitle}
                 </a>

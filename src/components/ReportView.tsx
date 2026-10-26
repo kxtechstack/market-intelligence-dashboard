@@ -41,7 +41,7 @@ export default function ReportView({
     if (!content) return null;
     if (typeof content === "string") {
       if (!content.trim()) return null;
-      return <p className="text-[13px] leading-relaxed text-zinc-800 mb-2">{content}</p>;
+      return <p className="text-[13px] leading-relaxed text-slate-700 mb-1.5 last:mb-0 font-normal tracking-normal">{content}</p>;
     }
     if (Array.isArray(content)) {
       const filtered = content.filter((item) => Boolean(item && item.trim()));
@@ -49,7 +49,7 @@ export default function ReportView({
       return (
         <div className="mb-2">
           {filtered.map((item, idx) => (
-            <p key={idx} className="text-[13px] leading-relaxed text-zinc-800 mb-2">
+            <p key={idx} className="text-[13px] leading-relaxed text-slate-700 mb-1.5 last:mb-0 font-normal tracking-normal">
               {item}
             </p>
           ))}
@@ -63,19 +63,19 @@ export default function ReportView({
     switch (block.type) {
       case "heading":
         return (
-          <h4 key={index} className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 key={index} className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             {block.text}
           </h4>
         );
       case "paragraph":
         return (
-          <p key={index} className="text-[13px] leading-relaxed text-zinc-800 mb-2">
+          <p key={index} className="text-[13px] leading-relaxed text-slate-700 mb-1.5 last:mb-0 font-normal tracking-normal">
             {block.text}
           </p>
         );
       case "bullets":
         return (
-          <ul key={index} className="list-disc pl-5 my-2 space-y-1 text-[13px] text-zinc-700">
+          <ul key={index} className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
             {block.items.map((item, i) => (
               <li key={i}>{item}</li>
             ))}
@@ -83,7 +83,7 @@ export default function ReportView({
         );
       case "numbered_list":
         return (
-          <ol key={index} className="list-decimal pl-5 my-2 space-y-1 text-[13px] text-zinc-700">
+          <ol key={index} className="list-decimal pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
             {block.items.map((item, i) => (
               <li key={i}>{item}</li>
             ))}
@@ -102,11 +102,11 @@ export default function ReportView({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200/70 text-zinc-800">
+              <tbody className="divide-y divide-zinc-200/70 text-slate-700 text-[13px] font-normal leading-relaxed tracking-normal">
                 {block.rows.map((row, rIdx) => (
                   <tr key={rIdx}>
                     {row.cells.map((cell, cIdx) => (
-                      <td key={cIdx} className="px-3.5 py-2.5 text-zinc-800">
+                      <td key={cIdx} className="px-3.5 py-2.5 text-slate-700 font-normal text-[13px] leading-relaxed tracking-normal">
                         {cell}
                       </td>
                     ))}
@@ -139,7 +139,7 @@ export default function ReportView({
     if (!hasSources || !sources) return null;
     return (
       <div className="mt-4 pt-3 border-t border-zinc-200/60 font-sans">
-        <h4 className="text-[13.5px] font-bold text-zinc-900 mb-2 font-sans">
+        <h4 className="text-[13.5px] font-semibold text-zinc-900 mb-2 font-serif">
           Key Signals Leading to This Intelligence
         </h4>
         <div className="flex flex-col">
@@ -235,7 +235,7 @@ export default function ReportView({
                 </div>
                 {tabLabel && onSourceClick ? (
                   <span title={`Open in ${tabLabel}`}>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#7c3aed] shrink-0 mt-0.5 transition-colors" />
+                    <ArrowUpRight className="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#2d39d2] shrink-0 mt-0.5 transition-colors" />
                   </span>
                 ) : hasUrl ? (
                   <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 shrink-0 mt-0.5 transition-colors" />
@@ -318,14 +318,14 @@ export default function ReportView({
     <div className="w-full">
       {/* 1. Title */}
       {report.title && report.title.trim() && (
-        <h3 className="text-[15px] font-bold text-zinc-900 mb-3 font-sans">
+        <h3 className="text-[15px] font-semibold text-zinc-900 mb-3 font-serif">
           {report.title}
         </h3>
       )}
 
       {/* 2. Body Text (Legacy Markdown Fallback - Prioritized First) */}
       {report.bodyText && report.bodyText.trim() && (
-        <MarketGenieMarkdown content={report.bodyText} />
+        <MarketGenieMarkdown content={report.bodyText} headingSerif thinner />
       )}
 
       {/* 3. Structured Blocks (Phase 1 sections converted to blocks + Phase 2 native blocks) */}
@@ -339,7 +339,7 @@ export default function ReportView({
             : (report as any).outlook.length > 0)
       ) && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Outlook
           </h4>
           {renderTextOrArray((report as any).outlook)}
@@ -353,7 +353,7 @@ export default function ReportView({
            (Array.isArray((report as any).analysis) && (report as any).analysis.length > 0))
       ) && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Analysis
           </h4>
           {renderTextOrArray((report as any).analysis)}
@@ -363,7 +363,7 @@ export default function ReportView({
       {/* 6. Key Movement & Impact Analysis (Legacy Table) */}
       {hasKeyMovement && (report as any).key_movement_analysis && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Key Movement & Impact Analysis
           </h4>
           <div className="my-3 overflow-x-auto rounded-[6px] border border-zinc-200 shadow-2xs">
@@ -377,11 +377,11 @@ export default function ReportView({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200/70 text-zinc-800">
+              <tbody className="divide-y divide-zinc-200/70 text-slate-700 text-[13px] font-normal leading-relaxed tracking-normal">
                 {(report as any).key_movement_analysis.rows.map((row: any, rIdx: number) => (
                   <tr key={rIdx}>
                     {row.cells.map((cell: string, cIdx: number) => (
-                      <td key={cIdx} className="px-3.5 py-2.5 text-zinc-800">
+                      <td key={cIdx} className="px-3.5 py-2.5 text-slate-700 font-normal text-[13px] leading-relaxed tracking-normal">
                         {cell}
                       </td>
                     ))}
@@ -396,20 +396,10 @@ export default function ReportView({
       {/* 7. Chart (Positioned after primary content) */}
       {hasChart && (
         <div className="mt-4 pt-3 border-t border-zinc-200/60">
-          <div className="text-[11.5px] font-semibold text-zinc-700 mb-2 flex items-center gap-1.5">
-            <BarChart2 className="w-3.5 h-3.5 text-[#7c3aed]" />
-            <span>
-              {chartMeta?.chartType
-                ? chartMeta.chartType.charAt(0).toUpperCase() +
-                  chartMeta.chartType.slice(1) +
-                  " Chart"
-                : "Chart"}
-            </span>
-          </div>
           <img
             src={"data:image/png;base64," + chart}
             alt="Data visualization"
-            className="w-full max-w-md rounded-[4px] border border-zinc-200 bg-white"
+            className="w-full max-w-md"
           />
         </div>
       )}
@@ -417,10 +407,10 @@ export default function ReportView({
       {/* 8. Key Facts (Legacy) */}
       {Boolean((report as any).key_facts && Array.isArray((report as any).key_facts) && (report as any).key_facts.length > 0) && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Key Facts
           </h4>
-          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] text-zinc-700">
+          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
             {(report as any).key_facts.map((fact: string, idx: number) => (
               <li key={idx}>{fact}</li>
             ))}
@@ -431,10 +421,10 @@ export default function ReportView({
       {/* 9. Driving Factors (Legacy) */}
       {hasDrivingFactors && (report as any).driving_factors && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Driving Factors
           </h4>
-          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] text-zinc-700">
+          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
             {(report as any).driving_factors.map((factor: string, idx: number) => (
               <li key={idx}>{factor}</li>
             ))}
@@ -450,7 +440,7 @@ export default function ReportView({
             : (report as any).what_to_watch.length > 0)
       ) && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             What to Watch
           </h4>
           {renderTextOrArray((report as any).what_to_watch)}
@@ -460,10 +450,10 @@ export default function ReportView({
       {/* 11. Decision Implication (Legacy) */}
       {decisionImplication && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Decision Implication
           </h4>
-          <p className="text-[13px] leading-relaxed text-zinc-800">
+          <p className="text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
             {decisionImplication}
           </p>
         </div>
@@ -472,10 +462,10 @@ export default function ReportView({
       {/* 12. Bottom Line */}
       {Boolean((report as any).bottom_line && (report as any).bottom_line.trim()) && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 border-t border-zinc-200/60 pt-3 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 border-t border-zinc-200/60 pt-3 font-serif">
             Bottom Line
           </h4>
-          <p className="text-[13px] leading-relaxed text-zinc-800 font-medium">
+          <p className="text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
             {(report as any).bottom_line}
           </p>
         </div>
@@ -484,12 +474,12 @@ export default function ReportView({
       {/* 13. Confidence & Evidence (Legacy) */}
       {confidenceEvidence && (
         <div>
-          <h4 className="text-[13.5px] font-bold text-zinc-900 mt-4 mb-2 font-sans">
+          <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Confidence & Evidence
           </h4>
           <ul className="list-none pl-0 my-2 space-y-1.5">
             {confidenceEvidence.map((item, idx) => (
-              <li key={idx} className="text-[12.5px] text-zinc-700">
+              <li key={idx} className="text-[12.5px] text-zinc-700 font-light">
                 <span className="font-semibold text-zinc-900">{item.label}:</span>{" "}
                 {item.value}
               </li>
@@ -507,61 +497,96 @@ export default function ReportView({
 interface MarketGenieMarkdownProps {
   content: string;
   className?: string;
+  headingSerif?: boolean;
+  thinner?: boolean;
 }
 
-export function MarketGenieMarkdown({ content, className = "" }: MarketGenieMarkdownProps) {
+export function MarketGenieMarkdown({
+  content,
+  className = "",
+  headingSerif = false,
+  thinner = false,
+}: MarketGenieMarkdownProps) {
   if (!content) return null;
 
   return (
-    <div className={`markdown-body text-[12.5px] leading-relaxed font-sans text-zinc-800 space-y-2.5 ${className}`}>
+    <div
+      className={`markdown-body text-[13px] leading-relaxed text-slate-700 tracking-normal space-y-2.5 ${
+        headingSerif ? "font-serif" : "font-sans"
+      } font-normal ${className}`}
+    >
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => (
-            <h1 className="text-[15px] font-bold text-zinc-900 mt-4 mb-2 font-sans border-b border-zinc-200/80 pb-1.5 first:mt-0">
+            <h1
+              className={`text-[15.5px] ${
+                headingSerif ? "font-semibold font-serif" : "font-bold font-sans"
+              } text-zinc-900 mt-4 mb-2 border-b border-zinc-200/80 pb-1.5 first:mt-0`}
+            >
               {children}
             </h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-[14px] font-bold text-zinc-900 mt-3.5 mb-1.5 font-sans border-b border-zinc-200/60 pb-1 first:mt-0">
+            <h2
+              className={`text-[14.5px] ${
+                headingSerif ? "font-semibold font-serif" : "font-bold font-sans"
+              } text-zinc-900 mt-3.5 mb-1.5 border-b border-zinc-200/60 pb-1 first:mt-0`}
+            >
               {children}
             </h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-[13.5px] font-bold text-zinc-900 mt-3 mb-1 font-sans first:mt-0">
+            <h3
+              className={`text-[14px] ${
+                headingSerif ? "font-semibold font-serif" : "font-bold font-sans"
+              } text-zinc-900 mt-3 mb-1 first:mt-0`}
+            >
               {children}
             </h3>
           ),
           h4: ({ children }) => (
-            <h4 className="text-[13px] font-bold text-zinc-900 mt-2.5 mb-1 font-sans first:mt-0">
+            <h4
+              className={`text-[13.5px] ${
+                headingSerif ? "font-semibold font-serif" : "font-bold font-sans"
+              } text-zinc-900 mt-2.5 mb-1 first:mt-0`}
+            >
               {children}
             </h4>
           ),
           h5: ({ children }) => (
-            <h5 className="text-[12.5px] font-bold text-zinc-900 mt-2 mb-1 font-sans first:mt-0">
+            <h5
+              className={`text-[13px] ${
+                headingSerif ? "font-semibold font-serif" : "font-bold font-sans"
+              } text-zinc-900 mt-2 mb-1 first:mt-0`}
+            >
               {children}
             </h5>
           ),
           h6: ({ children }) => (
-            <h6 className="text-[12px] font-bold text-zinc-900 mt-2 mb-1 font-sans first:mt-0">
+            <h6
+              className={`text-[12.5px] ${
+                headingSerif ? "font-semibold font-serif" : "font-bold font-sans"
+              } text-zinc-900 mt-2 mb-1 first:mt-0`}
+            >
               {children}
             </h6>
           ),
           p: ({ children }) => (
-            <p className="mb-2 last:mb-0 leading-relaxed text-zinc-800">{children}</p>
+            <p className="mb-1.5 last:mb-0 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</p>
           ),
           ul: ({ children }) => (
-            <ul className="list-disc pl-5 my-2 space-y-1 text-zinc-700 [&_ul]:list-[circle] [&_ul]:my-1 [&_ul]:pl-4">
+            <ul className="list-disc pl-5 my-2 space-y-1 text-slate-700 text-[13px] leading-relaxed font-normal tracking-normal [&_ul]:list-[circle] [&_ul]:my-1 [&_ul]:pl-4">
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal pl-5 my-2 space-y-1 text-zinc-700 [&_ol]:list-[lower-alpha] [&_ol]:my-1 [&_ol]:pl-4">
+            <ol className="list-decimal pl-5 my-2 space-y-1 text-slate-700 text-[13px] leading-relaxed font-normal tracking-normal [&_ol]:list-[lower-alpha] [&_ol]:my-1 [&_ol]:pl-4">
               {children}
             </ol>
           ),
           li: ({ children }) => (
-            <li className="leading-normal text-[12.5px] py-0.5 text-zinc-700">
+            <li className="leading-relaxed text-[13px] py-0.5 text-slate-700 font-normal tracking-normal">
               {children}
             </li>
           ),
@@ -572,7 +597,7 @@ export function MarketGenieMarkdown({ content, className = "" }: MarketGenieMark
             <em className="italic text-zinc-600">{children}</em>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-[#7c3aed]/50 pl-3 my-2 text-zinc-600 italic">
+            <blockquote className="border-l-2 border-[#2d39d2]/50 pl-3 my-2 text-slate-700 text-[13px] leading-relaxed font-normal tracking-normal italic">
               {children}
             </blockquote>
           ),
