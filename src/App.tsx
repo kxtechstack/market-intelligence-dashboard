@@ -339,7 +339,7 @@ function TopMenuBar({
     },
     {
       id: "competitive_radar",
-      label: "Competitive Radar",
+      label: "Competitive Intelligence",
       desc: "Peer group telemetry and strategic shifts",
       icon: Radar,
       countKey: "competitive_radar",
@@ -384,17 +384,15 @@ function TopMenuBar({
       {/* 1. Left: Logo on the top left */}
       <div 
         onClick={() => onTabChange(isLoggedIn ? "landing_page" : "login")} 
-        className="flex items-center gap-2.5 cursor-pointer group select-none"
-        title="REUI Dashboard"
+        className="flex items-center cursor-pointer group select-none -ml-3.5 md:-ml-4"
+        title="InsideMarkets"
       >
-        <div className="w-7 h-7 rounded-[7px] border border-zinc-200 bg-white shadow-2xs flex items-center justify-center text-zinc-900 group-hover:border-zinc-300 transition-colors">
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 5v8a6 6 0 0 0 12 0V5" />
-          </svg>
-        </div>
-        <span className="font-bold text-[13.5px] tracking-[0.16em] text-zinc-900 font-sans">
-          REUI
-        </span>
+        <img
+          id="brand-logo"
+          src="/IMLogo.png"
+          alt="InsideMarkets"
+          className="h-7 sm:h-8 w-auto object-contain"
+        />
       </div>
 
       {/* 2. Right: Only resources, support, search and then credit usage plus toggle color */}
@@ -499,49 +497,51 @@ function TopMenuBar({
           {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        {/* User name in other serif font and Company name under it with dropdown */}
-        <div className="relative">
-          <div 
-            onClick={() => setOpenDropdown(openDropdown === "user" ? null : "user")}
-            className="flex items-center gap-1.5 pl-1.5 border-l border-zinc-200/90 ml-1 py-0.5 leading-tight select-none cursor-pointer group"
-          >
-            <div className="flex flex-col items-start justify-center">
-              <span 
-                style={{ fontFamily: '"Source Serif 4", Georgia, Cambria, "Times New Roman", Times, serif' }}
-                className="text-[13px] font-medium text-zinc-900 leading-snug tracking-tight group-hover:text-[#2d39d2] transition-colors"
-              >
-                {userName}
-              </span>
-              <span className="text-[10.5px] text-zinc-500 font-normal leading-snug">
-                {companyName}
-              </span>
+        {/* User name in other serif font and Company name under it with dropdown (only shown when logged in) */}
+        {isLoggedIn && (
+          <div className="relative">
+            <div 
+              onClick={() => setOpenDropdown(openDropdown === "user" ? null : "user")}
+              className="flex items-center gap-1.5 pl-1.5 border-l border-zinc-200/90 ml-1 py-0.5 leading-tight select-none cursor-pointer group"
+            >
+              <div className="flex flex-col items-start justify-center">
+                <span 
+                  style={{ fontFamily: '"Source Serif 4", Georgia, Cambria, "Times New Roman", Times, serif' }}
+                  className="text-[13px] font-medium text-zinc-900 leading-snug tracking-tight group-hover:text-[#2d39d2] transition-colors"
+                >
+                  {userName}
+                </span>
+                <span className="text-[10.5px] text-zinc-500 font-normal leading-snug">
+                  {companyName}
+                </span>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-150 ${openDropdown === "user" ? "rotate-180" : ""}`} />
             </div>
-            <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-150 ${openDropdown === "user" ? "rotate-180" : ""}`} />
-          </div>
 
-          {openDropdown === "user" && (
-            <div className="absolute right-0 mt-1.5 w-52 bg-white border border-zinc-200 rounded-[6px] shadow-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-              <button
-                onClick={() => {
-                  onTabChange("settings");
-                  setOpenDropdown(null);
-                }}
-                className="w-full text-left px-3 py-2 text-[12.5px] hover:bg-zinc-50 flex items-center gap-2 transition-colors text-zinc-700 cursor-pointer font-medium"
-              >
-                <span>Workspace Configuration</span>
-              </button>
-              <button
-                onClick={() => {
-                  onLogout();
-                  setOpenDropdown(null);
-                }}
-                className="w-full text-left px-3 py-2 text-[12.5px] hover:bg-red-50 flex items-center gap-2 transition-colors text-red-600 cursor-pointer font-medium border-t border-zinc-100 mt-1 pt-2"
-              >
-                <span>Logout</span>
-              </button>
-            </div>
-          )}
-        </div>
+            {openDropdown === "user" && (
+              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-zinc-200 rounded-[6px] shadow-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                <button
+                  onClick={() => {
+                    onTabChange("settings");
+                    setOpenDropdown(null);
+                  }}
+                  className="w-full text-left px-3 py-2 text-[12.5px] hover:bg-zinc-50 flex items-center gap-2 transition-colors text-zinc-700 cursor-pointer font-medium"
+                >
+                  <span>Workspace Configuration</span>
+                </button>
+                <button
+                  onClick={() => {
+                    onLogout();
+                    setOpenDropdown(null);
+                  }}
+                  className="w-full text-left px-3 py-2 text-[12.5px] hover:bg-red-50 flex items-center gap-2 transition-colors text-red-600 cursor-pointer font-medium border-t border-zinc-100 mt-1 pt-2"
+                >
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Search Modules Modal with Counts */}
@@ -919,7 +919,7 @@ export default function App() {
       foreward_outlook: "Forward Outlook",
       latest: "Latest Intelligence",
       find_opportunities: "Find Opportunities",
-      competitive_radar: "Competitive Radar",
+      competitive_radar: "Competitive Intelligence",
       voice_of_customer: "Voice of Customer",
       decision_intelligence: "Decision Intelligence",
       my_bookmarks: "My Bookmarks",
@@ -1268,7 +1268,17 @@ export default function App() {
         {/* Transient / Light Panes */}
         {activeTab === "latest" && <LatestPane onReturn={handleReturn} />}
         {activeTab === "find_opportunities" && <FindOpportunitiesPane onReturn={handleReturn} />}
-        {activeTab === "competitive_radar" && <CompetitiveRadarPane onReturn={handleReturn} />}
+        {activeTab === "competitive_radar" && (
+          <CompetitiveRadarPane 
+            onReturn={handleReturn}
+            clientId={clientId || undefined}
+            onSwitchToDecisionIntelligence={(query, tab, label, returnLabel) => {
+              setInitialQuery({query, timestamp: Date.now()});
+              setDiReturnConfig({tab, label: returnLabel});
+              setActiveTab("decision_intelligence");
+            }}
+          />
+        )}
         {activeTab === "voice_of_customer" && <VoiceOfCustomerPane onReturn={handleReturn} />}
         
         <div className={activeTab === "landing_page" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>

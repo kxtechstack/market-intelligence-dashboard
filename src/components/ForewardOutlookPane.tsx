@@ -2149,7 +2149,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
 
               {/* Document Narrative */}
               <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-zinc-600 font-sans select-text">
-                <p className="font-light text-zinc-800 leading-relaxed">{selectedTrend.summary}</p>
+                <p className="font-[350] text-zinc-800 leading-relaxed" style={{ fontWeight: 350 }}>{selectedTrend.summary}</p>
                 
                 <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-600 mt-1">
                   <span className="font-normal text-zinc-600 mt-[3px]">Reference:</span>
@@ -2200,7 +2200,7 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                   {selectedTrend.business_impact.map((bullet, idx) => (
                     <div key={idx} className="flex gap-2.5 items-start">
                       <span className="text-[#2d39d2] text-xs mt-1 shrink-0 select-none">•</span>
-                      <p className="text-[13px] leading-relaxed text-zinc-800 font-light select-text font-sans">
+                      <p className="text-[13px] leading-relaxed text-zinc-800 font-[350] select-text font-sans" style={{ fontWeight: 350 }}>
                         {bullet}
                       </p>
                     </div>

@@ -41,7 +41,7 @@ export default function ReportView({
     if (!content) return null;
     if (typeof content === "string") {
       if (!content.trim()) return null;
-      return <p className="text-[13px] leading-relaxed text-slate-700 mb-1.5 last:mb-0 font-normal tracking-normal">{content}</p>;
+      return <p className="text-[13px] leading-relaxed text-black mb-1.5 last:mb-0 font-normal tracking-normal">{content}</p>;
     }
     if (Array.isArray(content)) {
       const filtered = content.filter((item) => Boolean(item && item.trim()));
@@ -49,7 +49,7 @@ export default function ReportView({
       return (
         <div className="mb-2">
           {filtered.map((item, idx) => (
-            <p key={idx} className="text-[13px] leading-relaxed text-slate-700 mb-1.5 last:mb-0 font-normal tracking-normal">
+            <p key={idx} className="text-[13px] leading-relaxed text-black mb-1.5 last:mb-0 font-normal tracking-normal">
               {item}
             </p>
           ))}
@@ -69,13 +69,13 @@ export default function ReportView({
         );
       case "paragraph":
         return (
-          <p key={index} className="text-[13px] leading-relaxed text-slate-700 mb-1.5 last:mb-0 font-normal tracking-normal">
+          <p key={index} className="text-[13px] leading-relaxed text-black mb-1.5 last:mb-0 font-normal tracking-normal">
             {block.text}
           </p>
         );
       case "bullets":
         return (
-          <ul key={index} className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
+          <ul key={index} className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-black font-normal tracking-normal">
             {block.items.map((item, i) => (
               <li key={i}>{item}</li>
             ))}
@@ -83,7 +83,7 @@ export default function ReportView({
         );
       case "numbered_list":
         return (
-          <ol key={index} className="list-decimal pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
+          <ol key={index} className="list-decimal pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-black font-normal tracking-normal">
             {block.items.map((item, i) => (
               <li key={i}>{item}</li>
             ))}
@@ -102,11 +102,11 @@ export default function ReportView({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200/70 text-slate-700 text-[13px] font-normal leading-relaxed tracking-normal">
+              <tbody className="divide-y divide-zinc-200/70 text-black text-[13px] font-normal leading-relaxed tracking-normal">
                 {block.rows.map((row, rIdx) => (
                   <tr key={rIdx}>
                     {row.cells.map((cell, cIdx) => (
-                      <td key={cIdx} className="px-3.5 py-2.5 text-slate-700 font-normal text-[13px] leading-relaxed tracking-normal">
+                      <td key={cIdx} className="px-3.5 py-2.5 text-black font-normal text-[13px] leading-relaxed tracking-normal">
                         {cell}
                       </td>
                     ))}
@@ -377,11 +377,11 @@ export default function ReportView({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200/70 text-slate-700 text-[13px] font-normal leading-relaxed tracking-normal">
+              <tbody className="divide-y divide-zinc-200/70 text-black text-[13px] font-normal leading-relaxed tracking-normal">
                 {(report as any).key_movement_analysis.rows.map((row: any, rIdx: number) => (
                   <tr key={rIdx}>
                     {row.cells.map((cell: string, cIdx: number) => (
-                      <td key={cIdx} className="px-3.5 py-2.5 text-slate-700 font-normal text-[13px] leading-relaxed tracking-normal">
+                      <td key={cIdx} className="px-3.5 py-2.5 text-black font-normal text-[13px] leading-relaxed tracking-normal">
                         {cell}
                       </td>
                     ))}
@@ -410,7 +410,7 @@ export default function ReportView({
           <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Key Facts
           </h4>
-          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
+          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-black font-normal tracking-normal">
             {(report as any).key_facts.map((fact: string, idx: number) => (
               <li key={idx}>{fact}</li>
             ))}
@@ -424,7 +424,7 @@ export default function ReportView({
           <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Driving Factors
           </h4>
-          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
+          <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-black font-normal tracking-normal">
             {(report as any).driving_factors.map((factor: string, idx: number) => (
               <li key={idx}>{factor}</li>
             ))}
@@ -453,7 +453,7 @@ export default function ReportView({
           <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 font-serif">
             Decision Implication
           </h4>
-          <p className="text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
+          <p className="text-[13px] leading-relaxed text-black font-normal tracking-normal">
             {decisionImplication}
           </p>
         </div>
@@ -465,7 +465,7 @@ export default function ReportView({
           <h4 className="text-[13.5px] font-semibold text-zinc-900 mt-4 mb-2 border-t border-zinc-200/60 pt-3 font-serif">
             Bottom Line
           </h4>
-          <p className="text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">
+          <p className="text-[13px] leading-relaxed text-black font-normal tracking-normal">
             {(report as any).bottom_line}
           </p>
         </div>
@@ -511,7 +511,7 @@ export function MarketGenieMarkdown({
 
   return (
     <div
-      className={`markdown-body text-[13px] leading-relaxed text-slate-700 tracking-normal space-y-2.5 ${
+      className={`markdown-body text-[13px] leading-relaxed text-black tracking-normal space-y-2.5 ${
         headingSerif ? "font-serif" : "font-sans"
       } font-normal ${className}`}
     >
@@ -573,20 +573,20 @@ export function MarketGenieMarkdown({
             </h6>
           ),
           p: ({ children }) => (
-            <p className="mb-1.5 last:mb-0 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</p>
+            <p className="mb-1.5 last:mb-0 text-[13px] leading-relaxed text-black font-normal tracking-normal">{children}</p>
           ),
           ul: ({ children }) => (
-            <ul className="list-disc pl-5 my-2 space-y-1 text-slate-700 text-[13px] leading-relaxed font-normal tracking-normal [&_ul]:list-[circle] [&_ul]:my-1 [&_ul]:pl-4">
+            <ul className="list-disc pl-5 my-2 space-y-1 text-black text-[13px] leading-relaxed font-normal tracking-normal [&_ul]:list-[circle] [&_ul]:my-1 [&_ul]:pl-4">
               {children}
             </ul>
           ),
           ol: ({ children }) => (
-            <ol className="list-decimal pl-5 my-2 space-y-1 text-slate-700 text-[13px] leading-relaxed font-normal tracking-normal [&_ol]:list-[lower-alpha] [&_ol]:my-1 [&_ol]:pl-4">
+            <ol className="list-decimal pl-5 my-2 space-y-1 text-black text-[13px] leading-relaxed font-normal tracking-normal [&_ol]:list-[lower-alpha] [&_ol]:my-1 [&_ol]:pl-4">
               {children}
             </ol>
           ),
           li: ({ children }) => (
-            <li className="leading-relaxed text-[13px] py-0.5 text-slate-700 font-normal tracking-normal">
+            <li className="leading-relaxed text-[13px] py-0.5 text-black font-normal tracking-normal">
               {children}
             </li>
           ),
@@ -597,7 +597,7 @@ export function MarketGenieMarkdown({
             <em className="italic text-zinc-600">{children}</em>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-[#2d39d2]/50 pl-3 my-2 text-slate-700 text-[13px] leading-relaxed font-normal tracking-normal italic">
+            <blockquote className="border-l-2 border-[#2d39d2]/50 pl-3 my-2 text-black text-[13px] leading-relaxed font-normal tracking-normal italic">
               {children}
             </blockquote>
           ),

@@ -89,7 +89,6 @@ export default function LeftMenubar({ activeTab, onTabChange, onLogout, userInit
             const isActive = activeTab === item.id;
             const isNonClickable = [
               "find_opportunities",
-              "competitive_radar",
               "voice_of_customer",
               "sustainability_intelligence",
             ].includes(item.id);

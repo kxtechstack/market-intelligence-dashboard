@@ -172,6 +172,47 @@ const getSourceBadge = (moduleName: string) => {
   };
 };
 
+const getMainCategoryTagClass = (category: string) => {
+  const cat = (category || "").toLowerCase();
+  if (cat.includes("funding") || cat.includes("investment")) {
+    return "bg-amber-50 border border-amber-200 text-amber-800";
+  }
+  if (cat.includes("industry") || cat.includes("structure")) {
+    return "bg-blue-50 border border-blue-200 text-blue-800";
+  }
+  if (cat.includes("talent") || cat.includes("movement")) {
+    return "bg-emerald-50 border border-emerald-200 text-emerald-800";
+  }
+  if (cat.includes("macro") || cat.includes("economic")) {
+    return "bg-indigo-50 border border-indigo-200 text-indigo-800";
+  }
+  if (cat.includes("tech") || cat.includes("adoption")) {
+    return "bg-purple-50 border border-purple-200 text-purple-800";
+  }
+  if (cat.includes("consumer") || cat.includes("demand")) {
+    return "bg-rose-50 border border-rose-200 text-rose-800";
+  }
+  if (cat.includes("technology")) {
+    return "bg-purple-50 border border-purple-200 text-purple-800";
+  }
+  if (cat.includes("supply") || cat.includes("chain")) {
+    return "bg-orange-50 border border-orange-200 text-orange-800";
+  }
+  if (cat.includes("product") || cat.includes("innovation")) {
+    return "bg-teal-50 border border-teal-200 text-teal-800";
+  }
+  if (cat.includes("sustainability") || cat.includes("environmental")) {
+    return "bg-emerald-50 border border-emerald-200 text-emerald-800";
+  }
+  if (cat.includes("policy") || cat.includes("regulat") || cat.includes("risk") || cat.includes("legal") || cat.includes("compliance")) {
+    return "bg-rose-50 border border-rose-200 text-rose-800";
+  }
+  if (cat.includes("outlook") || cat.includes("trend") || cat.includes("forward") || cat.includes("strategic")) {
+    return "bg-blue-50 border border-blue-200 text-blue-800";
+  }
+  return "bg-slate-50 border border-slate-200 text-slate-800";
+};
+
 interface SignalUsedItem {
   id: string;
   insight_id?: string;
@@ -2443,20 +2484,20 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
               <div className="w-full flex flex-col mb-2 animate-fadeIn space-y-6 pb-6">
                 {/* Highlights Header */}
                 <div className="flex items-center justify-between">
-                  <h2 className="text-[14.5px] font-normal text-zinc-900 tracking-tight font-serif">
+                  <h2 className="text-[14.5px] font-normal text-black tracking-tight font-serif">
                     Latest Highlights & Intelligence Briefing
                   </h2>
                 </div>
 
                 {/* Unified Conversational Answer Card */}
-                <div className="bg-white border border-zinc-200/90 rounded-[10px] p-5 md:p-6 shadow-2xs space-y-5 text-slate-700 font-normal leading-relaxed tracking-normal">
+                <div className="bg-white border border-zinc-200/90 rounded-[10px] p-5 md:p-6 shadow-2xs space-y-5 text-black font-normal leading-relaxed tracking-normal">
                   {highlightsLoading ? (
                     <div className="py-8 flex items-center justify-center gap-2 text-xs text-zinc-400">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2d39d2]" />
                       <span>Loading highlights…</span>
                     </div>
                   ) : !hasAnyHighlightsData ? (
-                    <p className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal">
+                    <p className="text-[13px] text-black font-normal leading-relaxed tracking-normal">
                       No highlights available yet. They appear after the next scheduled update.
                     </p>
                   ) : (
@@ -2471,7 +2512,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                             .map((paragraph, pIdx) => (
                               <p
                                 key={pIdx}
-                                className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal"
+                                className="text-[13px] text-black font-normal leading-relaxed tracking-normal"
                               >
                                 {paragraph}
                               </p>
@@ -2509,16 +2550,16 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
 
                           return (
                             <div key={module.id} className="space-y-3">
-                              <h3 className="text-[11.5px] font-medium text-zinc-600 uppercase tracking-widest font-sans">
+                              <h3 className="text-[11.5px] font-medium text-black uppercase tracking-widest font-sans">
                                 {module.name} Highlights
                                 {moduleHighlight?.signal_date && (
-                                  <span className="text-zinc-400 font-normal normal-case tracking-normal ml-1.5">
+                                  <span className="text-zinc-500 font-normal normal-case tracking-normal ml-1.5">
                                     · {formatSignalDate(moduleHighlight.signal_date)}
                                   </span>
                                 )}
                               </h3>
                               {hasHighlightText && (
-                                <div className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal space-y-3">
+                                <div className="text-[13px] text-black font-normal leading-relaxed tracking-normal space-y-3">
                                   {paragraphs.map((paragraph, pIdx) => (
                                     <p key={pIdx}>{paragraph}</p>
                                   ))}
@@ -2528,7 +2569,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                               {hasSignalRows && (
                                 <div className="border border-zinc-200/90 rounded-[8px] bg-white overflow-hidden shadow-2xs">
                                   <table className="w-full text-left border-collapse">
-                                    <tbody className="divide-y divide-zinc-100 text-zinc-800">
+                                    <tbody className="divide-y divide-zinc-100 text-black">
                                       {visibleCards.map((card) => {
                                         const cardKey = `${module.id}-${card.id}`;
                                         const isOpen = !!expandedCards[cardKey];
@@ -2541,7 +2582,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                               className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
                                             >
                                               <td className="py-2.5 px-3.5 align-middle">
-                                                <div className="text-[12px] text-zinc-800 font-normal">{card.title}</div>
+                                                <div className="text-[12px] text-black font-normal">{card.title}</div>
                                               </td>
                                               <td className="py-2.5 px-3.5 align-middle text-right whitespace-nowrap">
                                                 <div className="flex items-center justify-end gap-2">
@@ -2579,12 +2620,18 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                                   className="bg-zinc-50/50 hover:bg-zinc-100/60 transition-colors cursor-pointer"
                                                 >
                                                   <td className="py-2 px-3.5 pl-8 align-middle">
-                                                    <div className="text-[11.5px] text-zinc-700 font-normal">{sig.title}</div>
+                                                    <div className="text-[11.5px] text-black font-normal">{sig.title}</div>
                                                   </td>
                                                   <td className="py-2 px-3.5 align-middle text-right whitespace-nowrap">
                                                     <div className="flex items-center justify-end gap-2">
                                                       {sig.tag && (
-                                                        <span className="text-[9px] font-medium text-zinc-500">{sig.tag}</span>
+                                                        <span
+                                                          className={`inline-flex items-center px-2 py-0.5 rounded-[4px] text-[9.5px] font-medium shrink-0 ${getMainCategoryTagClass(
+                                                            sig.tag
+                                                          )}`}
+                                                        >
+                                                          {sig.tag}
+                                                        </span>
                                                       )}
                                                     </div>
                                                   </td>
@@ -2600,7 +2647,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                           className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
                                         >
                                           <td className="py-2.5 px-3.5 align-middle">
-                                            <div className="text-[12px] text-zinc-800 font-normal">{sig.title}</div>
+                                            <div className="text-[12px] text-black font-normal">{sig.title}</div>
                                           </td>
                                           <td className="py-2.5 px-3.5 align-middle text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-2">
@@ -2631,7 +2678,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                         }
                                         className="text-[11.5px] font-medium text-zinc-600 hover:text-zinc-900 transition-colors cursor-pointer"
                                       >
-                                        {isCardsExpanded ? "Show less" : `Show all ${totalItems} cards`}
+                                        {isCardsExpanded ? "Show less" : "Show more"}
                                       </button>
                                     </div>
                                   )}
@@ -2652,7 +2699,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                             .map((paragraph, pIdx) => (
                               <p
                                 key={pIdx}
-                                className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal"
+                                className="text-[13px] text-black font-normal leading-relaxed tracking-normal"
                               >
                                 {paragraph}
                               </p>
@@ -2678,7 +2725,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                     className={`max-w-[92%] rounded-[10px] px-4 py-3 text-[13px] leading-relaxed tracking-normal ${
                       msg.role === "user"
                         ? "bg-[#f3f3f4] text-zinc-900 border border-zinc-200/70 font-sans"
-                        : "bg-white border border-zinc-200/80 text-slate-700 shadow-2xs w-full font-normal"
+                        : "bg-white border border-zinc-200/80 text-black shadow-2xs w-full font-normal"
                     }`}
                   >
                     {msg.heading && (
@@ -2698,7 +2745,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                         onSourceClick={handleSourceOpen}
                       />
                     ) : (
-                      <div className="markdown-body text-[13px] leading-relaxed text-slate-700 space-y-2.5 font-normal tracking-normal">
+                      <div className="markdown-body text-[13px] leading-relaxed text-black space-y-2.5 font-normal tracking-normal">
                         <Markdown
                           remarkPlugins={[remarkGfm]}
                           components={{
@@ -2732,12 +2779,12 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                 {children}
                               </h6>
                             ),
-                            p: ({ children }) => <p className="mb-1.5 last:mb-0 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</p>,
+                            p: ({ children }) => <p className="mb-1.5 last:mb-0 text-[13px] leading-relaxed text-black font-normal tracking-normal">{children}</p>,
                             ul: ({ children }) => (
-                              <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</ul>
+                              <ul className="list-disc pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-black font-normal tracking-normal">{children}</ul>
                             ),
                             ol: ({ children }) => (
-                              <ol className="list-decimal pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</ol>
+                              <ol className="list-decimal pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-black font-normal tracking-normal">{children}</ol>
                             ),
                             li: ({ children }) => {
                               const childrenArray = React.Children.toArray(children);
@@ -2813,7 +2860,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                                 );
                               }
 
-                              return <li className="leading-relaxed text-[13px] py-0.5 text-slate-700 font-normal tracking-normal">{children}</li>;
+                              return <li className="leading-relaxed text-[13px] py-0.5 text-black font-normal tracking-normal">{children}</li>;
                             },
                             a: ({ href, children }) => (
                               <a
@@ -2845,15 +2892,15 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                               </thead>
                             ),
                             tbody: ({ children }) => (
-                              <tbody className="divide-y divide-zinc-200/70 text-slate-700 text-[13px] font-normal leading-relaxed tracking-normal">{children}</tbody>
+                              <tbody className="divide-y divide-zinc-200/70 text-black text-[13px] font-normal leading-relaxed tracking-normal">{children}</tbody>
                             ),
                             tr: ({ children }) => (
                               <tr className="hover:bg-zinc-50/80 transition-colors">{children}</tr>
                             ),
                             th: ({ children }) => <th className="px-3.5 py-2.5 font-semibold text-zinc-900">{children}</th>,
-                            td: ({ children }) => <td className="px-3.5 py-2.5 text-slate-700 font-normal text-[13px] leading-relaxed tracking-normal">{children}</td>,
+                            td: ({ children }) => <td className="px-3.5 py-2.5 text-black font-normal text-[13px] leading-relaxed tracking-normal">{children}</td>,
                             blockquote: ({ children }) => (
-                              <blockquote className="border-l-3 border-[#2d39d2] pl-3 py-1 my-2 text-slate-700 bg-purple-50/50 rounded-r-[4px] text-[13px] font-normal leading-relaxed tracking-normal">
+                              <blockquote className="border-l-3 border-[#2d39d2] pl-3 py-1 my-2 text-black bg-purple-50/50 rounded-r-[4px] text-[13px] font-normal leading-relaxed tracking-normal">
                                 {children}
                               </blockquote>
                             ),
@@ -2924,7 +2971,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                               onClick={() => handleListItemClick(item)}
                               className="flex items-center justify-between gap-4 py-2 px-3.5 hover:bg-zinc-50/70 transition-colors cursor-pointer group/row"
                             >
-                              <span className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal group-hover/row:text-zinc-950">
+                              <span className="text-[13px] text-black font-normal leading-relaxed tracking-normal group-hover/row:text-zinc-950">
                                 {item.title}
                               </span>
 

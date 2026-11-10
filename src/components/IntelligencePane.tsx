@@ -1301,7 +1301,16 @@ export default function IntelligencePane({
         </div>
 
         {/* Alerts list workspace without background color */}
-        <div id="alerts-scrollbar-area" className="flex-1 overflow-y-auto px-0 py-3 flex flex-col gap-4 transition-all duration-300">
+        <div 
+          id="alerts-scrollbar-area" 
+          className={`relative flex-1 overflow-y-auto px-0 py-3 flex flex-col gap-4 transition-all duration-300 ${selectedAlert ? "blur-sm" : ""}`}
+        >
+          {selectedAlert && (
+            <div
+              className="absolute inset-0 z-50 bg-transparent cursor-pointer"
+              onClick={() => onSelectAlert(null as any)}
+            />
+          )}
           {isLoading ? (
             <div className="flex-1 flex items-center justify-center text-sm text-zinc-400">
                <div className="w-5 h-5 border-2 border-[#2d39d2] border-t-transparent rounded-full animate-spin"></div>
@@ -1660,7 +1669,7 @@ export default function IntelligencePane({
 
             {/* Document Content Paragraphs: full-width narrative and reference box underneath matching Market Dynamics */}
             <div className="flex flex-col gap-4 text-[13px] leading-relaxed text-zinc-600 font-sans select-text">
-              <p className="font-light text-zinc-800 leading-relaxed text-left">{selectedAlert.summary}</p>
+              <p className="font-[350] text-zinc-800 leading-relaxed text-left" style={{ fontWeight: 350 }}>{selectedAlert.summary}</p>
               
               {/* Reference */}
               <div className="flex items-start gap-1.5 select-none text-[11px] text-zinc-600 mt-1">
@@ -1695,7 +1704,7 @@ export default function IntelligencePane({
                 {businessImpactList.map((bullet, idx) => (
                   <div key={idx} className="flex gap-2.5 items-start">
                     <span className="text-[#2d39d2] text-xs mt-1 shrink-0 select-none">•</span>
-                    <p className="text-[13px] leading-relaxed text-zinc-800 font-light select-text font-sans">
+                    <p className="text-[13px] leading-relaxed text-zinc-800 font-[350] select-text font-sans" style={{ fontWeight: 350 }}>
                       {bullet}
                     </p>
                   </div>
