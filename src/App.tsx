@@ -8,6 +8,8 @@ import MarketDynamicsPane from "./components/MarketDynamicsPane";
 import FindOpportunitiesPane from "./components/FindOpportunitiesPane";
 import CompetitiveRadarPane from "./components/CompetitiveRadarPane";
 import VoiceOfCustomerPane from "./components/VoiceOfCustomerPane";
+import VoiceOfMarketPane from "./components/VoiceOfMarketPane";
+import SustainabilityIntelligencePane from "./components/SustainabilityIntelligencePane";
 import ForewardOutlookPane from "./components/ForewardOutlookPane";
 import DecisionIntelligencePane from "./components/DecisionIntelligencePane";
 import LandingPane from "./components/LandingPane";
@@ -348,8 +350,8 @@ function TopMenuBar({
     },
     {
       id: "voice_of_customer",
-      label: "Voice of Customer",
-      desc: "Customer sentiment, pain points and feedback trends",
+      label: "Voice of Market",
+      desc: "Analyst posts, announcements and market perspectives",
       icon: MessageSquare,
       countKey: "voice_of_customer",
       defaultCount: 0,
@@ -357,8 +359,8 @@ function TopMenuBar({
     },
     {
       id: "my_bookmarks",
-      label: "My Bookmarks",
-      desc: "Saved intelligence signals and bookmarked reports",
+      label: "My Notes & Bookmarks",
+      desc: "Saved intelligence signals, notes, and bookmarked reports",
       icon: Bookmark,
       countKey: "my_bookmarks",
       defaultCount: 0,
@@ -717,7 +719,7 @@ function TopMenuBar({
             <div className="flex items-center justify-between border-b border-zinc-100 pb-3 mb-4">
               <div>
                 <h3 className="text-[15px] font-semibold text-zinc-900">Subscription & Credits</h3>
-                <p className="text-[12px] text-zinc-500">Graceview Market Intelligence Enterprise Tier</p>
+                <p className="text-[12px] text-zinc-500">InsideMarkets Enterprise Tier</p>
               </div>
               <button onClick={() => setShowPricingModal(false)} className="p-1 text-zinc-400 hover:text-zinc-700 rounded cursor-pointer">
                 <X className="w-4 h-4" />
@@ -743,17 +745,13 @@ function TopMenuBar({
                 </div>
               </div>
               <div className="text-[12px] text-zinc-600 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <span>Unlimited regulatory scanning and live consultation feeds</span>
+                <div className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
+                  <span>Each decision intelligence question consumes approximately 1 credit.</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <span>Full access to MarketGenie strategic inference & report synthesis</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <span>Custom signals and SEC document retrieval</span>
+                <div className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
+                  <span>Unlimited Signal Monitoring: Access daily market signals, company developments and intelligence feeds without consuming credits.</span>
                 </div>
               </div>
             </div>
@@ -883,7 +881,7 @@ export default function App() {
   const VALID_TABS = [
     "landing_page", "policy_risk_monitor", "market_dynamics", "foreward_outlook", 
     "latest", "find_opportunities", "competitive_radar", 
-    "voice_of_customer", "decision_intelligence", "my_bookmarks", 
+    "voice_of_customer", "sustainability_intelligence", "decision_intelligence", "my_bookmarks", 
     "support", "settings"
   ];
 
@@ -920,9 +918,10 @@ export default function App() {
       latest: "Latest Intelligence",
       find_opportunities: "Find Opportunities",
       competitive_radar: "Competitive Intelligence",
-      voice_of_customer: "Voice of Customer",
+      voice_of_customer: "Voice of Market",
+      sustainability_intelligence: "Sustainability Intelligence",
       decision_intelligence: "Decision Intelligence",
-      my_bookmarks: "My Bookmarks",
+      my_bookmarks: "My Notes & Bookmarks",
       support: "Support",
       settings: "Settings",
       login: "Login",
@@ -1279,7 +1278,26 @@ export default function App() {
             }}
           />
         )}
-        {activeTab === "voice_of_customer" && <VoiceOfCustomerPane onReturn={handleReturn} />}
+        {activeTab === "voice_of_customer" && (
+          <VoiceOfMarketPane 
+            onReturn={handleReturn} 
+            clientId={clientId || ""}
+            userId={userId || ""}
+          />
+        )}
+        {activeTab === "sustainability_intelligence" && (
+          <SustainabilityIntelligencePane 
+            onReturn={handleReturn}
+            clientId={clientId || ""}
+            industry={industry || ""}
+            userId={userId || ""}
+            onSwitchToDecisionIntelligence={(query, tab, label, returnLabel) => {
+              setInitialQuery({query, timestamp: Date.now()});
+              setDiReturnConfig({tab, label: returnLabel});
+              setActiveTab("decision_intelligence");
+            }}
+          />
+        )}
         
         <div className={activeTab === "landing_page" ? "flex-1 flex flex-col overflow-hidden" : "hidden"}>
           <LandingPane 
@@ -1335,7 +1353,7 @@ export default function App() {
         </div>
 
         {/* Fallback for unrecognized tabs */}
-        {!["landing_page", "policy_risk_monitor", "market_dynamics", "foreward_outlook", "latest", "find_opportunities", "competitive_radar", "voice_of_customer", "decision_intelligence", "my_bookmarks", "support", "settings"].includes(activeTab) && (
+        {!["landing_page", "policy_risk_monitor", "market_dynamics", "foreward_outlook", "latest", "find_opportunities", "competitive_radar", "voice_of_customer", "sustainability_intelligence", "decision_intelligence", "my_bookmarks", "support", "settings"].includes(activeTab) && (
           <div className="flex-1 h-full bg-zinc-50 flex items-center justify-center p-8 select-none">
             <div className="max-w-md w-full bg-white border border-zinc-200 p-6 rounded-[4px] shadow-[0_1px_3px_rgba(0,0,0,0.01)] text-center flex flex-col items-center">
               <h3 className="text-base font-medium text-zinc-900 mb-1">

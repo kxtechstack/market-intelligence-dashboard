@@ -5,6 +5,7 @@ import { ChatSources } from "./ChatSources";
 import { MarketGenieMarkdown } from "./ReportView";
 import { FORWARD_OUTLOOK_MODULE_ID, API_URL } from "../constants";
 import { BubbleMapSection } from "./BubbleMapSection";
+import NoteModal from "./NoteModal";
 
 interface ForewardOutlookPaneProps {
   onReturn: () => void;
@@ -957,6 +958,7 @@ export default function ForewardOutlookPane({
   const [snapshot, setSnapshot] = useState<any>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(true);
   const [enabledSubmodules, setEnabledSubmodules] = useState<Map<string, string>>(new Map());
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   useEffect(() => {
     async function loadEnabledSubmodules() {
@@ -2032,58 +2034,32 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                   Impact Horizon: {formatTerm(selectedTrend.term)}
                 </span>
 
-                <div className="flex items-center gap-1.5 shrink-0 select-none">
-                    <button
-                      id="not-interested-button"
-                      onClick={async () => {
-                        if (!selectedTrend || !clientId || !userId) return;
-                        try {
-                          const { error } = await supabase
-                            .from("hidden_articles")
-                            .insert([
-                              {
-                                client_id: clientId,
-                                user_id: userId,
-                                trend_cluster_id: selectedTrend.id
-                              }
-                            ]);
-                          if (error) throw error;
+                  <div className="flex items-center gap-1.5 shrink-0 select-none">
+                    <div className="relative group/btn flex items-center justify-center">
+                      <button
+                        id="bookmark-doc-button"
+                        onClick={() => setIsNoteModalOpen(true)}
+                        className={`w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 ${
+                          isBookmarked[selectedTrend.id]
+                            ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
+                            : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
+                        }`}
+                      >
+                        <Bookmark className={`w-3 h-3 ${isBookmarked[selectedTrend.id] ? "text-amber-500 fill-amber-500" : ""}`} />
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                        Notes & Bookmarks
+                      </div>
+                    </div>
 
-                          setHiddenIds(prev => ({ ...prev, [selectedTrend.id]: true }));
-                          setLastHiddenTrend(selectedTrend);
-                          triggerToast(`Hidden: ${selectedTrend.title}`, true);
-                        } catch (err: any) {
-                          console.error("Error hiding article:", err);
-                          triggerToast(`Failed to hide article: ${err.message || "Unknown error"}`);
-                        }
-                      }}
-                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[3px] flex items-center justify-center transition-colors"
-                      title="Not Interested"
-                    >
-                      <Square className="w-3 h-3" />
-                    </button>
-
-                    <button
-                      id="bookmark-doc-button"
-                      onClick={async () => {
-                        if (!selectedTrend || !clientId || !userId) return;
-                        const isCurrentlyBookmarked = isBookmarked[selectedTrend.id];
-                        
-                        try {
-                          if (isCurrentlyBookmarked) {
-                            // DELETE
+                    <div className="relative group/btn flex items-center justify-center">
+                      <button
+                        id="not-interested-button"
+                        onClick={async () => {
+                          if (!selectedTrend || !clientId || !userId) return;
+                          try {
                             const { error } = await supabase
-                              .from("bookmarks")
-                              .delete()
-                              .eq("client_id", clientId)
-                              .eq("user_id", userId)
-                              .eq("trend_cluster_id", selectedTrend.id);
-                            if (error) throw error;
-                            triggerToast(`Removed bookmark for ${selectedTrend.title}`);
-                          } else {
-                            // INSERT
-                            const { error } = await supabase
-                              .from("bookmarks")
+                              .from("hidden_articles")
                               .insert([
                                 {
                                   client_id: clientId,
@@ -2092,35 +2068,23 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
                                 }
                               ]);
                             if (error) throw error;
-                            triggerToast(`Saved bookmark for ${selectedTrend.title}`);
-                          }
-                          // Refresh bookmarks
-                          await fetchBookmarks();
-                          // Notify other components
-                          window.dispatchEvent(new CustomEvent("bookmarks-updated"));
-                        } catch (err: any) {
-                          console.error("Error toggling bookmark:", err);
-                          triggerToast(`Failed to update bookmark: ${err.message || "Unknown error"}`);
-                        }
-                      }}
-                      className={`w-[22px] h-[22px] border rounded-[3px] flex items-center justify-center transition-colors duration-150 ${
-                        isBookmarked[selectedTrend.id]
-                          ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
-                          : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
-                      }`}
-                      title={isBookmarked[selectedTrend.id] ? "Remove Bookmark" : "Bookmark"}
-                    >
-                      <Bookmark className={`w-3 h-3 ${isBookmarked[selectedTrend.id] ? "text-amber-500 fill-amber-500" : ""}`} />
-                    </button>
 
-                    <button
-                      id="export-doc-button"
-                      onClick={() => triggerToast(`Exported strategic brief for ${selectedTrend.title} to PDF draft.`)}
-                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50 rounded-[3px] flex items-center justify-center transition-colors"
-                      title="Export"
-                    >
-                      <Share2 className="w-3 h-3" />
-                    </button>
+                            setHiddenIds(prev => ({ ...prev, [selectedTrend.id]: true }));
+                            setLastHiddenTrend(selectedTrend);
+                            triggerToast(`Hidden: ${selectedTrend.title}`, true);
+                          } catch (err: any) {
+                            console.error("Error hiding article:", err);
+                            triggerToast(`Failed to hide article: ${err.message || "Unknown error"}`);
+                          }
+                        }}
+                        className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                        Not Relevant
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2605,6 +2569,47 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
             )}
           </div>
         </div>
+      )}
+
+      {/* Note & Bookmark WYSIWYG Modal */}
+      {selectedTrend && (
+        <NoteModal
+          isOpen={isNoteModalOpen}
+          onClose={() => setIsNoteModalOpen(false)}
+          title={selectedTrend.title}
+          initialContent={localStorage.getItem(`note_forward_outlook_${selectedTrend.id}`) || ""}
+          onSave={async (contentHtml) => {
+            if (!selectedTrend) return;
+            try {
+              if (contentHtml && contentHtml.trim()) {
+                localStorage.setItem(`note_forward_outlook_${selectedTrend.id}`, contentHtml);
+              } else {
+                localStorage.removeItem(`note_forward_outlook_${selectedTrend.id}`);
+              }
+
+              if (clientId && userId && !isBookmarked[selectedTrend.id]) {
+                const { error } = await supabase
+                  .from("bookmarks")
+                  .insert([
+                    {
+                      client_id: clientId,
+                      user_id: userId,
+                      trend_cluster_id: selectedTrend.id
+                    }
+                  ]);
+                if (!error) {
+                  setIsBookmarked(prev => ({ ...prev, [selectedTrend.id]: true }));
+                  await fetchBookmarks();
+                  window.dispatchEvent(new CustomEvent("bookmarks-updated"));
+                }
+              }
+              triggerToast(`Saved notes & bookmark for ${selectedTrend.title}`);
+            } catch (err: any) {
+              console.error("Error saving note:", err);
+              triggerToast("Saved note locally");
+            }
+          }}
+        />
       )}
 
     </div>

@@ -1506,7 +1506,7 @@ export default function DecisionIntelligencePane({
           }
         }
       } catch (e) {
-        console.error("[DI] Failed to load suggested questions", e);
+        console.warn("[DI] Unable to load suggested questions", e);
       }
     })();
   }, [clientId, industry]);
@@ -1516,20 +1516,42 @@ export default function DecisionIntelligencePane({
     try {
       const res = await fetch(
         `${API_URL}/decision-intelligence/conversations?userId=${encodeURIComponent(userId)}`
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { conversations } = await res.json();
-      const mapped: ChatSession[] = (conversations || []).map((c: any) => ({
-        id: c.id,
-        title: c.title,
-        date: "",
-        displayTime: relativeTime(c.updated_at),
-        dayGroup: groupDay(c.updated_at),
-        messages: [],
-      }));
-      setPreviousSessions(mapped);
+      ).catch(() => null);
+
+      if (res && res.ok) {
+        const { conversations } = await res.json();
+        const mapped: ChatSession[] = (conversations || []).map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          date: "",
+          displayTime: relativeTime(c.updated_at),
+          dayGroup: groupDay(c.updated_at),
+          messages: [],
+        }));
+        setPreviousSessions(mapped);
+        return;
+      }
+
+      // Supabase fallback if backend API endpoint returned 404 or network error
+      const { data: convData, error: convErr } = await supabase
+        .from("di_conversations")
+        .select("*")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false });
+
+      if (!convErr && convData) {
+        const mapped: ChatSession[] = convData.map((c: any) => ({
+          id: c.id,
+          title: c.title || "Untitled Session",
+          date: "",
+          displayTime: relativeTime(c.updated_at || new Date().toISOString()),
+          dayGroup: groupDay(c.updated_at || new Date().toISOString()),
+          messages: [],
+        }));
+        setPreviousSessions(mapped);
+      }
     } catch (e) {
-      console.error("[DI] Failed to load conversations", e);
+      console.warn("[DI] Unable to load conversations", e);
     }
   };
 
@@ -2362,45 +2384,94 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
     try {
       const res = await fetch(
         `${API_URL}/decision-intelligence/conversations/${session.id}?userId=${encodeURIComponent(userId)}`
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const hydrated: ChatMessage[] = (data.messages || []).map((m: any) => {
-        if (m.role === "user") {
+      ).catch(() => null);
+
+      if (res && res.ok) {
+        const data = await res.json();
+        const hydrated: ChatMessage[] = (data.messages || []).map((m: any) => {
+          if (m.role === "user") {
+            return {
+              id: m.id,
+              role: "user",
+              text: m.content || "",
+              timestamp: new Date(m.created_at),
+            };
+          }
+          const payload = m.payload || {};
+          const rawItems = payload.items || payload.listItems || [];
           return {
             id: m.id,
-            role: "user",
+            role: "model",
             text: m.content || "",
             timestamp: new Date(m.created_at),
+            ...payload,
+            chartBase64: payload.chart || payload.chartBase64 || null,
+            chartMeta: payload.chartMeta || null,
+            noDataSuggestions: payload.noDataSuggestions || payload.suggestions || [],
+            report: payload.report || null,
+            reportSources: payload.reportSources || payload.sources || [],
+            listItems: rawItems.map((it: any, idx: number) => ({
+              id: it.id || `item-${idx}`,
+              title: it.title || "",
+              category: it.category || "",
+              summary: it.summary || "",
+              impact: it.impact || undefined,
+              module: it.module || undefined,
+              parentLabel: it.parentLabel || undefined,
+            })),
           };
-        }
-        const payload = m.payload || {};
-        const rawItems = payload.items || payload.listItems || [];
-        return {
-          id: m.id,
-          role: "model",
-          text: m.content || "",
-          timestamp: new Date(m.created_at),
-          ...payload,
-          chartBase64: payload.chart || payload.chartBase64 || null,
-          chartMeta: payload.chartMeta || null,
-          noDataSuggestions: payload.noDataSuggestions || payload.suggestions || [],
-          report: payload.report || null,
-          reportSources: payload.reportSources || payload.sources || [],
-          listItems: rawItems.map((it: any, idx: number) => ({
-            id: it.id || `item-${idx}`,
-            title: it.title || "",
-            category: it.category || "",
-            summary: it.summary || "",
-            impact: it.impact || undefined,
-            module: it.module || undefined,
-            parentLabel: it.parentLabel || undefined,
-          })),
-        };
-      });
-      setMessages(hydrated);
+        });
+        setMessages(hydrated);
+        return;
+      }
+
+      // Supabase fallback if API returns 404 or fails
+      const { data: msgData, error: msgErr } = await supabase
+        .from("di_messages")
+        .select("*")
+        .eq("conversation_id", session.id)
+        .order("created_at", { ascending: true });
+
+      if (!msgErr && msgData) {
+        const hydrated: ChatMessage[] = msgData.map((m: any) => {
+          if (m.role === "user") {
+            return {
+              id: m.id,
+              role: "user",
+              text: m.content || "",
+              timestamp: new Date(m.created_at),
+            };
+          }
+          const payload = m.payload || {};
+          const rawItems = payload.items || payload.listItems || [];
+          return {
+            id: m.id,
+            role: "model",
+            text: m.content || "",
+            timestamp: new Date(m.created_at),
+            ...payload,
+            chartBase64: payload.chart || payload.chartBase64 || null,
+            chartMeta: payload.chartMeta || null,
+            noDataSuggestions: payload.noDataSuggestions || payload.suggestions || [],
+            report: payload.report || null,
+            reportSources: payload.reportSources || payload.sources || [],
+            listItems: rawItems.map((it: any, idx: number) => ({
+              id: it.id || `item-${idx}`,
+              title: it.title || "",
+              category: it.category || "",
+              summary: it.summary || "",
+              impact: it.impact || undefined,
+              module: it.module || undefined,
+              parentLabel: it.parentLabel || undefined,
+            })),
+          };
+        });
+        setMessages(hydrated);
+      } else {
+        setMessages([]);
+      }
     } catch (e) {
-      console.error("[DI] Failed to load conversation", e);
+      console.warn("[DI] Unable to load conversation", e);
       setMessages([]);
     }
   };
@@ -2410,8 +2481,11 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
       const res = await fetch(
         `${API_URL}/decision-intelligence/conversations/${sessionId}?userId=${encodeURIComponent(userId)}`,
         { method: 'DELETE' }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      ).catch(() => null);
+
+      if (!res || !res.ok) {
+        await supabase.from("di_conversations").delete().eq("id", sessionId).eq("user_id", userId);
+      }
 
       // Remove from local state
       setPreviousSessions(prev => prev.filter(s => s.id !== sessionId));
@@ -2423,8 +2497,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
         setCurrentConversationId(null);
       }
     } catch (err) {
-      console.error('[DI] delete session failed', err);
-      alert('Could not delete this chat. Please try again.');
+      console.warn('[DI] delete session fallback:', err);
     }
   };
 

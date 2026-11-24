@@ -5,6 +5,7 @@ import { SourceItem } from "./ForewardOutlookPane";
 import { ChatSources } from "./ChatSources";
 import { MarketGenieMarkdown } from "./ReportView";
 import { MARKET_DYNAMICS_MODULE_ID, API_URL } from "../constants";
+import NoteModal from "./NoteModal";
 
 interface MarketDynamicsPaneProps {
   onReturn: () => void;
@@ -446,6 +447,7 @@ export default function MarketDynamicsPane({
   const [snapshot, setSnapshot] = useState<any>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(true);
   const [enabledSubmodules, setEnabledSubmodules] = useState<Map<string, string>>(new Map());
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   useEffect(() => {
     async function loadEnabledSubmodules() {
@@ -638,63 +640,64 @@ export default function MarketDynamicsPane({
       try {
         // Fetch enabled signal configuration and market insights in parallel
         const [enabledSignalsRes, insightsRes] = await Promise.all([
-          supabase
-            .schema("admin")
-            .from("client_signals")
-            .select(`
-              id,
-              signal_id,
-              is_enabled,
-              signal:signals(
+          Promise.resolve(
+            supabase
+              .schema("admin")
+              .from("client_signals")
+              .select(`
                 id,
-                signal_name,
-                module_id,
-                submodule_id,
-                submodule:submodules(
+                signal_id,
+                is_enabled,
+                signal:signals(
                   id,
-                  submodule_name,
-                  module_id
+                  signal_name,
+                  module_id,
+                  submodule_id,
+                  submodule:submodules(
+                    id,
+                    submodule_name,
+                    module_id
+                  )
                 )
-              )
-            `)
-            .eq("client_id", clientId)
-            .eq("is_enabled", true),
-          supabase
-            .from("market_insights_live")
-            .select("*")
-            .eq("module_id", MARKET_DYNAMICS_MODULE_ID)
-            .eq("client_id", clientId)
+              `)
+              .eq("client_id", clientId)
+              .eq("is_enabled", true)
+          ).catch(err => ({ data: null, error: err })),
+          Promise.resolve(
+            supabase
+              .from("market_insights_live")
+              .select("*")
+              .eq("module_id", MARKET_DYNAMICS_MODULE_ID)
+              .eq("client_id", clientId)
+          ).catch(err => ({ data: null, error: err }))
         ]);
 
-        if (enabledSignalsRes.error) throw enabledSignalsRes.error;
-        if (insightsRes.error) throw insightsRes.error;
-
-        const enabledSignalsData = enabledSignalsRes.data || [];
-        const insightsData = insightsRes.data || [];
+        const enabledSignalsData = enabledSignalsRes?.data || [];
+        const insightsData = insightsRes?.data || [];
 
         // Filter for this specific module ID locally
         const enabledSignals = (enabledSignalsData || [])
           .filter((cs: any) => cs.signal?.module_id === MARKET_DYNAMICS_MODULE_ID)
           .sort((a: any, b: any) => {
-            const subA = a.signal.submodule.submodule_name;
-            const subB = b.signal.submodule.submodule_name;
+            const subA = a.signal?.submodule?.submodule_name || "";
+            const subB = b.signal?.submodule?.submodule_name || "";
             if (subA !== subB) return subA.localeCompare(subB);
-            return a.signal.signal_name.localeCompare(b.signal.signal_name);
+            return (a.signal?.signal_name || "").localeCompare(b.signal?.signal_name || "");
           });
-        if (insightsData && insightsData.length > 0) {
-          console.log("Market insight item keys:", Object.keys(insightsData[0]));
-        }
+
         setMarketInsights(insightsData || []);
 
         if (enabledSignals.length > 0) {
           // Group enabled signals by submodule
           const submodulesMap: Record<string, { name: string, signals: any[] }> = {};
           enabledSignals.forEach((cs: any) => {
-            const sm = cs.signal.submodule;
-            if (!submodulesMap[sm.id]) {
-              submodulesMap[sm.id] = { name: sm.submodule_name, signals: [] };
+            const sm = cs.signal?.submodule;
+            if (sm && sm.id) {
+              if (!submodulesMap[sm.id]) {
+                submodulesMap[sm.id] = { name: sm.submodule_name, signals: [] };
+              }
+              submodulesMap[sm.id].signals.push(cs.signal);
             }
-            submodulesMap[sm.id].signals.push(cs.signal);
           });
 
           const newRichSignals: SignalGridItem[] = [];
@@ -760,13 +763,20 @@ export default function MarketDynamicsPane({
             const firstSubmoduleName = Object.values(submodulesMap)[0].name;
             setSelectedCategory(firstSubmoduleName);
           }
-        } else {
-          setRichSignals([]);
-          setSignalSubCardTitles({});
-          setMarketInsights([]);
         }
       } catch (err) {
-        console.error("Error fetching market dynamics:", err);
+        console.warn("Notice: Unable to fetch live market dynamics, checking cache fallback:", err);
+        try {
+          const cached = sessionStorage.getItem(`market_dynamics_cache_${clientId}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed.richSignals) setRichSignals(parsed.richSignals);
+            if (parsed.signalSubCardTitles) setSignalSubCardTitles(parsed.signalSubCardTitles);
+            if (parsed.marketInsights) setMarketInsights(parsed.marketInsights);
+          }
+        } catch (cacheErr) {
+          console.warn("Failed to read market dynamics cache", cacheErr);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -1193,16 +1203,16 @@ export default function MarketDynamicsPane({
     setIsFetchingSimilar(true);
 
     fetch(`${API_URL}/similar-insight/${selectedInsightId}`)
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : { similar: [] })
       .then(data => {
-        const mapped = (data.similar || []).map((item: any) => ({
+        const mapped = ((data && data.similar) || []).map((item: any) => ({
           id: item.insight_id,
           title: item.title,
         }));
         setSimilarFutureProspects(mapped);
       })
       .catch(err => {
-        console.error('Failed to fetch similar market movements:', err);
+        console.warn('Unable to fetch similar market movements:', err);
         setSimilarFutureProspects([]);
       })
       .finally(() => setIsFetchingSimilar(false));
@@ -2009,57 +2019,31 @@ export default function MarketDynamicsPane({
                 </span>
 
                 <div className="flex items-center gap-1.5 shrink-0 select-none">
-                  <button
-                    id="not-interested-button"
-                    onClick={async () => {
-                      if (!renderedTrend || !clientId || !userId) return;
-                      try {
-                        const { error } = await supabase
-                          .from("hidden_articles")
-                          .insert([
-                            {
-                              client_id: clientId,
-                              user_id: userId,
-                              market_insight_id: renderedTrend.id
-                            }
-                          ]);
-                        if (error) throw error;
+                  <div className="relative group/btn flex items-center justify-center">
+                    <button
+                      id="bookmark-doc-button"
+                      onClick={() => setIsNoteModalOpen(true)}
+                      className={`w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 ${
+                        isBookmarked[renderedTrend.id]
+                          ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
+                          : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
+                      }`}
+                    >
+                      <Bookmark className={`w-3 h-3 ${isBookmarked[renderedTrend.id] ? "text-amber-500 fill-amber-500" : ""}`} />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                      Notes & Bookmarks
+                    </div>
+                  </div>
 
-                        setHiddenIds(prev => ({ ...prev, [renderedTrend.id]: true }));
-                        setLastHiddenInsight(renderedTrend);
-                        triggerToast(`Hidden: ${renderedTrend.title}`, true);
-                      } catch (err: any) {
-                        console.error("Error hiding article:", err);
-                        triggerToast(`Failed to hide article: ${err.message || "Unknown error"}`);
-                      }
-                    }}
-                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors"
-                    title="Not Interested"
-                  >
-                    <Square className="w-3 h-3" />
-                  </button>
-
-                  <button
-                    id="bookmark-doc-button"
-                    onClick={async () => {
-                      if (!renderedTrend || !clientId || !userId) return;
-                      const isCurrentlyBookmarked = isBookmarked[renderedTrend.id];
-                      
-                      try {
-                        if (isCurrentlyBookmarked) {
-                          // DELETE
+                  <div className="relative group/btn flex items-center justify-center">
+                    <button
+                      id="not-interested-button"
+                      onClick={async () => {
+                        if (!renderedTrend || !clientId || !userId) return;
+                        try {
                           const { error } = await supabase
-                            .from("bookmarks")
-                            .delete()
-                            .eq("client_id", clientId)
-                            .eq("user_id", userId)
-                            .eq("market_insight_id", renderedTrend.id);
-                          if (error) throw error;
-                          triggerToast(`Removed bookmark for ${renderedTrend.title}`);
-                        } else {
-                          // INSERT
-                          const { error } = await supabase
-                            .from("bookmarks")
+                            .from("client_hidden_insights")
                             .insert([
                               {
                                 client_id: clientId,
@@ -2068,35 +2052,23 @@ export default function MarketDynamicsPane({
                               }
                             ]);
                           if (error) throw error;
-                          triggerToast(`Saved bookmark for ${renderedTrend.title}`);
-                        }
-                        // Refresh bookmarks
-                        await fetchBookmarks();
-                        // Notify other components
-                        window.dispatchEvent(new CustomEvent("bookmarks-updated"));
-                      } catch (err: any) {
-                        console.error("Error toggling bookmark:", err);
-                        triggerToast(`Failed to update bookmark: ${err.message || "Unknown error"}`);
-                      }
-                    }}
-                    className={`w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 ${
-                      isBookmarked[renderedTrend.id]
-                        ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
-                        : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
-                    }`}
-                    title={isBookmarked[renderedTrend.id] ? "Remove Bookmark" : "Bookmark"}
-                  >
-                    <Bookmark className={`w-3 h-3 ${isBookmarked[renderedTrend.id] ? "text-amber-500 fill-amber-500" : ""}`} />
-                  </button>
 
-                  <button
-                    id="export-doc-button"
-                    onClick={() => triggerToast(`Exported strategic brief for ${renderedTrend.title} to PDF draft.`)}
-                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50 rounded-[4px] flex items-center justify-center transition-colors"
-                    title="Export"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
+                          setHiddenIds(prev => ({ ...prev, [renderedTrend.id]: true }));
+                          setLastHiddenInsight(renderedTrend);
+                          triggerToast(`Hidden: ${renderedTrend.title}`, true);
+                        } catch (err: any) {
+                          console.error("Error hiding article:", err);
+                          triggerToast(`Failed to hide article: ${err.message || "Unknown error"}`);
+                        }
+                      }}
+                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                      Not Relevant
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2557,6 +2529,47 @@ export default function MarketDynamicsPane({
             )}
           </div>
         </div>
+      )}
+
+      {/* Note & Bookmark WYSIWYG Modal */}
+      {renderedTrend && (
+        <NoteModal
+          isOpen={isNoteModalOpen}
+          onClose={() => setIsNoteModalOpen(false)}
+          title={renderedTrend.title}
+          initialContent={localStorage.getItem(`note_market_dynamics_${renderedTrend.id}`) || ""}
+          onSave={async (contentHtml) => {
+            if (!renderedTrend) return;
+            try {
+              if (contentHtml && contentHtml.trim()) {
+                localStorage.setItem(`note_market_dynamics_${renderedTrend.id}`, contentHtml);
+              } else {
+                localStorage.removeItem(`note_market_dynamics_${renderedTrend.id}`);
+              }
+
+              if (clientId && userId && !isBookmarked[renderedTrend.id]) {
+                const { error } = await supabase
+                  .from("bookmarks")
+                  .insert([
+                    {
+                      client_id: clientId,
+                      user_id: userId,
+                      market_insight_id: renderedTrend.id
+                    }
+                  ]);
+                if (!error) {
+                  setIsBookmarked(prev => ({ ...prev, [renderedTrend.id]: true }));
+                  await fetchBookmarks();
+                  window.dispatchEvent(new CustomEvent("bookmarks-updated"));
+                }
+              }
+              triggerToast(`Saved notes & bookmark for ${renderedTrend.title}`);
+            } catch (err: any) {
+              console.error("Error saving note:", err);
+              triggerToast("Saved note locally");
+            }
+          }}
+        />
       )}
 
     </div>

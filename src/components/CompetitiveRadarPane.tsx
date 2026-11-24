@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Filter, Search, ChevronDown, ChevronUp, ArrowUp, ArrowDown, ArrowRight, X, Bookmark, Share2, Square, CornerDownRight } from "lucide-react";
+import { Filter, Search, ChevronDown, ChevronUp, ArrowUp, ArrowDown, ArrowRight, X, Bookmark, Share2, Square, CornerDownRight, FileText } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import NoteModal from "./NoteModal";
 
 interface CompetitiveRadarPaneProps {
   onReturn?: () => void;
@@ -361,6 +362,7 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
   const [selectedItem, setSelectedItem] = useState<CompetitorStrategicShift | null>(null);
   // Selected live competitor change (Section 3 competitor activity)
   const [selectedLiveCard, setSelectedLiveCard] = useState<LiveCompetitorChange | null>(null);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState<boolean>(false);
   
   const [strategicShifts, setStrategicShifts] = useState<CompetitorStrategicShift[]>(() => initialCache?.strategicShifts || []);
   const [liveChanges, setLiveChanges] = useState<LiveCompetitorChange[]>(() => initialCache?.changes || []);
@@ -1400,38 +1402,34 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0 select-none">
-                    <button
-                      id="not-interested-button"
-                      onClick={closeDrawer}
-                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors cursor-pointer"
-                      title="Not Interested"
-                    >
-                      <Square className="w-3 h-3" />
-                    </button>
+                    <div className="relative group/btn flex items-center justify-center">
+                      <button
+                        onClick={() => setIsNoteModalOpen(true)}
+                        className={"w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 cursor-pointer " + (
+                          isBookmarked
+                            ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
+                            : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
+                        )}
+                      >
+                        <Bookmark className={"w-3 h-3 " + (isBookmarked ? "text-amber-500 fill-amber-500" : "")} />
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                        Notes & Bookmarks
+                      </div>
+                    </div>
 
-                    <button
-                      onClick={() => setIsBookmarked((prev) => !prev)}
-                      className={"w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 cursor-pointer " + (
-                        isBookmarked
-                          ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
-                          : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
-                      )}
-                      title={isBookmarked ? "Remove Bookmark" : "Bookmark"}
-                    >
-                      <Bookmark className={"w-3 h-3 " + (isBookmarked ? "text-amber-500 fill-amber-500" : "")} />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (navigator.clipboard) {
-                          navigator.clipboard.writeText(selectedLiveCard.signal_title + " - " + selectedLiveCard.summary);
-                        }
-                      }}
-                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50 rounded-[4px] flex items-center justify-center transition-colors cursor-pointer"
-                      title="Export"
-                    >
-                      <Share2 className="w-3 h-3" />
-                    </button>
+                    <div className="relative group/btn flex items-center justify-center">
+                      <button
+                        id="not-interested-button"
+                        onClick={closeDrawer}
+                        className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                        Not Relevant
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1832,40 +1830,36 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0 select-none">
-                    <button
-                      id="not-interested-button"
-                      onClick={() => {
-                        setSelectedItem(null);
-                      }}
-                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors cursor-pointer"
-                      title="Not Interested"
-                    >
-                      <Square className="w-3 h-3" />
-                    </button>
+                    <div className="relative group/btn flex items-center justify-center">
+                      <button
+                        onClick={() => setIsNoteModalOpen(true)}
+                        className={`w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 cursor-pointer ${
+                          isBookmarked
+                            ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
+                            : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
+                        }`}
+                      >
+                        <Bookmark className={`w-3 h-3 ${isBookmarked ? "text-amber-500 fill-amber-500" : ""}`} />
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                        Notes & Bookmarks
+                      </div>
+                    </div>
 
-                    <button
-                      onClick={() => setIsBookmarked((prev) => !prev)}
-                      className={`w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 cursor-pointer ${
-                        isBookmarked
-                          ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
-                          : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
-                      }`}
-                      title={isBookmarked ? "Remove Bookmark" : "Bookmark"}
-                    >
-                      <Bookmark className={`w-3 h-3 ${isBookmarked ? "text-amber-500 fill-amber-500" : ""}`} />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (navigator.clipboard) {
-                          navigator.clipboard.writeText(`${selectedItem.title} - ${selectedItem.summary}`);
-                        }
-                      }}
-                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50 rounded-[4px] flex items-center justify-center transition-colors cursor-pointer"
-                      title="Export"
-                    >
-                      <Share2 className="w-3 h-3" />
-                    </button>
+                    <div className="relative group/btn flex items-center justify-center">
+                      <button
+                        id="not-interested-button"
+                        onClick={() => {
+                          setSelectedItem(null);
+                        }}
+                        className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                        Not Relevant
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2231,6 +2225,36 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
           )}
         </div>
         </>
+      )}
+
+      {/* Note & Bookmark WYSIWYG Modal for Live Cards and Strategic Shifts */}
+      {(selectedLiveCard || selectedItem) && (
+        <NoteModal
+          isOpen={isNoteModalOpen}
+          onClose={() => setIsNoteModalOpen(false)}
+          title={selectedLiveCard ? selectedLiveCard.signal_title : (selectedItem ? selectedItem.title : "")}
+          initialContent={
+            selectedLiveCard
+              ? localStorage.getItem(`note_competitive_live_${selectedLiveCard.id}`) || ""
+              : (selectedItem ? localStorage.getItem(`note_competitive_shift_${selectedItem.rank}_${selectedItem.category}`) || "" : "")
+          }
+          onSave={async (contentHtml) => {
+            const key = selectedLiveCard
+              ? `note_competitive_live_${selectedLiveCard.id}`
+              : (selectedItem ? `note_competitive_shift_${selectedItem.rank}_${selectedItem.category}` : "");
+            
+            if (key) {
+              if (contentHtml && contentHtml.trim()) {
+                localStorage.setItem(key, contentHtml);
+              } else {
+                localStorage.removeItem(key);
+              }
+            }
+
+            setIsBookmarked(true);
+            window.dispatchEvent(new CustomEvent("bookmarks-updated"));
+          }}
+        />
       )}
 
     </div>

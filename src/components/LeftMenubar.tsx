@@ -87,11 +87,7 @@ export default function LeftMenubar({ activeTab, onTabChange, onLogout, userInit
         <div className="flex flex-col gap-[2px] w-full items-center">
           {SIDEBAR_ITEMS.map((item) => {
             const isActive = activeTab === item.id;
-            const isNonClickable = [
-              "find_opportunities",
-              "voice_of_customer",
-              "sustainability_intelligence",
-            ].includes(item.id);
+            const isNonClickable = false;
 
             return (
               <button
@@ -121,7 +117,7 @@ export default function LeftMenubar({ activeTab, onTabChange, onLogout, userInit
 
                 {/* Micro tooltip on hover */}
                 <div className="absolute left-[44px] top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 translate-x-1 group-hover/item:translate-x-2 transition-all duration-150 bg-zinc-900 border border-zinc-800 text-[#f8fafc] text-[10.5px] font-normal px-2.5 py-1 rounded-[4px] shadow-[0_2px_8px_rgba(0,0,0,0.15)] whitespace-nowrap z-50 pointer-events-none">
-                  {item.label}
+                  {item.id === "voice_of_customer" ? "Voice of Market (Human Analyst)" : item.label}
                 </div>
               </button>
             );

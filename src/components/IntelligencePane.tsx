@@ -11,6 +11,7 @@ import { ChatSources } from "./ChatSources";
 import { MarketGenieMarkdown } from "./ReportView";
 import { POLICY_RISK_MODULE_ID, API_URL } from "../constants";
 import { supabase } from "../lib/supabase";
+import NoteModal from "./NoteModal";
 
 const getSnapshotChipClass = (color: string) => {
   switch (color) {
@@ -81,6 +82,7 @@ export default function IntelligencePane({
   const [snapshot, setSnapshot] = useState<any>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(true);
   const [enabledSubmodules, setEnabledSubmodules] = useState<Map<string, string>>(new Map());
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 
   useEffect(() => {
     async function loadEnabledSubmodules() {
@@ -1534,57 +1536,31 @@ export default function IntelligencePane({
                 </span>
 
                 <div className="flex items-center gap-1.5 shrink-0 select-none">
-                  <button
-                    id="not-interested-button"
-                    onClick={async () => {
-                      if (!selectedAlert || !clientId || !userId) return;
-                      try {
-                        const { error } = await supabase
-                          .from("hidden_articles")
-                          .insert([
-                            {
-                              client_id: clientId,
-                              user_id: userId,
-                              policy_signal_id: selectedAlert.id
-                            }
-                          ]);
-                        if (error) throw error;
+                  <div className="relative group/btn flex items-center justify-center">
+                    <button
+                      id="bookmark-doc-button"
+                      onClick={() => setIsNoteModalOpen(true)}
+                      className={`w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 ${
+                        isBookmarked[selectedAlert.id]
+                          ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
+                          : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
+                      }`}
+                    >
+                      <Bookmark className={`w-3 h-3 ${isBookmarked[selectedAlert.id] ? "text-amber-500 fill-amber-500" : ""}`} />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                      Notes & Bookmarks
+                    </div>
+                  </div>
 
-                        setHiddenIds(prev => ({ ...prev, [selectedAlert.id]: true }));
-                        setLastHiddenAlert(selectedAlert);
-                        triggerToast(`Hidden: ${selectedAlert.signal_title}`, true);
-                      } catch (err) {
-                        console.error("Error hiding article:", err);
-                        triggerToast("Failed to hide article");
-                      }
-                    }}
-                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors"
-                    title="Not Interested"
-                  >
-                    <Square className="w-3 h-3" />
-                  </button>
-
-                  <button
-                    id="bookmark-doc-button"
-                    onClick={async () => {
-                      if (!selectedAlert || !clientId || !userId) return;
-                      const isCurrentlyBookmarked = isBookmarked[selectedAlert.id];
-                      
-                      try {
-                        if (isCurrentlyBookmarked) {
-                          // DELETE
+                  <div className="relative group/btn flex items-center justify-center">
+                    <button
+                      id="not-interested-button"
+                      onClick={async () => {
+                        if (!selectedAlert || !clientId || !userId) return;
+                        try {
                           const { error } = await supabase
-                            .from("bookmarks")
-                            .delete()
-                            .eq("client_id", clientId)
-                            .eq("user_id", userId)
-                            .eq("policy_signal_id", selectedAlert.id);
-                          if (error) throw error;
-                          triggerToast(`Removed bookmark for ${selectedAlert.signal_title}`);
-                        } else {
-                          // INSERT
-                          const { error } = await supabase
-                            .from("bookmarks")
+                            .from("client_hidden_signals")
                             .insert([
                               {
                                 client_id: clientId,
@@ -1593,35 +1569,23 @@ export default function IntelligencePane({
                               }
                             ]);
                           if (error) throw error;
-                          triggerToast(`Saved bookmark for ${selectedAlert.signal_title}`);
-                        }
-                        // Refresh bookmarks
-                        await fetchBookmarks();
-                        // Notify other components
-                        window.dispatchEvent(new CustomEvent("bookmarks-updated"));
-                      } catch (err) {
-                        console.error("Error toggling bookmark:", err);
-                        triggerToast("Failed to update bookmark");
-                      }
-                    }}
-                    className={`w-[22px] h-[22px] border rounded-[4px] flex items-center justify-center transition-colors duration-150 ${
-                      isBookmarked[selectedAlert.id]
-                        ? "bg-amber-50/60 border-amber-200/80 text-amber-500 hover:bg-amber-100/35"
-                        : "bg-[#fafafa] border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50"
-                    }`}
-                    title={isBookmarked[selectedAlert.id] ? "Remove Bookmark" : "Bookmark"}
-                  >
-                    <Bookmark className={`w-3 h-3 ${isBookmarked[selectedAlert.id] ? "text-amber-500 fill-amber-500" : ""}`} />
-                  </button>
 
-                  <button
-                    id="export-doc-button"
-                    onClick={() => triggerToast(`Exported report for ${selectedAlert.signal_title} to PDF/CSV draft.`)}
-                    className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100/50 rounded-[4px] flex items-center justify-center transition-colors"
-                    title="Export"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
+                          setHiddenIds(prev => ({ ...prev, [selectedAlert.id]: true }));
+                          setLastHiddenAlert(selectedAlert);
+                          triggerToast(`Hidden: ${selectedAlert.signal_title}`, true);
+                        } catch (err) {
+                          console.error("Error hiding article:", err);
+                          triggerToast("Failed to hide article");
+                        }
+                      }}
+                      className="w-[22px] h-[22px] bg-[#fafafa] border border-zinc-200 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-[4px] flex items-center justify-center transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/btn:flex items-center bg-zinc-900 border border-zinc-800 text-white text-[10.5px] font-sans font-normal px-2 py-0.5 rounded shadow-md whitespace-nowrap z-50 pointer-events-none">
+                      Not Relevant
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2061,6 +2025,49 @@ export default function IntelligencePane({
               </button>
             )}
           </div>
+        )}
+
+        {/* Note & Bookmark WYSIWYG Modal */}
+        {selectedAlert && (
+          <NoteModal
+            isOpen={isNoteModalOpen}
+            onClose={() => setIsNoteModalOpen(false)}
+            title={selectedAlert.signal_title}
+            initialContent={localStorage.getItem(`note_policy_risk_${selectedAlert.id}`) || ""}
+            onSave={async (contentHtml) => {
+              if (!selectedAlert) return;
+              try {
+                // Save note content locally
+                if (contentHtml && contentHtml.trim()) {
+                  localStorage.setItem(`note_policy_risk_${selectedAlert.id}`, contentHtml);
+                } else {
+                  localStorage.removeItem(`note_policy_risk_${selectedAlert.id}`);
+                }
+
+                // Ensure item is bookmarked in database if not already
+                if (clientId && userId && !isBookmarked[selectedAlert.id]) {
+                  const { error } = await supabase
+                    .from("bookmarks")
+                    .insert([
+                      {
+                        client_id: clientId,
+                        user_id: userId,
+                        policy_signal_id: selectedAlert.id
+                      }
+                    ]);
+                  if (!error) {
+                    setIsBookmarked(prev => ({ ...prev, [selectedAlert.id]: true }));
+                    await fetchBookmarks();
+                    window.dispatchEvent(new CustomEvent("bookmarks-updated"));
+                  }
+                }
+                triggerToast(`Saved notes & bookmark for ${selectedAlert.signal_title}`);
+              } catch (err: any) {
+                console.error("Error saving note:", err);
+                triggerToast("Saved note locally");
+              }
+            }}
+          />
         )}
 
       </div>
