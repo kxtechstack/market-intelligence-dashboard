@@ -259,9 +259,10 @@ function PdfViewer({ file, onLinkError }: { file: AttachmentItem; onLinkError?: 
         if (!isMounted) return;
 
         const containerWidth = container.clientWidth || 600;
+        const availableWidth = containerWidth - 24 - 16;
         const unscaledViewport = page.getViewport({ scale: 1.0 });
-        const scale = (containerWidth - 32) / unscaledViewport.width;
-        const viewport = page.getViewport({ scale: Math.max(scale, 0.5) });
+        const scale = availableWidth / unscaledViewport.width;
+        const viewport = page.getViewport({ scale: Math.max(scale, 0.3) });
 
         const context = canvas.getContext('2d');
         if (!context) return;
@@ -292,6 +293,12 @@ function PdfViewer({ file, onLinkError }: { file: AttachmentItem; onLinkError?: 
       isMounted = false;
     };
   }, [pageNum, numPages]);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+  }, [pageNum, isLoading]);
 
   return (
     <div className="w-full border border-zinc-300 rounded-[4px] overflow-hidden bg-zinc-900 text-white font-sans shadow-sm">
@@ -345,15 +352,17 @@ function PdfViewer({ file, onLinkError }: { file: AttachmentItem; onLinkError?: 
 
       <div 
         ref={containerRef}
-        className="bg-zinc-100 min-h-[385px] max-h-[520px] overflow-auto flex flex-col items-center justify-center relative p-4"
+        className={`bg-zinc-100 h-[420px] overflow-y-auto overflow-x-hidden relative p-3 flex flex-col ${
+          isLoading || hasError ? "items-center justify-center" : "items-start justify-start"
+        }`}
       >
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center space-y-2 py-20 text-zinc-600">
+          <div className="flex flex-col items-center justify-center space-y-2 py-20 text-zinc-600 my-auto mx-auto">
             <Loader2 className="w-6 h-6 animate-spin text-[#2d39d2]" />
             <span className="text-xs font-medium">Loading PDF...</span>
           </div>
         ) : hasError ? (
-          <div className="flex flex-col items-center justify-center space-y-4 p-8 text-center text-zinc-700 my-auto">
+          <div className="flex flex-col items-center justify-center space-y-4 p-8 text-center text-zinc-700 my-auto mx-auto">
             <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
               <FileText className="w-6 h-6" />
             </div>
@@ -386,7 +395,7 @@ function PdfViewer({ file, onLinkError }: { file: AttachmentItem; onLinkError?: 
             </div>
           </div>
         ) : (
-          <canvas ref={canvasRef} className="shadow-sm bg-white rounded-[2px]" />
+          <canvas ref={canvasRef} className="shadow-sm bg-white rounded-[2px] mx-auto max-w-full" />
         )}
       </div>
     </div>
