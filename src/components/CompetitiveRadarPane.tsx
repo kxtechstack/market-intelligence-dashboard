@@ -7,6 +7,8 @@ interface CompetitiveRadarPaneProps {
   onReturn?: () => void;
   onSwitchToDecisionIntelligence?: (query: string, tab: string, label: string, returnLabel: string) => void;
   clientId?: string;
+  navigatedItemId?: string | null;
+  onClearNavigatedItem?: () => void;
 }
 
 export interface StrategicShiftSignal {
@@ -343,7 +345,7 @@ const formatSignalDate = (dateStr: string) => {
   return dateStr.replace(/,\s*\d{4}/, "").trim();
 };
 
-export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntelligence, clientId }: CompetitiveRadarPaneProps) {
+export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntelligence, clientId, navigatedItemId, onClearNavigatedItem }: CompetitiveRadarPaneProps) {
   const [activeTab, setActiveTab] = useState<string>("Overview");
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -376,6 +378,7 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
   
   // Show skeleton only the very first time, when nothing is remembered yet
   const [isActivityLoading, setIsActivityLoading] = useState<boolean>(() => !hasCachedData && Boolean(effectiveClientId));
+  const [hasChangesFetched, setHasChangesFetched] = useState<boolean>(false);
   const [isMatrixLoading, setIsMatrixLoading] = useState<boolean>(() => !hasCachedData && Boolean(effectiveClientId));
   const [activityError, setActivityError] = useState<string | null>(null);
 
@@ -557,6 +560,7 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
       return;
     }
 
+    setHasChangesFetched(false);
     const cached = getCachedData(effectiveClientId);
     if (selectedTimeframe === "All time" && cached?.changes?.length) {
       setLiveChanges(cached.changes);
@@ -596,6 +600,7 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
       if (isMounted && res.data) {
         setLiveChanges(res.data);
         setIsActivityLoading(false);
+        setHasChangesFetched(true);
         if (selectedTimeframe === "All time") {
           liveDataRef.current.changes = res.data;
           if (effectiveClientId) {
@@ -604,6 +609,7 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
         }
       } else if (isMounted) {
         setIsActivityLoading(false);
+        setHasChangesFetched(true);
       }
     });
 
@@ -725,6 +731,58 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
 
   // Accordion state: by default, all categories are expanded
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!navigatedItemId) return;
+    if (!effectiveClientId) {
+      onClearNavigatedItem?.();
+      return;
+    }
+
+    const card = liveChanges.find((c) => c.id === navigatedItemId);
+    if (card) {
+      if (activeTab !== "Overview" && card.organization.toLowerCase() !== activeTab.toLowerCase()) {
+        setActiveTab("Overview");
+      }
+      if (selectedCategoryFilter !== "All" && card.category !== selectedCategoryFilter) {
+        setSelectedCategoryFilter("All");
+      }
+      if (searchQuery.trim() !== "") {
+        setSearchQuery("");
+      }
+
+      const cat = card.category || "General Updates";
+      setExpandedCategories((prev) => ({
+        ...prev,
+        [cat]: true,
+      }));
+      setSelectedLiveCard(card);
+      setSelectedSignalId(null);
+      setSelectedItem(null);
+      setExpandedQuotesSignalIds({});
+
+      setTimeout(() => {
+        const el = document.getElementById(`change-card-${card.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 80);
+
+      onClearNavigatedItem?.();
+      return;
+    }
+
+    if (isActivityLoading || !hasChangesFetched) {
+      return;
+    }
+
+    if (selectedTimeframe !== "All time") {
+      setSelectedTimeframe("All time");
+      return;
+    }
+
+    onClearNavigatedItem?.();
+  }, [navigatedItemId, effectiveClientId, liveChanges, isActivityLoading, hasChangesFetched, selectedTimeframe]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => ({
@@ -1295,6 +1353,7 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
                             return (
                               <div
                                 key={card.id}
+                                id={`change-card-${card.id}`}
                                 onClick={() => {
                                   setSelectedLiveCard(card);
                                   setSelectedSignalId(null);

@@ -1271,6 +1271,8 @@ export default function App() {
           <CompetitiveRadarPane 
             onReturn={handleReturn}
             clientId={clientId || undefined}
+            navigatedItemId={navigatedItemId}
+            onClearNavigatedItem={() => setNavigatedItemId(null)}
             onSwitchToDecisionIntelligence={(query, tab, label, returnLabel) => {
               setInitialQuery({query, timestamp: Date.now()});
               setDiReturnConfig({tab, label: returnLabel});

@@ -63,6 +63,24 @@ import ReportView from "./ReportView";
 import { API_URL, MARKET_DYNAMICS_MODULE_ID, POLICY_RISK_MODULE_ID, FORWARD_OUTLOOK_MODULE_ID } from "../constants";
 import { supabase } from "../lib/supabase";
 
+export interface AnswerSource {
+  n: number;
+  title: string;
+  module: string;
+  module_name: string;
+  date?: string;
+  signal_id?: string;
+}
+
+export interface AnswerDetails {
+  body?: string;
+  sources?: AnswerSource[];
+}
+
+export type DIChatMessage = ChatMessage & {
+  details?: AnswerDetails;
+};
+
 interface ChatSession {
   id: string;
   title: string;
@@ -70,7 +88,7 @@ interface ChatSession {
   displayTime: string;
   dayGroup: string;
   tag?: string;
-  messages: ChatMessage[];
+  messages: DIChatMessage[];
 }
 
 interface QuestionLibraryItem {
@@ -162,571 +180,6 @@ const getSourceBadge = (moduleName: string) => {
   };
 };
 
-const FALLBACK_HIGHLIGHTS: HighlightRow[] = [
-  {
-    moduleId: MARKET_DYNAMICS_MODULE_ID,
-    moduleName: "Market Dynamics",
-    tabId: "market_dynamics",
-    label: "Funding & Investment Activity",
-    body: "Biotech firms leverage covalent molecules for innovative treatments",
-  },
-  {
-    moduleId: MARKET_DYNAMICS_MODULE_ID,
-    moduleName: "Market Dynamics",
-    tabId: "market_dynamics",
-    label: "Industry Structure Changes",
-    body: "Independent Beauty Brands Can Compete with Conglomerates via Niche Strategies",
-  },
-  {
-    moduleId: POLICY_RISK_MODULE_ID,
-    moduleName: "Policy & Risk Monitor",
-    tabId: "policy_risk_monitor",
-    label: "Regulatory Consultation",
-    body: "Ghana Calls for Cosmetology Council to Regulate Beauty Industry",
-  },
-  {
-    moduleId: POLICY_RISK_MODULE_ID,
-    moduleName: "Policy & Risk Monitor",
-    tabId: "policy_risk_monitor",
-    label: "Regulatory Enforcement",
-    body: "Korea Deploys Task Force to Shield Cosmetics Industry from New Rules",
-  },
-  {
-    moduleId: FORWARD_OUTLOOK_MODULE_ID,
-    moduleName: "Future Outlook",
-    tabId: "foreward_outlook",
-    label: "Product",
-    body: "Opal Cosmetics files patent for Skin Care Composition Containing Tussilago Farfara Leaf Extract",
-  },
-  {
-    moduleId: FORWARD_OUTLOOK_MODULE_ID,
-    moduleName: "Future Outlook",
-    tabId: "foreward_outlook",
-    label: "Technology",
-    body: "Amorepacific Integrates 70 Years of Research Data Using AI",
-  },
-  {
-    moduleId: MARKET_DYNAMICS_MODULE_ID,
-    moduleName: "Market Dynamics",
-    tabId: "market_dynamics",
-    label: "Consumer Trends",
-    body: "Rising demand for microbiome-friendly personal care formulations across APAC",
-  },
-  {
-    moduleId: POLICY_RISK_MODULE_ID,
-    moduleName: "Policy & Risk Monitor",
-    tabId: "policy_risk_monitor",
-    label: "Compliance Update",
-    body: "EU Updates Guidelines on Nano-materials in Cosmetic Sunscreen Products",
-  },
-  {
-    moduleId: FORWARD_OUTLOOK_MODULE_ID,
-    moduleName: "Future Outlook",
-    tabId: "foreward_outlook",
-    label: "Sustainability",
-    body: "Major cosmetic brands commit to 100% recyclable PCR packaging by 2028",
-  },
-  {
-    moduleId: MARKET_DYNAMICS_MODULE_ID,
-    moduleName: "Market Dynamics",
-    tabId: "market_dynamics",
-    label: "Strategic Partnership",
-    body: "Global beauty conglomerates partner with biotech startups for sustainable actives",
-  },
-];
-
-const QUESTION_LIBRARY: QuestionLibraryItem[] = [];
-
-const DUMMY_LIST_RESPONSES: Record<string, Array<{ id: string; title: string; category: string; date: string; summary: string; impact?: string }>> = {
-  "lst-1": [
-    {
-      id: "l1-1",
-      title: "SFDA Circular 2026-88: Accelerated Registration for Halal-Certified Bio-Actives",
-      category: "Regulatory Policy",
-      date: "Aug 09, 2026",
-      summary: "Saudi Food & Drug Authority enacted a fast-track approval protocol reducing registration turnaround time from 90 to 30 days for anti-aging serums containing certified Halal bio-fermented hyaluronic acid.",
-      impact: "High Impact"
-    },
-    {
-      id: "l1-2",
-      title: "EU Cosmetic Regulation Amendment (EC 1223/2009 Annex III Update)",
-      category: "Ingredient Restriction",
-      date: "Aug 06, 2026",
-      summary: "Revised maximum allowable concentration limits for synthetic UV filter octocrylene (9.0% max cap) and BHT antioxidants across all leave-on skincare imports entering EU ports.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l1-3",
-      title: "UAE MoHaP Guideline: Eco-Safe Packaging Labeling Enforcement",
-      category: "Packaging & ESG",
-      date: "Aug 05, 2026",
-      summary: "Ministry of Health & Prevention mandates QR-code traceable PCR plastic packaging verification for all premium personal care SKUs sold in UAE luxury retail.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l1-4",
-      title: "ASEAN Harmonized Cosmetic Directive: Micro-Plastic Exfoliant Ban",
-      category: "Trade & Environment",
-      date: "Aug 03, 2026",
-      summary: "Southeast Asian trade bloc enforces a total import ban on wash-off skincare products containing non-biodegradable synthetic polymer microbeads.",
-      impact: "High Impact"
-    }
-  ],
-  "lst-2": [
-    {
-      id: "l2-1",
-      title: "Octocrylene (CAS 6197-30-4) Concentration Cap",
-      category: "UV Filters",
-      date: "Aug 01, 2026",
-      summary: "Maximum allowable concentration in sunscreen and daily moisturizers reduced to 9.0% max due to updated SCCS bioaccumulation safety re-evaluations.",
-      impact: "High Impact"
-    },
-    {
-      id: "l2-2",
-      title: "Lyral / HICC (CAS 31906-04-4) Total Import Ban",
-      category: "Fragrance Compounds",
-      date: "Aug 01, 2026",
-      summary: "Complete prohibition of Hydroxyisohexyl 3-cyclohexene carboxaldehyde in all leave-on and rinse-off cosmetic formulations entering European Union markets.",
-      impact: "High Impact"
-    },
-    {
-      id: "l2-3",
-      title: "BHT / Butylated Hydroxytoluene (CAS 128-37-0)",
-      category: "Antioxidants",
-      date: "Aug 01, 2026",
-      summary: "Restricted to 0.1% maximum concentration in leave-on skin products and 0.8% in rinse-off formulations to prevent bioaccumulation risk.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l2-4",
-      title: "Uncoated Nano Zinc Oxide (CAS 1314-13-2)",
-      category: "Mineral Sunscreens",
-      date: "Aug 01, 2026",
-      summary: "Uncoated nano-grade zinc oxide particles subjected to mandatory inhalation safety re-dossier submissions for spray aerosol products.",
-      impact: "High Impact"
-    }
-  ],
-  "lst-3": [
-    {
-      id: "l3-1",
-      title: "Chalhoub Group (Prestige Retail & Omnichannel)",
-      category: "GCC Regional Lead",
-      date: "Market Leader 2026",
-      summary: "Operates 750+ luxury doors across UAE, KSA, Kuwait, and Qatar representing Sephora, L'Oréal Luxe, and niche indie prestige beauty brands.",
-      impact: "High Impact"
-    },
-    {
-      id: "l3-2",
-      title: "Al Tayer Group (Luxury Department Stores)",
-      category: "Department Store Retail",
-      date: "Market Leader 2026",
-      summary: "Exclusive distributor for Bloomingdale's, Harvey Nichols, and boutique clean skincare lines across GCC high-street shopping malls.",
-      impact: "High Impact"
-    },
-    {
-      id: "l3-3",
-      title: "A.S. Watson Group / Watsons GCC",
-      category: "Mass-Prestige & Clinical",
-      date: "Market Leader 2026",
-      summary: "Rapidly expanding pharmacy-beauty footprint in Saudi Arabia with 120+ doors focusing on dermacosmetics and scalp-care ranges.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l3-4",
-      title: "Alshaya Group",
-      category: "Omnichannel GCC Franchise",
-      date: "Market Leader 2026",
-      summary: "Manages regional franchise retail for Charlotte Tilbury, Jo Malone, and Boots pharmacy network across the Middle East.",
-      impact: "Medium Impact"
-    }
-  ],
-  "lst-4": [
-    {
-      id: "l4-1",
-      title: "Shiseido Future Solution LX Bio-Ferment Serum",
-      category: "Japan Prestige",
-      date: "Jun 2026",
-      summary: "Features patented postbiotic rice ferment technology targeting dermal collagen density and firming in mature skin.",
-      impact: "High Impact"
-    },
-    {
-      id: "l4-2",
-      title: "Amorepacific Time Response Bio-Peptide Ampoule",
-      category: "K-Beauty Innovation",
-      date: "May 2026",
-      summary: "Dual-chamber clinical ampoule combining green tea stem-cell exosomes with multi-weight hyaluronic acid complexes.",
-      impact: "High Impact"
-    },
-    {
-      id: "l4-3",
-      title: "Proya Elastic Peptide Barrier Repair Cream",
-      category: "C-Beauty Clinical",
-      date: "May 2026",
-      summary: "Priced in mid-prestige tier, utilizing bio-identical ceramide 3 and copper tripeptide-1 for urban anti-pollution protection.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l4-4",
-      title: "SK-II Masterpiece Pitera Intensive Treatment",
-      category: "Luxury APAC",
-      date: "Apr 2026",
-      summary: "Ultra-concentrated fermented yeast elixir launching exclusively in Tokyo, Seoul, and Shanghai flagship doors.",
-      impact: "High Impact"
-    }
-  ],
-  "lst-5": [
-    {
-      id: "l5-1",
-      title: "Step 1: SFDA e-Clearance Account & GHAD Portal Setup",
-      category: "Administrative Setup",
-      date: "Mandatory Protocol",
-      summary: "Establish an authorized local Saudi legal entity or appoint an official local distributor with a valid SFDA commercial license.",
-      impact: "High Impact"
-    },
-    {
-      id: "l5-2",
-      title: "Step 2: Certificate of Free Sale (CFS) Legalization",
-      category: "Dossier Verification",
-      date: "Mandatory Protocol",
-      summary: "Submit an apostilled CFS from the country of origin, legalized by the Saudi Embassy, confirming product safety compliance.",
-      impact: "High Impact"
-    },
-    {
-      id: "l5-3",
-      title: "Step 3: Halal Compliance & Ingredient Dossier Submission",
-      category: "Safety & Halal Audit",
-      date: "Mandatory Protocol",
-      summary: "Provide full quantitative formula breakdown, heavy metal/microbial lab test reports, and Halal certificate for animal-derived ingredients.",
-      impact: "High Impact"
-    },
-    {
-      id: "l5-4",
-      title: "Step 4: SFDA Unified Artwork & GSO 1943/2021 Labeling",
-      category: "Packaging Approval",
-      date: "Mandatory Protocol",
-      summary: "Ensure primary packaging includes Arabic labeling, batch numbers, PAO symbol, and SFDA registration barcode.",
-      impact: "Medium Impact"
-    }
-  ],
-  "lst-6": [
-    {
-      id: "l6-1",
-      title: "US Patent 2026/0148922: Lyophilized Postbiotic Micro-Encapsulation",
-      category: "Biotech Patent",
-      date: "Jul 2026",
-      summary: "Assigned to L'Oréal R&D. Utilizes lipid nanocarriers to stabilize heat-sensitive Lactobacillus ferments at ambient temperatures.",
-      impact: "High Impact"
-    },
-    {
-      id: "l6-2",
-      title: "EP 4291082-A1: Anaerobic Bio-Fermentation of Red Ginseng Postbiotics",
-      category: "EU/APAC Patent",
-      date: "May 2026",
-      summary: "Assigned to Amorepacific Corp. Method for isolating bio-active ginsenoside metabolites for epidermal lipid barrier repair.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l6-3",
-      title: "WO 2026/088102: Dual-Phase Fermented Saccharomyces Exosome Complexes",
-      category: "WIPO Global Patent",
-      date: "Mar 2026",
-      summary: "Assigned to Evonik Industries. Stabilizes active peptides in aqueous gel matrix without synthetic parabens or phenoxyethanol.",
-      impact: "Medium Impact"
-    }
-  ],
-  "lst-7": [
-    {
-      id: "l7-1",
-      title: "Indonesia (BPOM Customs Ports)",
-      category: "ASEAN Trade Tariff",
-      date: "2026 Tariff Schedule",
-      summary: "10.0% - 15.0% Ad Valorem import duty on finished skincare plus 11% VAT under ATIGA regional agreement.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l7-2",
-      title: "Vietnam (Customs Department)",
-      category: "ASEAN Trade Tariff",
-      date: "2026 Tariff Schedule",
-      summary: "Finished cosmetic goods imported from non-ASEAN trade partners incur 20% tariff; 0% for certified intra-ASEAN origin.",
-      impact: "High Impact"
-    },
-    {
-      id: "l7-3",
-      title: "Thailand (Revenue Department)",
-      category: "ASEAN Trade Tariff",
-      date: "2026 Tariff Schedule",
-      summary: "5.0% tariff + 7% VAT applied to premium skincare active ingredients and bulk formulations imported for local bottling.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l7-4",
-      title: "Singapore (Customs Port)",
-      category: "Free Trade Port",
-      date: "2026 Tariff Schedule",
-      summary: "0.0% duty-free entry for all personal care and cosmetic products; subject only to standard Goods and Services Tax.",
-      impact: "Low Impact"
-    }
-  ],
-  "lst-8": [
-    {
-      id: "l8-1",
-      title: "Cradle to Cradle Certified® (Gold / Platinum)",
-      category: "Circular Economy",
-      date: "Global Standard",
-      summary: "Assesses material health, product circularity, clean air & climate protection, water stewardship, and social fairness.",
-      impact: "High Impact"
-    },
-    {
-      id: "l8-2",
-      title: "FSC® (Forest Stewardship Council) Recycled 100%",
-      category: "Paper Outer Packaging",
-      date: "Global Standard",
-      summary: "Guarantees paperboard outer packaging is manufactured strictly from verified post-consumer reclaimed fibers.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l8-3",
-      title: "Ocean-Bound Plastic (OBP) Certification",
-      category: "Recycled Polymers",
-      date: "Global Standard",
-      summary: "Audits supply chain sourcing for plastic waste recovered within 50km of ocean shorelines prior to resin conversion.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l8-4",
-      title: "Ecocert COSMOS Organic & Natural Standard",
-      category: "Eco-Design Compliance",
-      date: "Global Standard",
-      summary: "Restricts toxic plastic polymers (PVC, polystyrene) and mandates minimal packaging-to-content volume ratios.",
-      impact: "High Impact"
-    }
-  ],
-  "lst-9": [
-    {
-      id: "l9-1",
-      title: "Anua (Korean Soothing Barrier Care)",
-      category: "K-Beauty Import",
-      date: "+140% KSA Growth",
-      summary: "Captured 8.5% market share in gentle soothing toners across Sephora KSA and online storefronts in Riyadh.",
-      impact: "High Impact"
-    },
-    {
-      id: "l9-2",
-      title: "Asteri Beauty (Saudi Native Clean Cosmetics)",
-      category: "Local KSA Brand",
-      date: "+95% KSA Growth",
-      summary: "Expanded footprint in Riyadh department stores with climate-proof longwear foundations and scalp treatments.",
-      impact: "High Impact"
-    },
-    {
-      id: "l9-3",
-      title: "Byoma (Barrier-Repair Dermacosmetics)",
-      category: "UK/Global Indie",
-      date: "+110% KSA Growth",
-      summary: "Gained rapid traction among Gen-Z shoppers in Riyadh through affordable tri-ceramide complex hydration serums.",
-      impact: "High Impact"
-    },
-    {
-      id: "l9-4",
-      title: "Glow Recipe (Fruit-Forward Clinical Skincare)",
-      category: "US Prestige Indie",
-      date: "+65% KSA Growth",
-      summary: "Driven by viral demand for Niacinamide Dew Drops across Middle Eastern social commerce channels.",
-      impact: "Medium Impact"
-    }
-  ],
-  "lst-10": [
-    {
-      id: "l10-1",
-      title: "HRIPT (Human Repeat Insult Patch Test) 50-Subject Panel",
-      category: "Sensitization Audit",
-      date: "Dermatological Standard",
-      summary: "9 repeated 24-hour patch applications over 3 weeks followed by a challenge phase to prove zero allergic contact dermatitis.",
-      impact: "High Impact"
-    },
-    {
-      id: "l10-2",
-      title: "Ophthalmologist Safety Testing (Periocular Products)",
-      category: "Ocular Safety",
-      date: "Dermatological Standard",
-      summary: "Controlled eye area trial under board-certified ophthalmologist supervision for sting-free contact lens wearer approval.",
-      impact: "High Impact"
-    },
-    {
-      id: "l10-3",
-      title: "TEWL (Transepidermal Water Loss) Bio-Instrumentation",
-      category: "Barrier Function Protocol",
-      date: "Dermatological Standard",
-      summary: "Quantitative measurement using Tewameter probes verifying skin barrier integrity pre- and post-product application.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l10-4",
-      title: "Non-Comedogenic Facial Pores Imaging Trial",
-      category: "Acnegenic Audit",
-      date: "Dermatological Standard",
-      summary: "30-day clinical trial using VISIA complex photography analyzing sebum production and pore occlusion rates.",
-      impact: "Low Impact"
-    }
-  ],
-  "lst-11": [
-    {
-      id: "l11-1",
-      title: "Beautyworld Middle East 2026 (Dubai World Trade Centre)",
-      category: "GCC Trade Fair",
-      date: "Oct 27 - 29, 2026",
-      summary: "The largest international trade exhibition for beauty products, hair, fragrances, and wellbeing in the Middle East.",
-      impact: "High Impact"
-    },
-    {
-      id: "l11-2",
-      title: "In-Cosmetics Asia 2026 (BITEC Bangkok, Thailand)",
-      category: "Raw Materials & Formulation",
-      date: "Nov 03 - 05, 2026",
-      summary: "Leading Asia-Pacific event for personal care ingredients, bio-active developments, and formulation technology.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l11-3",
-      title: "Cosmoprof Asia 2026 (Hong Kong Convention Centre)",
-      category: "Global APAC Expo",
-      date: "Nov 11 - 13, 2026",
-      summary: "B2B beauty exhibition covering finished cosmetic products, OEM/ODM contract manufacturing, and packaging.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l11-4",
-      title: "PCC World Expo 2026 (Riyadh Front Exhibition Center, KSA)",
-      category: "Saudi Beauty & Pharma",
-      date: "Dec 01 - 03, 2026",
-      summary: "Dedicated Saudi Arabian forum bringing together personal care manufacturers, SFDA regulators, and GCC retail buyers.",
-      impact: "High Impact"
-    }
-  ],
-  "lst-12": [
-    {
-      id: "l12-1",
-      title: "Bloomage Biotech (China & Global)",
-      category: "Fermentation Leader",
-      date: "Certified Supplier",
-      summary: "World's largest producer of bio-fermented sodium hyaluronate across micro-molecular to high-molecular weight grades.",
-      impact: "High Impact"
-    },
-    {
-      id: "l12-2",
-      title: "Givaudan Active Beauty (France/Switzerland)",
-      category: "Prestige Bio-Actives",
-      date: "Certified Supplier",
-      summary: "Produces Eutectys bio-fermented hyaluronic acid complexes certified COSMOS Organic and Halal compliant.",
-      impact: "High Impact"
-    },
-    {
-      id: "l12-3",
-      title: "Evonik Personal Care (Germany)",
-      category: "European Biotech",
-      date: "Certified Supplier",
-      summary: "Offers HyaCare® bio-fermented hyaluronic acid manufactured using non-GMO Streptococcus zooepidemicus strains.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l12-4",
-      title: "HTL Biotechnology (France)",
-      category: "Medical & Clinical Grade",
-      date: "Certified Supplier",
-      summary: "Specializes in high-purity pharmaceutical and dermacosmetic grade hyaluronic acid for topical serums.",
-      impact: "High Impact"
-    }
-  ],
-  "lst-13": [
-    {
-      id: "l13-1",
-      title: "Category 1: Purchased Goods & Services Carbon Footprint",
-      category: "Scope 3 Emission",
-      date: "GHG Protocol Standard",
-      summary: "Cradle-to-gate greenhouse gas emissions calculated per kilogram of raw active ingredients and packaging resins.",
-      impact: "High Impact"
-    },
-    {
-      id: "l13-2",
-      title: "Category 4: Upstream Transportation & Distribution Mileage",
-      category: "Scope 3 Logistics",
-      date: "GHG Protocol Standard",
-      summary: "Total ton-kilometer emissions generated by air freight, ocean transit, and cold-chain truck delivery networks.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l13-3",
-      title: "Category 12: End-of-Life Treatment of Sold Products",
-      category: "Packaging Circularity",
-      date: "GHG Protocol Standard",
-      summary: "Estimated percentage of primary and secondary packaging entering municipal recycling streams vs landfill.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "l13-4",
-      title: "RSPO Traceability & Deforestation-Free Palm Oil Ratio",
-      category: "Sustainable Sourcing",
-      date: "GHG Protocol Standard",
-      summary: "Mandatory disclosure of Round Table on Sustainable Palm Oil (RSPO) Mass Balance or Segregated certification percentages.",
-      impact: "High Impact"
-    }
-  ]
-};
-
-const getDummyListItems = (query: string) => {
-  const qLower = query.toLowerCase().trim();
-  const matched = QUESTION_LIBRARY.find(
-    (q) => q.question.toLowerCase().trim() === qLower || q.title.toLowerCase().trim() === qLower
-  );
-
-  if (matched && DUMMY_LIST_RESPONSES[matched.id]) {
-    return DUMMY_LIST_RESPONSES[matched.id];
-  }
-
-  const partialMatched = QUESTION_LIBRARY.find(
-    (q) => q.category === "List" && (qLower.includes(q.title.toLowerCase()) || q.question.toLowerCase().includes(qLower) || qLower.includes(q.question.toLowerCase().slice(0, 15)))
-  );
-
-  if (partialMatched && DUMMY_LIST_RESPONSES[partialMatched.id]) {
-    return DUMMY_LIST_RESPONSES[partialMatched.id];
-  }
-
-  return [
-    {
-      id: "gen-1",
-      title: "SFDA Policy Directive 2026-08: Active Ingredient Compliance",
-      category: "Regulatory Policy",
-      date: "Aug 10, 2026",
-      summary: "Updated registration dossier requirements for imported clinical skincare and active cosmetic formulations in Saudi Arabia.",
-      impact: "High Impact"
-    },
-    {
-      id: "gen-2",
-      title: "EU Cosmetics Annex III Regulation Update",
-      category: "Ingredient Mandate",
-      date: "Aug 07, 2026",
-      summary: "Enforced concentration thresholds for synthetic preservatives and UV filters across leave-on skincare formulations.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "gen-3",
-      title: "ASEAN Harmonized Trade Tariff Schedule",
-      category: "Trade & Tariffs",
-      date: "Aug 04, 2026",
-      summary: "Adjusted customs duty rates and tax incentives for intra-regional trade of eco-certified personal care products.",
-      impact: "Medium Impact"
-    },
-    {
-      id: "gen-4",
-      title: "Global Eco-Packaging Circularity Directive",
-      category: "Packaging & ESG",
-      date: "Aug 02, 2026",
-      summary: "Mandates 30% minimum post-consumer recycled (PCR) resin composition for primary cosmetic plastic packaging.",
-      impact: "High Impact"
-    }
-  ];
-};
 
 interface DecisionIntelligencePaneProps {
   onReturn?: () => void;
@@ -741,6 +194,10 @@ interface DecisionIntelligencePaneProps {
 }
 
 const MODULE_TO_TAB: Record<string, { tabId: string; tabLabel: string }> = {
+  "policy": { tabId: "policy_risk_monitor", tabLabel: "Policy & Risk Monitor" },
+  "market": { tabId: "market_dynamics", tabLabel: "Market Dynamics" },
+  "outlook": { tabId: "foreward_outlook", tabLabel: "Forward Outlook" },
+  "competitor": { tabId: "competitive_radar", tabLabel: "Competitive Radar" },
   "Policy & Risk": { tabId: "policy_risk_monitor", tabLabel: "Policy & Risk Monitor" },
   "Market Dynamics": { tabId: "market_dynamics", tabLabel: "Market Dynamics" },
   "Forward Outlook": { tabId: "foreward_outlook", tabLabel: "Forward Outlook" },
@@ -867,190 +324,6 @@ const convertReportToMarkdown = (report: any): string => {
   return parts.join("\n\n");
 };
 
-const getSignalDetails = (titleText: string) => {
-  const title = titleText.trim().toLowerCase();
-
-  // 1. Pricing Signals
-  if (title.includes("competitor pricing changes") || title.includes("tactical discounting")) {
-    return {
-      text: "Our high-frequency monitoring of key competitor portals reveals tactical entry-level plan discounts designed to capture early-funnel accounts before broader pricing adjustments occur. Competitor A reduced its standard monthly plan by 14% while retaining its premium pricing tiers.",
-      tabId: "competitive_radar",
-      tabLabel: "Competitive Radar",
-    };
-  }
-  if (title.includes("annual subscriptions") || title.includes("promotional trial")) {
-    return {
-      text: "Campaign data sweeps indicate Competitor B is aggressively targeting customer lifetime value through a 3-month trial discount on annual commitments. This acts as a churn barrier by locking in subscribers during high-saturation marketing quarters.",
-      tabId: "competitive_radar",
-      tabLabel: "Competitive Radar",
-    };
-  }
-  if (title.includes("cart conversion") || title.includes("drop-off report")) {
-    return {
-      text: "Funnel log reviews show standard pricing tier checkouts experienced a 2.1% drop-off increase, directly correlated with competitor low-barrier trial ads. Resolving this requires tactical entry incentives or bundle offsets.",
-      tabId: "voice_of_customer",
-      tabLabel: "Voice of Customer",
-    };
-  }
-  if (title.includes("mid-market") || title.includes("velocity sweep")) {
-    return {
-      text: "Competitor velocity indexes demonstrate mid-tier stability but high bundle activity, with free shipping and value-add gifts reducing purchase friction by an estimated 7% in real terms without headline price cuts.",
-      tabId: "competitive_radar",
-      tabLabel: "Competitive Radar",
-    };
-  }
-
-  // 2. Raw Materials
-  if (title.includes("rotterdam cif") || title.includes("futures contract")) {
-    return {
-      text: "Rotterdam CIF Palm Kernel Oil futures contracts escalated 8.4% over 14 sessions due to tight logistics. This signals imminent Q4 cost hikes for fatty-acid-derived emulsifier products, requiring immediate procurement hedging.",
-      tabId: "policy_risk_monitor",
-      tabLabel: "Policy & Risk Monitor",
-    };
-  }
-  if (title.includes("southeast asian") || title.includes("export quotas")) {
-    return {
-      text: "Southeast Asian export quota reallocations have restricted physical raw material export volumes. Supply-chain analysts expect physical constraints to persist through winter, driving global emulsifier prices upward.",
-      tabId: "policy_risk_monitor",
-      tabLabel: "Policy & Risk Monitor",
-    };
-  }
-  if (title.includes("tier-1 emulsifier") || title.includes("supplier pricing")) {
-    return {
-      text: "Formal pricing alerts from tier-1 suppliers indicate projected escalations of 8% to 12% for upcoming deliveries. Procurement must review active ingredient specifications to mitigate gross margin compression.",
-      tabId: "policy_risk_monitor",
-      tabLabel: "Policy & Risk Monitor",
-    };
-  }
-
-  // 3. Scalp Health
-  if (title.includes("gcc premium") || title.includes("search query")) {
-    return {
-      text: "Regional search matrices indicate a +42% YoY surge in scalp care intent in KSA and UAE. Consumers are shifting spend from standard wash-off shampoos to high-efficacy leave-on scalp barrier treatments.",
-      tabId: "voice_of_customer",
-      tabLabel: "Voice of Customer",
-    };
-  }
-  if (title.includes("dermatologist") || title.includes("barrier hypersensitivity")) {
-    return {
-      text: "Dermatological panel feedback indicates that hard, desalinated regional water is accelerating scalp dryness and sensitivity, driving 88% of surveyed clinical patients to actively request barrier serums.",
-      tabId: "foreward_outlook",
-      tabLabel: "Forward Outlook",
-    };
-  }
-  if (title.includes("prestige regional") || title.includes("sales velocity")) {
-    return {
-      text: "Regional retail POS sales show premium scalp serums ($65-$95 tier) grew 28% YoY across Sephora and Faces counters, yielding a 12% higher gross margin contribution compared to traditional conditioners.",
-      tabId: "market_dynamics",
-      tabLabel: "Market Dynamics",
-    };
-  }
-
-  // 4. Halal / KSA
-  if (title.includes("sfda gazette") || title.includes("fast-track")) {
-    return {
-      text: "SFDA Circular #2026-04 created a fast-track approval portal for cosmetic registrations, shortening the compliance cycle from 90 to 30 days and providing an open entry window for certified brands.",
-      tabId: "policy_risk_monitor",
-      tabLabel: "Policy & Risk Monitor",
-    };
-  }
-  if (title.includes("saso 2815") || title.includes("origin audit")) {
-    return {
-      text: "SASO 2815 guidelines mandate complete raw material tracking back to source. Peptide formulations passing this audit are granted the SASO Halal Mark, which is highly preferred by local luxury buyers.",
-      tabId: "policy_risk_monitor",
-      tabLabel: "Policy & Risk Monitor",
-    };
-  }
-  if (title.includes("ksa vision 2030") || title.includes("destination door")) {
-    return {
-      text: "Under Saudi Arabia's retail expansion plan, 14 luxury shopping malls have opened. Major retail chains are prioritizing prime shelf placement for verified Halal-certified bioactive skincare lines.",
-      tabId: "market_dynamics",
-      tabLabel: "Market Dynamics",
-    };
-  }
-
-  // 5. Sustainable Packaging
-  if (title.includes("iso 14040") || title.includes("carbon footprint")) {
-    return {
-      text: "Audited Life Cycle Assessment (LCA) data confirms refillable aluminum cartridges reduce Scope 3 carbon emissions by 42% compared to PCR plastic. Tooling cost premium is fully amortized in 14 months.",
-      tabId: "foreward_outlook",
-      tabLabel: "Forward Outlook",
-    };
-  }
-  if (title.includes("eu packaging") || title.includes("waste regulation") || title.includes("ppwr")) {
-    return {
-      text: "The EU's upcoming Packaging and Packaging Waste Regulation (PPWR) legally mandates a 30% recycled PCR plastic baseline or fully reusable hardware formats by 2027, making refillable aluminum a safe compliance path.",
-      tabId: "policy_risk_monitor",
-      tabLabel: "Policy & Risk Monitor",
-    };
-  }
-  if (title.includes("repeat purchase") || title.includes("velocity trial")) {
-    return {
-      text: "In-store pilot trials in London and Paris specialty boutiques achieved a 68% repeat purchase rate for refill units, demonstrating high consumer loyalty and an average 18% increase in customer LTV.",
-      tabId: "voice_of_customer",
-      tabLabel: "Voice of Customer",
-    };
-  }
-
-  // 6. Consumer Sentiment / Biotech
-  if (title.includes("clean beauty") || title.includes("securing significant")) {
-    return {
-      text: "Financial trade reports confirm venture capital is heavily favoring biotech skincare brands. High multiples and growth investments are concentrated in startups leveraging sustainable clinical claims.",
-      tabId: "market_dynamics",
-      tabLabel: "Market Dynamics",
-    };
-  }
-  if (title.includes("l'oréal's") || title.includes("leadership changes")) {
-    return {
-      text: "Strategic re-alignment within global cosmetics majors focuses on reallocating sourcing budgets to green sciences and zero-carbon bio-actives, driving tier-1 ingredient suppliers to scale up fermentation.",
-      tabId: "competitive_radar",
-      tabLabel: "Competitive Radar",
-    };
-  }
-  if (title.includes("capsum's") || title.includes("acquisition")) {
-    return {
-      text: "The acquisition of Capsum microfluidics formulation lab validates the industry's shift toward high-precision bio-active encapsulation, positioning biotech hydration as the core premium product class.",
-      tabId: "competitive_radar",
-      tabLabel: "Competitive Radar",
-    };
-  }
-  if (title.includes("sentiment migration") || title.includes("bio-fermented vs")) {
-    return {
-      text: "A customer review crawl across online platforms reveals positive sentiment for bio-fermented actives rose to 84% (+28% YoY), while synthetic ingredients fell to 38% on solvent residue concerns.",
-      tabId: "voice_of_customer",
-      tabLabel: "Voice of Customer",
-    };
-  }
-
-  // 7. Fallback / Universal
-  if (title.includes("high-frequency") || title.includes("commodity & trade")) {
-    return {
-      text: "Global commodity indicators show positive trade index momentum (+5.8% 30-day moving average). Procurement teams are advised to execute standard supply contract hedges before quarterly supplier rate adjustments.",
-      tabId: "policy_risk_monitor",
-      tabLabel: "Policy & Risk Monitor",
-    };
-  }
-  if (title.includes("regional regulatory") || title.includes("policy database")) {
-    return {
-      text: "Regional compliance database trackers flagged pending updates. Reviewing ingredient certifications and safety dossiers prevents compliance delays in key regional doors.",
-      tabId: "policy_risk_monitor",
-      tabLabel: "Policy & Risk Monitor",
-    };
-  }
-  if (title.includes("consumer intent") || title.includes("search volume")) {
-    return {
-      text: "E-commerce transactional analysis indicates conversion scores are 3.2 percentage points higher on product listings displaying clinical bio-fermented hydration and zero-carbon sustainability credentials.",
-      tabId: "voice_of_customer",
-      tabLabel: "Voice of Customer",
-    };
-  }
-
-  return {
-    text: "Review the full intelligence details and strategic assessments for this detected signal in the corresponding module page.",
-    tabId: "policy_risk_monitor",
-    tabLabel: "Policy & Risk Monitor",
-  };
-};
 
 export default function DecisionIntelligencePane({
   onReturn,
@@ -1063,7 +336,7 @@ export default function DecisionIntelligencePane({
   fetchCreditUsage,
   onCreditUsageUpdate,
 }: DecisionIntelligencePaneProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<DIChatMessage[]>([]);
   const [savedMessageIds, setSavedMessageIds] = useState<Record<string, boolean>>({});
   const [sharedMessageIds, setSharedMessageIds] = useState<Record<string, boolean>>({});
   const [homeQuestions, setHomeQuestions] = useState<HomePrompt[]>([]);
@@ -1071,12 +344,28 @@ export default function DecisionIntelligencePane({
 
   // Persist conversationId in localStorage so it survives unmount/remount
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(
-    () => localStorage.getItem("di_current_conversation_id")
+    () => localStorage.getItem("dr_current_conversation_id")
   );
 
   useEffect(() => {
-    localStorage.setItem("di_current_conversation_id", currentConversationId || "");
+    localStorage.setItem("dr_current_conversation_id", currentConversationId || "");
   }, [currentConversationId]);
+
+  const diFetch = async (path: string, options: RequestInit = {}) => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session || !session.access_token) {
+      throw new Error("NO_SESSION");
+    }
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session.access_token}`,
+      ...(options.headers as Record<string, string> || {}),
+    };
+    return fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  };
 
   useEffect(() => {
     if (initialQuery?.query) {
@@ -1199,8 +488,8 @@ export default function DecisionIntelligencePane({
       doc.text("GENERATED ON:", 24, y + 16);
 
       doc.setFont("helvetica", "normal");
-      doc.text(userId || "techstack@knometrix.com", 60, y + 6);
-      doc.text(industry || "Biotech Skincare & Wellness", 60, y + 11);
+      if (userId) doc.text(userId, 60, y + 6);
+      if (industry) doc.text(industry, 60, y + 11);
       doc.text(new Date().toLocaleString("en-US", { 
         year: 'numeric', month: 'long', day: 'numeric', 
         hour: '2-digit', minute: '2-digit', timeZoneName: 'short' 
@@ -1290,53 +579,6 @@ export default function DecisionIntelligencePane({
         }
       }
 
-      // Extract and Expand Signal Details!
-      const knownSignals = [
-        "Competitor pricing changes", "Annual subscriptions", "Cart conversion", "Mid-market",
-        "Rotterdam CIF", "Southeast Asian", "Tier-1 emulsifier", "GCC premium",
-        "Dermatologist", "SFDA gazette", "SASO 2815", "KSA Vision 2030",
-        "ISO 14040", "EU packaging", "Repeat purchase", "Clean beauty",
-        "L'Oréal's", "Capsum's", "Sentiment migration", "High-frequency",
-        "Regional regulatory", "Consumer intent"
-      ];
-
-      const detectedSignals: string[] = [];
-      const lowerText = text.toLowerCase();
-      knownSignals.forEach(sig => {
-        if (lowerText.includes(sig.toLowerCase())) {
-          detectedSignals.push(sig);
-        }
-      });
-
-      if (detectedSignals.length > 0) {
-        y += 6;
-        if (y > 230) {
-          doc.addPage();
-          drawHeaderAndFooter();
-          y = 25;
-        }
-        
-        // Signal Header
-        addText("EXPANDED SIGNAL BACKGROUND & INTELLIGENCE", 11.5, true, "#18181b");
-        y += 2;
-
-        detectedSignals.forEach(sig => {
-          const details = getSignalDetails(sig);
-          if (details) {
-            y += 2;
-            if (y > 270) {
-              doc.addPage();
-              drawHeaderAndFooter();
-              y = 25;
-            }
-            addText(sig, 9.5, true, "#2d39d2");
-            y += 0.5;
-            addText(details.text, 9, false, "#4b5563", 4);
-            y += 2;
-          }
-        });
-      }
-
       doc.save(`Decision_Intelligence_Report_${msgId.substring(0, 6)}.pdf`);
     } catch (err) {
       console.error("Failed to generate PDF: ", err);
@@ -1378,8 +620,8 @@ export default function DecisionIntelligencePane({
   const [selectedLibraryTab, setSelectedLibraryTab] = useState<"Decision Intelligence" | "Inference" | "List">("Decision Intelligence");
   const [librarySearchQuery, setLibrarySearchQuery] = useState("");
 
-  const [highlightsData, setHighlightsData] = useState<HighlightRow[]>(FALLBACK_HIGHLIGHTS);
-  const [highlightsLoading, setHighlightsLoading] = useState(true);
+  const [highlightsData, setHighlightsData] = useState<HighlightRow[]>([]);
+  const [highlightsLoading, setHighlightsLoading] = useState(false);
   const [highlightsDate, setHighlightsDate] = useState<string>("");
 
   const todayFormattedDate = useMemo(() => {
@@ -1393,75 +635,6 @@ export default function DecisionIntelligencePane({
     return `${ordinalDay} ${month} ${year}`;
   }, []);
 
-  useEffect(() => {
-    async function loadTodayHighlights() {
-      const targetClientId = clientId || "b61b4d3b-caeb-457b-9971-636c83688ee4";
-      setHighlightsLoading(true);
-
-      try {
-        const [mktRes, polRes, trdRes] = await Promise.all([
-          supabase.from("market_insights_live").select("id, title, category, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(4),
-          supabase.from("policy_signals").select("id, signal_title, category, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(4),
-          supabase.from("trend_signals").select("id, signal_title, sector, created_at").eq("client_id", targetClientId).order("created_at", { ascending: false }).limit(4)
-        ]);
-
-        const rows: HighlightRow[] = [];
-
-        if (mktRes.data) {
-          mktRes.data.forEach((r: any) => {
-            rows.push({
-              moduleId: MARKET_DYNAMICS_MODULE_ID,
-              moduleName: "Market Dynamics",
-              tabId: "market_dynamics",
-              itemId: r.id,
-              label: r.category || "Market Dynamics",
-              body: r.title || "",
-            });
-          });
-        }
-
-        if (polRes.data) {
-          polRes.data.forEach((r: any) => {
-            rows.push({
-              moduleId: POLICY_RISK_MODULE_ID,
-              moduleName: "Policy & Risk Monitor",
-              tabId: "policy_risk_monitor",
-              itemId: r.id,
-              label: r.category || "Policy & Risk",
-              body: r.signal_title || "",
-            });
-          });
-        }
-
-        if (trdRes.data) {
-          trdRes.data.forEach((r: any) => {
-            rows.push({
-              moduleId: FORWARD_OUTLOOK_MODULE_ID,
-              moduleName: "Future Outlook",
-              tabId: "foreward_outlook",
-              itemId: r.id,
-              label: r.sector || "Future Outlook",
-              body: r.signal_title || "",
-            });
-          });
-        }
-
-        if (rows.length > 0) {
-          setHighlightsData(rows);
-        } else {
-          setHighlightsData(FALLBACK_HIGHLIGHTS);
-        }
-      } catch (err) {
-        console.error("Failed to load today highlights:", err);
-        setHighlightsData(FALLBACK_HIGHLIGHTS);
-      } finally {
-        setHighlightsLoading(false);
-      }
-    }
-
-    loadTodayHighlights();
-  }, [clientId]);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -1473,92 +646,77 @@ export default function DecisionIntelligencePane({
   }, [messages, loading]);
 
   useEffect(() => {
-    if (!clientId) return;
     (async () => {
       try {
-        const params = new URLSearchParams({
-          clientId,
-          industry: industry || "",
-        });
-
         const [homeRes, libRes] = await Promise.all([
-          fetch(`${API_URL}/decision-intelligence/suggested-questions?${params.toString()}&surface=home`),
-          fetch(`${API_URL}/decision-intelligence/suggested-questions?${params.toString()}&surface=library`),
+          diFetch(`/dynamic-rag/suggested-questions?surface=home`),
+          diFetch(`/dynamic-rag/suggested-questions?surface=library`),
         ]);
 
         if (homeRes.ok) {
-          const { questions } = await homeRes.json();
-          if (Array.isArray(questions)) setHomeQuestions(questions);
+          const data = await homeRes.json();
+          const qs = data.questions || data || [];
+          if (Array.isArray(qs)) setHomeQuestions(qs);
         }
 
         if (libRes.ok) {
-          const { questions } = await libRes.json();
-          if (Array.isArray(questions)) {
+          const data = await libRes.json();
+          const qs = data.questions || data || [];
+          if (Array.isArray(qs)) {
             setLibraryQuestions(
-              questions.map((q: any) => ({
-                id: q.id,
+              qs.map((q: any) => ({
+                id: q.id || Math.random().toString(36).substring(2),
                 category: CATEGORY_TO_TAB[q.category] ?? "Decision Intelligence",
-                title: q.title,
+                title: q.title || q.question,
                 question: q.question,
                 description: q.description ?? undefined,
               }))
             );
           }
         }
-      } catch (e) {
-        console.warn("[DI] Unable to load suggested questions", e);
+      } catch (e: any) {
+        if (e.message === "NO_SESSION") {
+          console.warn("[DI] No session for suggested questions");
+        } else {
+          console.warn("[DI] Unable to load suggested questions", e);
+        }
       }
     })();
-  }, [clientId, industry]);
+  }, []);
 
   const loadConversations = async () => {
-    if (!userId) return;
     try {
-      const res = await fetch(
-        `${API_URL}/decision-intelligence/conversations?userId=${encodeURIComponent(userId)}`
-      ).catch(() => null);
-
-      if (res && res.ok) {
-        const { conversations } = await res.json();
-        const mapped: ChatSession[] = (conversations || []).map((c: any) => ({
+      const res = await diFetch(`/dynamic-rag/conversations`);
+      if (res.ok) {
+        const data = await res.json();
+        const conversations = data.conversations || data || [];
+        const mapped: ChatSession[] = conversations.map((c: any) => ({
           id: c.id,
-          title: c.title,
+          title: c.title || "Untitled Chat",
           date: "",
           displayTime: relativeTime(c.updated_at),
           dayGroup: groupDay(c.updated_at),
           messages: [],
         }));
         setPreviousSessions(mapped);
-        return;
       }
-
-      // Supabase fallback if backend API endpoint returned 404 or network error
-      const { data: convData, error: convErr } = await supabase
-        .from("di_conversations")
-        .select("*")
-        .eq("user_id", userId)
-        .order("updated_at", { ascending: false });
-
-      if (!convErr && convData) {
-        const mapped: ChatSession[] = convData.map((c: any) => ({
-          id: c.id,
-          title: c.title || "Untitled Session",
-          date: "",
-          displayTime: relativeTime(c.updated_at || new Date().toISOString()),
-          dayGroup: groupDay(c.updated_at || new Date().toISOString()),
-          messages: [],
-        }));
-        setPreviousSessions(mapped);
+    } catch (e: any) {
+      if (e.message === "NO_SESSION") {
+        setMessages([{
+          id: "no-session-err",
+          role: "model",
+          text: "Please log in again.",
+          timestamp: new Date(),
+        }]);
+      } else {
+        console.warn("[DI] Unable to load conversations", e);
       }
-    } catch (e) {
-      console.warn("[DI] Unable to load conversations", e);
     }
   };
 
   useEffect(() => {
-    if (!userId) return;
     loadConversations();
-  }, [userId]);
+  }, []);
 
   function relativeTime(iso: string): string {
     if (!iso) return "";
@@ -1583,100 +741,12 @@ export default function DecisionIntelligencePane({
     return "Earlier";
   }
 
-  const generateItemDetailExplanation = (item: {
-    title: string;
-    category?: string;
-    date?: string;
-    summary: string;
-    impact?: string;
-  }) => {
-    const line1 = item.summary;
-    const line2 = `This ${item.category ? item.category.toLowerCase() : "regulatory policy"} update serves as a key strategic baseline for market access, compliance planning, and regional product positioning.`;
-    const line3 = `Cross-functional R&D, Regulatory Affairs, and Supply Chain teams must evaluate product specifications and dossier submissions to ensure uninterrupted clearance.`;
-    const line4 = `Proactive alignment with these standards provides a first-mover advantage while safeguarding brand equity and gross margins across key retail doors.`;
-    const line5 = `Operational lead times and logistics buffers should be actively monitored during the transitional window to prevent fulfillment bottlenecks.`;
-    const line6 = `We recommend coordinating directly with regional distribution and retail partners to execute local registration and commercial rollout.`;
-
-    return `${line1}\n${line2}\n${line3}\n${line4}\n${line5}\n${line6}`;
-  };
-
-    const handleSourceOpen = (source: any) => {
+  const handleSourceOpen = (source: any) => {
     console.log("[DI open]", source.module, "|", source.title, "| signal_id:", source.signal_id);
-    const tab = MODULE_TO_TAB[source.module || ""];
+    const mod = source.module || "";
+    const tab = MODULE_TO_TAB[mod] || MODULE_TO_TAB[mod.toLowerCase()];
     if (!tab || !onTabChange) return;
     onTabChange(tab.tabId, source.signal_id || undefined);
-  };
-
-  const handleListItemClick = (item: {
-    id: string;
-    title: string;
-    category?: string;
-    date?: string;
-    summary: string;
-    impact?: string;
-  }) => {
-    if (loading) return;
-
-    const targetTab = getTargetTabInfo(item);
-    const explanationText = generateItemDetailExplanation(item);
-
-    const userMessage: ChatMessage = {
-      id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2),
-      role: "user",
-      text: `Provide further details on: ${item.title}`,
-      timestamp: new Date(),
-    };
-
-    const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-
-    const initialModelMessage: ChatMessage = {
-      id: modelId,
-      role: "model",
-      heading: item.title,
-      text: "",
-      isStreaming: true,
-      timestamp: new Date(),
-      linkInfo: {
-        tabId: targetTab.tabId,
-        tabLabel: targetTab.tabLabel,
-        signalId: item.id,
-      },
-    };
-
-    setMessages((prev) => [...prev, userMessage, initialModelMessage]);
-    setLoading(true);
-
-    const tokens = explanationText.match(/\S+\s*/g) || [explanationText];
-    let currentIndex = 0;
-    let accumulated = "";
-
-    const timer = setInterval(() => {
-      if (currentIndex >= tokens.length) {
-        clearInterval(timer);
-        setLoading(false);
-        setMessages((prev) => {
-          const finished = prev.map((msg) =>
-            msg.id === modelId
-              ? { ...msg, text: explanationText, isStreaming: false }
-              : msg
-          );
-          updateOrAddSession(`Provide further details on: ${item.title}`, finished);
-          return finished;
-        });
-        return;
-      }
-
-      accumulated += tokens[currentIndex];
-      currentIndex += 1;
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === modelId
-            ? { ...msg, text: accumulated, isStreaming: true }
-            : msg
-        )
-      );
-    }, 18);
   };
 
 const DecisionChart: React.FC<{
@@ -1777,422 +847,38 @@ const DecisionChart: React.FC<{
   );
 };
 
-  const getStructuredInferenceResponse = (query: string): string => {
-    const q = query.toLowerCase();
-    const fullTopic = query.trim();
 
-    // 1. Competitor Pricing Changes / Discounting
-    if (q.includes("competitor") && (q.includes("price") || q.includes("pricing") || q.includes("discount") || q.includes("week"))) {
-      return `### Competitor Pricing Movement — Last 7 Days
-
-#### Outlook
-Competitor pricing has remained relatively stable overall, but there are signs of targeted discounting in selected segments, particularly among mid-market offerings.
-A comprehensive audit of competitor promotional logs indicates that standard subscription tiers are under targeted pressure. Competitor A and Competitor E have rolled out tactical 14% entry-level discounts to convert prospects who drop off during high-consideration cart checkout stages. This is designed to capture early-funnel accounts before broader pricing adjustments occur in Q4, safeguarding market share in high-churn quarters.
-
-#### Strategic Market Dynamics
-Our high-frequency monitoring of competitor portals reveals localized, high-impact acquisition trials. Rather than executing highly visible, public price cuts that would trigger structural market deflation, top-tier competitors are leveraging personalized checkout discounts and bundled value-adds (such as complimentary support packages or premium add-on trials) to drive volume. This enables them to capture price-sensitive segments while maintaining headline price integrity for their enterprise tier.
-
-#### Key Movement & Impact Analysis
-| Competitor | Pricing Change | Key Movement | Likely Implication |
-|---|---|---|---|
-| Competitor A | ↓ 5–8% | Reduced entry-level package pricing | Attempting to improve customer acquisition |
-| Competitor B | ↓ 3% | Limited-time promotion on annual plans | Increasing conversion and locking in customers |
-| Competitor C | No change | Pricing unchanged across core plans | Maintaining current market positioning |
-| Competitor D | ↑ 4% | Increased premium-tier pricing | Moving toward higher-value positioning |
-| Competitor E | ↓ 6% | Discounted selected legacy products | Potential tactical response to competitive pressure |
-
-\`\`\`chart
-{
-  "title": "Weekly Pricing Index Trend - Competitor A vs B vs E (Normalized)",
-  "type": "line",
-  "dataKey": "index",
-  "unit": " pts",
-  "data": [
-    {"name": "Wk 1", "index": 100},
-    {"name": "Wk 2", "index": 98},
-    {"name": "Wk 3", "index": 95},
-    {"name": "Wk 4", "index": 91},
-    {"name": "Wk 5", "index": 86},
-    {"name": "Wk 6", "index": 84}
-  ]
-}
-\`\`\`
-
-#### Driving Factors
-- The notable shift is not a broad market-wide price reduction. Instead, competitors appear to be using pricing selectively.
-- Lower-priced offerings are becoming more aggressive, with discounts concentrated around acquisition-focused products.
-- Premium offerings remain comparatively stable, suggesting that competitors are reluctant to trigger a broader price war.
-- Annual subscriptions and bundled packages are seeing more promotional activity than standard monthly pricing.
-- The gap between entry-level and premium offerings is beginning to widen.
-
-#### What to Watch
-The current pricing activity suggests that competitive pressure is increasing primarily at the customer acquisition stage, rather than across the entire market.
-
-If this continues, the key risk is not necessarily losing existing customers because of headline pricing. It is losing new customers during the evaluation stage because competitors are presenting a lower initial cost of entry.
-
-#### Decision Implication
-Rather than responding with an across-the-board price reduction, assess whether a targeted entry-level offer, annual-plan incentive, or value-added bundle can protect conversion while maintaining existing price positioning.
-
-#### Bottom Line
-Competitors are becoming more aggressive on how they package and discount their prices, rather than simply cutting prices across the board. The immediate strategic question is whether we need to respond at the entry point, not whether we need to lower our overall pricing.
-
-#### Confidence & Evidence
-- **Market signal:** Moderate
-- **Pricing changes detected:** 4 of 5 tracked competitors
-- **Most significant movement:** Entry-level package pricing
-- **Direction:** Moderately more price-competitive
-- **Recommended attention:** High — monitor for another 1–2 weeks before making a structural pricing change
-
-#### Key Signals Leading to This Intelligence
-- [Competitor Pricing Changes / Tactical Discounting Entry-Level Plan Campaign Audit](#)
-- [Annual Subscriptions & Promotional Trial Activity Door-Sweep Analysis](#)
-- [E-Commerce Standard Tier Cart Conversion and Drop-Off Report](#)
-- [Mid-Market Promotional Pricing Velocity Sweep Index](#)`;
-    }
-
-    // 2. Palm Kernel Oil / Emulsifier Margins / Raw Materials
-    if (q.includes("palm kernel") || q.includes("emulsifier") || q.includes("raw material") || q.includes("price spike")) {
-      return `### Impact of Palm Kernel Oil Price Spikes on Emulsifier Margins
-
-#### Outlook
-Margin pressure is likely next quarter if the inferred price increase persists.
-
-Palm kernel oil represents a significant input cost in several emulsifier formulations. Based on recent market signals, we estimate that palm kernel oil costs could increase by 8–12% next quarter if current price pressures continue.
-
-#### Key Movement & Impact Analysis
-| Scenario | Palm Kernel Oil Cost | Estimated Gross Margin Impact |
-|---|---|---|
-| Base case | +3% | -0.5 to -1.0 pp |
-| Moderate spike | +8% | -1.5 to -2.5 pp |
-| High spike | +12% | -2.5 to -4.0 pp |
-
-\`\`\`chart
-{
-  "title": "Raw Palm Kernel Oil Rotterdam CIF Future Trend ($/MT)",
-  "type": "area",
-  "dataKey": "price",
-  "unit": " USD",
-  "data": [
-    {"name": "May 26", "price": 1050},
-    {"name": "Jun 26", "price": 1120},
-    {"name": "Jul 26", "price": 1190},
-    {"name": "Aug 26", "price": 1280}
-  ]
-}
-\`\`\`
-
-*The impact will depend on the proportion of palm kernel oil in the product mix and the company's ability to pass higher input costs through to customers.*
-
-#### Driving Factors
-- Higher raw-material costs directly increase emulsifier production costs.
-- Contract pricing delays may prevent immediate pass-through to customers.
-- Competitors may hesitate to increase prices simultaneously, limiting pricing flexibility.
-
-#### What to Watch
-The key indicator is whether the price increase becomes sustained rather than temporary. If palm kernel oil remains elevated for 4–6 weeks, the pressure on next-quarter margins becomes materially higher.
-
-#### Decision Implication
-A broad price increase may not be necessary immediately. However, high-exposure emulsifier products should be reviewed for price adjustment, formulation optimization, or procurement hedging before the next pricing cycle.
-
-#### Bottom Line
-A sustained 8–12% increase in palm kernel oil could compress emulsifier gross margins by roughly 1.5–4 percentage points, unless the increase is partially passed through to customers or offset through procurement and formulation actions.
-
-#### Confidence & Evidence
-- **Confidence Level:** Medium — the price movement is currently an inferred signal rather than a confirmed cost increase.
-- **Signal Strength:** Moderate (observed across 3 regional commodity indexes)
-- **Primary Cost Driver:** Palm kernel oil futures +8.4%
-- **Monitoring Horizon:** Next 4–6 weeks
-
-#### Key Signals Leading to This Intelligence
-- [Rotterdam CIF Palm Kernel Oil 3-Month Futures Contract Price Index](#)
-- [Southeast Asian Commodity Export Quotas and Production Allocation Forecasts](#)
-- [Tier-1 Emulsifier Ingredient Supplier Pricing Escalation Database](#)`;
-    }
-
-    // 3. Scalp Health R&D Reallocation
-    if (q.includes("scalp") || q.includes("r&d") || q.includes("reallocate")) {
-      return `### R&D Reallocation Analysis: GCC Scalp Health Serums
-
-#### Outlook
-Reallocating 15% of active formula budget toward clinical scalp-care actives in the GCC market is a high-conviction growth move.
-
-Scalp-care search demand across KSA and UAE has surged 34% YoY, driven by desalinated water impact and strong consumer preference for dermatologist-endorsed trichological solutions.
-
-#### Key Movement & Impact Analysis
-| Formulation Track | R&D Capital Shift | Target Gross Margin | Launch Horizon |
-|---|---|---|---|
-| Anti-Pollution Scalp Serums | +10% | 76% | Q1 2027 |
-| Soothing Microbiome Tonics | +5% | 74% | Q2 2027 |
-| Legacy Wash-Off Products | -15% | 68% | Maintained |
-
-\`\`\`chart
-{
-  "title": "GCC Scalp Serum Market Sizing By Segment ($ Millions)",
-  "type": "pie",
-  "dataKey": "value",
-  "unit": "M",
-  "data": [
-    {"name": "Barrier Serums", "value": 25, "fill": "#2d39d2"},
-    {"name": "Microbiome Tonics", "value": 15, "fill": "#10b981"},
-    {"name": "Anti-Dandruff Premium", "value": 10, "fill": "#f59e0b"},
-    {"name": "Soothing Oils", "value": 8, "fill": "#3b82f6"}
-  ]
-}
-\`\`\`
-
-#### Driving Factors
-- Rapid consumer awareness shift recognizing scalp microbiome health as essential for hair retention.
-- High willingness-to-pay ($65–$95 premium tier) for targeted scalp treatment regimens in GCC retail.
-- Strong dermatologist endorsement channels driving high conversion across prestige doors.
-
-#### What to Watch
-Monitor clinical efficacy trial milestones and track pre-orders from key regional retail partners including Sephora Middle East and Faces.
-
-#### Decision Implication
-Reallocate 15% of formula R&D toward bio-active scalp serums while securing regional distribution exclusivity for patented active peptides.
-
-#### Bottom Line
-Scalp care represents a $45M addressable market segment in the GCC with 8% higher gross margins than standard hair care lines.
-
-#### Confidence & Evidence
-- **Confidence Level:** High — validated by POS retail sales velocity and regional clinical panel endorsements.
-- **Market Signal Strength:** Strong (+34% YoY search volume)
-- **Primary Driver:** Premium prestige category migration
-
-#### Key Signals Leading to This Intelligence
-- [GCC Premium Haircare & Scalp Barrier Search Query Volume Matrix](#)
-- [Dermatologist Clinical Patient Barrier Hypersensitivity Survey](#)
-- [Prestige Regional Retail POS Category Sales Velocity Reports](#)`;
-    }
-
-    // 4. Halal Anti-Aging / KSA Entry
-    if (q.includes("halal") || q.includes("ksa") || q.includes("saudi") || q.includes("sfda")) {
-      return `### Halal Anti-Aging Serum Entry Roadmap — Kingdom of Saudi Arabia (SFDA)
-
-#### Outlook
-SFDA registration and SASO Halal certification present a clear 4–6 month market entry corridor for premium anti-aging lines.
-
-Saudi Arabia's Vision 2030 retail expansion offers high potential for Halal-certified clinical skincare, provided raw material origin documentation passes SFDA e-cosmetic portal audit without delays.
-
-#### Key Movement & Impact Analysis
-| Milestone Stage | Regulatory Requirement | Lead Time | Approval Likelihood |
-|---|---|---|---|
-| Ingredient Screening | SASO 2815 Halal Origin Audit | 3–4 weeks | High |
-| SFDA E-System Filing | Safety Dossier & GMP Certification | 6–8 weeks | High |
-| Retail Door Authorization | SASO Halal Mark Issuance | 4–6 weeks | High |
-
-\`\`\`chart
-{
-  "title": "Approval Timeline Lead Times (Weeks)",
-  "type": "line",
-  "dataKey": "weeks",
-  "unit": " wks",
-  "data": [
-    {"name": "Ingredient Audit", "weeks": 3.5, "fill": "#3b82f6"},
-    {"name": "SFDA E-Filing", "weeks": 7.0, "fill": "#2d39d2"},
-    {"name": "Door Clearance", "weeks": 5.0, "fill": "#10b981"}
-  ]
-}
-\`\`\`
-
-#### Driving Factors
-- Escalating female workforce participation in Saudi Arabia expanding disposable income for clinical skincare.
-- Strict SFDA enforcement on halal ingredient origin certificates (porcine/alcohol-free verification).
-- Retailer preference for pre-cleared Halal-certified products in major Riyadh and Jeddah shopping malls.
-
-#### What to Watch
-Monitor SFDA regulatory updates regarding botanical extract extraction solvent rules and verify Halal certification body accreditation compatibility with SASO.
-
-#### Decision Implication
-Expedite dual-track registration on the GHAD/e-cosmetic portal while establishing a localized logistics warehouse in Riyadh to streamline fulfillment.
-
-#### Bottom Line
-Securing first-mover Halal anti-aging registration positions the brand for prime door placement across 120+ Saudi prestige beauty counters by Q1 next year.
-
-#### Confidence & Evidence
-- **Confidence Level:** High — based on published SFDA circulars and SASO compliance guidelines.
-- **Regulatory Status:** Active portal processing
-- **Key Door Pipeline:** 120+ retail counters pre-mapped
-
-#### Key Signals Leading to This Intelligence
-- [SFDA Gazette Fast-Track Cosmetic Approval Protocol Circular](#)
-- [SASO 2815 Halal Bioactive Ingredient Origin Audit Guidelines](#)
-- [KSA Vision 2030 Premium Shopping Destination Door Distribution Mapping](#)`;
-    }
-
-    // 5. PCR Plastic vs Refillable Aluminum / Sustainable Packaging
-    if (q.includes("pcr") || q.includes("aluminum") || q.includes("packaging") || q.includes("esg")) {
-      return `### Sustainable Packaging Transition: PCR Plastic vs Refillable Aluminum
-
-#### Outlook
-Refillable aluminum cartridges offer superior 5-year ESG carbon reduction and consumer retention, despite 14% higher initial tooling cost.
-
-Life Cycle Assessment (LCA) data shows aluminum refills achieve net cost parity after 3 purchase cycles while satisfying 2027 ESG mandatory directives.
-
-#### Key Movement & Impact Analysis
-| Packaging Option | Unit Tooling Cost | 3-Year Scope 3 Emissions | Customer LTV Uplift |
-|---|---|---|---|
-| 100% PCR Plastic | Base | -18% CO2e | +6% |
-| Refillable Aluminum Cartridge | +14% | -42% CO2e | +24% |
-| Hybrid Glass / Aluminum | +22% | -31% CO2e | +18% |
-
-\`\`\`chart
-{
-  "title": "3-Year Scope 3 Emissions Reduction (%)",
-  "type": "bar",
-  "dataKey": "emissions",
-  "unit": "%",
-  "data": [
-    {"name": "100% PCR Plastic", "emissions": 18, "fill": "#64748b"},
-    {"name": "Refill Aluminum", "emissions": 42, "fill": "#10b981"},
-    {"name": "Hybrid Glass", "emissions": 31, "fill": "#06b6d4"}
-  ]
-}
-\`\`\`
-
-#### Driving Factors
-- Imposing EU Packaging & Packaging Waste Regulation (PPWR) mandatory targets for reusability.
-- Consumer willingness-to-pay premium for zero-waste luxury cosmetic hardware.
-- Reduced shipping weights for lightweight refill pouches lowering supply chain freight costs.
-
-#### What to Watch
-Monitor supplier MOQ flexibility for anodized aluminum cartridges and test refill subscription adoption in pilot retail doors.
-
-#### Decision Implication
-Transition primary flagship skincare lines to refillable aluminum cartridges while utilizing 100% PCR plastic for travel-size SKUs.
-
-#### Bottom Line
-Aluminum refills deliver a 42% lifecycle carbon reduction and a 24% boost in customer lifetime value, fully securing 2027 ESG compliance.
-
-#### Confidence & Evidence
-- **Confidence Level:** High — backed by audited LCA environmental metrics and retail pilot conversion rates.
-- **ESG Compliance Index:** 94/100
-- **Payback Horizon:** 14 months
-
-#### Key Signals Leading to This Intelligence
-- [Certified ISO 14040 Life Cycle Assessment (LCA) Carbon Footprint Audit](#)
-- [EU Packaging & Packaging Waste Regulation (PPWR) Compliance Directives](#)
-- [Sustainable Refill Cartridge Repeat Purchase Velocity Trial Data](#)`;
-    }
-
-    // 6. Consumer Sentiment Shift (Synthetic vs. Bio-fermented Hyaluronic Acid)
-    if (q.includes("sentiment") || q.includes("hyaluronic") || q.includes("synthetic")) {
-      return `### Decision Intelligence Assessment: How has consumer sentiment shifted regarding synthetic vs. bio-fermented hyaluronic acid?
-
-#### Outlook
-Consumer sentiment has shifted decisively toward bio-fermented hyaluronic acid (+28% positive sentiment index growth), driven by zero-carbon clinical claims and skin-microbiome compatibility.
-
-Traditional synthetic variants face increasing consumer scrutiny on social channels due to chemical solvent residues and perceived lack of raw ingredient purity.
-
-#### Key Movement & Impact Analysis
-| Ingredient Class | Positive Sentiment Index | Consumer Adoption Trend | Net Premium Willingness-to-Pay |
-|---|---|---|---|
-| Bio-Fermented Hyaluronic | 84% | Strong upward acceleration (+34% YoY) | +15% Price Premium Elasticity |
-| Plant-Derived Vegan | 71% | Moderate upward growth | +8% Price Premium Elasticity |
-| Traditional Synthetic | 38% | Negative downward shift (-12% YoY) | -5% (Discounting Pressure) |
-
-\`\`\`chart
-{
-  "title": "Positive Sentiment Index by Ingredient Class (%)",
-  "type": "pie",
-  "dataKey": "score",
-  "unit": "%",
-  "data": [
-    {"name": "Bio-Fermented", "score": 84, "fill": "#2d39d2"},
-    {"name": "Plant-Derived", "score": 71, "fill": "#10b981"},
-    {"name": "Traditional Synthetic", "score": 38, "fill": "#ef4444"}
-  ]
-}
-\`\`\`
-
-#### Driving Factors
-- Zero-carbon bio-fermented actives are heavily favored by younger eco-conscious demographics (Gen Z and Millennials).
-- Increased consumer awareness regarding ingredient sourcing and biotechnological clinical efficacy.
-- Desired microbiome friendliness and reduced risk of dermal hypersensitivity compared to synthetics.
-
-#### What to Watch
-Monitor the entry of new low-cost bio-fermented supplier capacities in APAC and track regulatory labeling standards for bio-based claims in the EU.
-
-#### Decision Implication
-Formulate all upcoming clinical hydration portfolios exclusively with certified bio-fermented or plant-derived hyaluronic acid, and transition marketing copy to highlight biotech zero-carbon credentials.
-
-#### Bottom Line
-Consumer demand has permanently migrated away from synthetic cosmetic chemicals in favor of bio-fermented alternatives. Brands that transition their active ingredients early can capture a 15% pricing premium.
-
-#### Confidence & Evidence
-- **Confidence Level:** High — backed by sentiment mining across 45,000+ online review mentions and clinical panel surveys.
-- **Search Intent Momentum:** +34% YoY search query expansion
-- **Key Retail Channels:** High engagement in premium clean specialty stores
-
-#### Key Signals Leading to This Intelligence
-- [Clean beauty brands are securing significant funding and growth](#)
-- [L'Oréal's Leadership Changes Signal Industry-Wide Shifts](#)
-- [Capsum's Acquisition Strengthens Leadership in US Beauty Market](#)
-- [DTC Consumer Sentiment Migration Matrix: Bio-Fermented vs Synthetic Actives](#)`;
-    }
-
-    // 7. Universal Dynamic Generator for Any Other Inference Question (Full Uncut Title Heading)
-    return `### Decision Intelligence Assessment: ${fullTopic}
-
-#### Outlook
-Strategic analysis indicates favorable market positioning and positive ROI for "${fullTopic}", contingent on key risk controls and phased capital deployment.
-
-Evaluating this query reveals actionable strategic opportunities and risk mitigation paths aligned with current regional market conditions and operational goals.
-
-#### Key Movement & Impact Analysis
-| Strategic Dimension | Current Baseline | Inferred Direction | Estimated Impact |
-|---|---|---|---|
-| Market Growth Velocity | Moderate (+4.2%) | Accelerated (+8.5%) | +$1.8M ARR Opportunity |
-| Operational Margin Exposure | Baseline (68%) | Stabilized (71%) | +1.5 to +2.8 pp Net Margin |
-| Implementation Horizon | Q3 Planning | Phased Execution | 3–6 Month Payback Corridor |
-
-\`\`\`chart
-{
-  "title": "Projected Intelligence Dimension Scores",
-  "type": "area",
-  "dataKey": "score",
-  "unit": " pts",
-  "data": [
-    {"name": "Market Growth", "score": 85, "fill": "#2d39d2"},
-    {"name": "Margin Uplift", "score": 72, "fill": "#10b981"},
-    {"name": "Risk Exposure", "score": 38, "fill": "#f59e0b"},
-    {"name": "ROI Velocity", "score": 78, "fill": "#3b82f6"}
-  ]
-}
-\`\`\`
-
-#### Driving Factors
-- Shift in underlying consumer demand and channel preferences observed across target regional doors.
-- Regulatory alignment requirements necessitating proactive compliance and supply chain adjustments.
-- Competitive dynamics urging early positioning before market saturation.
-- Supply chain efficiencies gained through targeted procurement optimization.
-
-#### What to Watch
-Monitor weekly POS sell-through rates, raw material procurement indices, and key competitor promotional activities over the next 3 to 6 weeks.
-
-If key indicator thresholds stay within nominal ranges for 4 consecutive weeks, scale commitment to full commercial deployment.
-
-#### Decision Implication
-Proceed with a phased scenario roll-out, establishing tight monitoring gates and hedging raw material or distribution commitments prior to full-scale capital allocation.
-
-#### Bottom Line
-The overall risk-adjusted return supports proactive execution, provided risk thresholds are reviewed bi-weekly against real-time market signals.
-
-#### Confidence & Evidence
-- **Confidence Level:** Medium — derived from market signal inference and regional trade data.
-- **Market Signal Strength:** Developing (verified across 3 independent data streams)
-- **Monitoring Horizon:** 2–4 weeks
-- **Recommended Next Review:** 14 days
-
-#### Key Signals Leading to This Intelligence
-- [High-Frequency Global Commodity & Trade Index Scan](#)
-- [Regional Regulatory Policy Database Alert Logging](#)
-- [E-Commerce Channel Consumer Intent & Search Volume Analytics](#)`;
-  };
-
-  const handleSend = async (textToSend?: string, categoryHint?: string) => {
+  const handleSend = async (textToSend?: string) => {
     const query = (textToSend || input).trim();
     if (!query || loading) return;
+
+    let session;
+    try {
+      const sessionRes = await supabase.auth.getSession();
+      session = sessionRes.data.session;
+    } catch {
+      session = null;
+    }
+
+    if (!session || !session.access_token) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(2),
+          role: "user",
+          text: query,
+          timestamp: new Date(),
+        },
+        {
+          id: Math.random().toString(36).substring(2),
+          role: "model",
+          text: "Please log in again.",
+          timestamp: new Date(),
+        },
+      ]);
+      setInput("");
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2),
@@ -2205,109 +891,71 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
     setInput("");
     setLoading(true);
 
-    const typeMap: Record<string, string> = {
-      "List": "list",
-      "Inference": "inference",
-      "Decision Intelligence": "decision",
+    const executeSend = async (convIdToUse?: string | null): Promise<{ res: Response; data: any }> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+      try {
+        const res = await diFetch(`/dynamic-rag/chat`, {
+          method: "POST",
+          body: JSON.stringify({
+            question: query,
+            conversationId: convIdToUse || undefined,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        const data = await res.json().catch(() => ({}));
+        return { res, data };
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        throw err;
+      }
     };
-    const explicitType = categoryHint ? typeMap[categoryHint] : undefined;
 
     try {
-      const response = await fetch(`${API_URL}/decision-intelligence-v2/chat-with-memory`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: query,
-          clientId: clientId,
-          industry: industry,
-          userId: userId,
-          conversationId: currentConversationId || undefined,
-          ...(explicitType ? { type: explicitType } : {}),
-        }),
-      });
+      let { res, data } = await executeSend(currentConversationId);
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const data = await response.json();
-
-      if (data.conversationId && !currentConversationId) {
-        setCurrentConversationId(data.conversationId);
-        setActiveSessionId(data.conversationId);
+      if ((!res.ok || data.ok === false) && data.error?.code === "CONVERSATION_NOT_FOUND") {
+        setCurrentConversationId(null);
+        localStorage.removeItem("dr_current_conversation_id");
+        const retryResult = await executeSend(null);
+        res = retryResult.res;
+        data = retryResult.data;
       }
 
-      // Refresh conversations list immediately so the new chat history item is visible without a page refresh
+      if (!res.ok || data.ok === false) {
+        const errorMsg = data.error?.message || "Sorry, I could not answer that. Please try again.";
+        throw new Error(errorMsg);
+      }
+
+      if (data.conversation_id && !currentConversationId) {
+        setCurrentConversationId(data.conversation_id);
+        setActiveSessionId(data.conversation_id);
+      }
+
       loadConversations();
       (fetchCreditUsage || onCreditUsageUpdate)?.();
 
       const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-
-      let modelText = "";
-      let listItems: any[] | undefined = undefined;
-      let sources: any[] = [];
-      let chartBase64: string | null = null;
-      let chartMeta: any = null;
-      let report: any = null;
-      let reportSources: any[] = [];
-      let noDataSuggestions: string[] = [];
-
-      if (data.greeting && data.message) {
-        // Trivial greeting / non-question: backend short-circuited before LLM.
-        modelText = data.message;
-        listItems = undefined;
-      } else if (data.no_data && data.message) {
-        // No relevant data: backend suggests alternative questions.
-        modelText = data.message;
-        listItems = undefined;
-        noDataSuggestions = data.suggestions || [];
-      } else if (data.type === "list") {
-        modelText = `Here is the requested intelligence list for "${query}":`;
-        listItems = (data.items || []).map((it: any, idx: number) => ({
-          id: it.id || `item-${idx}`,
-          title: it.title || "",
-          category: it.category || "",
-          summary: it.summary || "",
-          impact: it.impact || undefined,
-          module: it.module || undefined,
-          parentLabel: it.parentLabel || undefined,
-        }));
-      } else if (data.type === "inference") {
-        // NEW: structured report + sources
-        report = data.report || null;
-        reportSources = data.reportSources || data.sources || [];
-        // Fallback text for old-style responses (should not happen with new backend)
-        modelText = data.answer || convertReportToMarkdown(report);
-      } else if (data.type === "decision") {
-        // NEW: structured report + sources + optional chart
-        report = data.report || null;
-        reportSources = data.reportSources || data.sources || [];
-        modelText = data.answer || convertReportToMarkdown(report);
-        chartBase64 = data.chart || null;
-        chartMeta = data.chartMeta || null;
-      } else {
-        modelText = data.answer || data.text || "";
-        if (!modelText && report) {
-          modelText = convertReportToMarkdown(report);
-        }
-      }
-
+      const details: AnswerDetails | undefined =
+        data.answer_details && typeof data.answer_details === "object"
+          ? data.answer_details
+          : undefined;
+      const modelText = details?.body || data.answer || "";
       const tokens = modelText.match(/\S+\s*/g) || (modelText ? [modelText] : []);
       let currentIndex = 0;
       let streamedText = "";
 
-      const initialModelMessage: ChatMessage = {
+      const initialModelMessage: DIChatMessage = {
         id: modelId,
         role: "model",
         text: "",
+        details,
         isStreaming: tokens.length > 0,
-        sources,
-        listItems: tokens.length === 0 ? listItems : undefined,
-        chartBase64,
-        chartMeta,
-        report,
-        reportSources,
-        noDataSuggestions: tokens.length === 0 ? noDataSuggestions : undefined,
         timestamp: new Date(),
-      } as any;
+      };
 
       setMessages((prev) => [...prev.filter((m) => m.id !== modelId), initialModelMessage]);
 
@@ -2330,8 +978,6 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                     ...msg,
                     text: modelText,
                     isStreaming: false,
-                    listItems,
-                    noDataSuggestions,
                   }
                 : msg
             )
@@ -2356,25 +1002,28 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
           )
         );
       }, intervalTime);
-    } catch (err) {
+
+    } catch (err: any) {
       console.error("[DI] handleSend failed", err);
       setLoading(false);
 
       const modelId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      const errText =
+        err.message === "NO_SESSION"
+          ? "Please log in again."
+          : err.name === "AbortError"
+          ? "The request timed out. Please try again."
+          : err.message || "Sorry, I could not answer that. Please try again.";
       setMessages((prev) => [
         ...prev,
         {
           id: modelId,
           role: "model",
-          text: "Sorry, I couldn't reach the intelligence service. Please try again.",
+          text: errText,
           timestamp: new Date(),
         },
       ]);
     }
-  };
-
-  const updateOrAddSession = (_firstQuery: string, _currentMsgs: ChatMessage[]) => {
-    // No-op — backend already saved both messages during handleSend.
   };
 
   const handleSelectSession = async (session: ChatSession) => {
@@ -2382,122 +1031,65 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
     setActiveSessionId(session.id);
     setCurrentConversationId(session.id);
     try {
-      const res = await fetch(
-        `${API_URL}/decision-intelligence/conversations/${session.id}?userId=${encodeURIComponent(userId)}`
-      ).catch(() => null);
-
-      if (res && res.ok) {
+      const res = await diFetch(`/dynamic-rag/conversations/${session.id}`);
+      if (res.ok) {
         const data = await res.json();
-        const hydrated: ChatMessage[] = (data.messages || []).map((m: any) => {
-          if (m.role === "user") {
-            return {
-              id: m.id,
-              role: "user",
-              text: m.content || "",
-              timestamp: new Date(m.created_at),
-            };
-          }
-          const payload = m.payload || {};
-          const rawItems = payload.items || payload.listItems || [];
+        const msgs = data.messages || [];
+        const hydrated: DIChatMessage[] = msgs.map((m: any) => {
+          const rawDetails = m.payload || m.answer_details || m.details;
+          const details: AnswerDetails | undefined =
+            rawDetails && typeof rawDetails === "object"
+              ? rawDetails
+              : (m.body !== undefined || Array.isArray(m.sources))
+                ? { body: m.body, sources: m.sources }
+                : undefined;
           return {
-            id: m.id,
-            role: "model",
-            text: m.content || "",
-            timestamp: new Date(m.created_at),
-            ...payload,
-            chartBase64: payload.chart || payload.chartBase64 || null,
-            chartMeta: payload.chartMeta || null,
-            noDataSuggestions: payload.noDataSuggestions || payload.suggestions || [],
-            report: payload.report || null,
-            reportSources: payload.reportSources || payload.sources || [],
-            listItems: rawItems.map((it: any, idx: number) => ({
-              id: it.id || `item-${idx}`,
-              title: it.title || "",
-              category: it.category || "",
-              summary: it.summary || "",
-              impact: it.impact || undefined,
-              module: it.module || undefined,
-              parentLabel: it.parentLabel || undefined,
-            })),
+            id: m.id || Math.random().toString(36).substring(2),
+            role: m.role === "user" ? "user" : "model",
+            text: details?.body || m.content || m.text || "",
+            details,
+            timestamp: new Date(m.created_at || Date.now()),
           };
         });
         setMessages(hydrated);
         return;
       }
-
-      // Supabase fallback if API returns 404 or fails
-      const { data: msgData, error: msgErr } = await supabase
-        .from("di_messages")
-        .select("*")
-        .eq("conversation_id", session.id)
-        .order("created_at", { ascending: true });
-
-      if (!msgErr && msgData) {
-        const hydrated: ChatMessage[] = msgData.map((m: any) => {
-          if (m.role === "user") {
-            return {
-              id: m.id,
-              role: "user",
-              text: m.content || "",
-              timestamp: new Date(m.created_at),
-            };
-          }
-          const payload = m.payload || {};
-          const rawItems = payload.items || payload.listItems || [];
-          return {
-            id: m.id,
-            role: "model",
-            text: m.content || "",
-            timestamp: new Date(m.created_at),
-            ...payload,
-            chartBase64: payload.chart || payload.chartBase64 || null,
-            chartMeta: payload.chartMeta || null,
-            noDataSuggestions: payload.noDataSuggestions || payload.suggestions || [],
-            report: payload.report || null,
-            reportSources: payload.reportSources || payload.sources || [],
-            listItems: rawItems.map((it: any, idx: number) => ({
-              id: it.id || `item-${idx}`,
-              title: it.title || "",
-              category: it.category || "",
-              summary: it.summary || "",
-              impact: it.impact || undefined,
-              module: it.module || undefined,
-              parentLabel: it.parentLabel || undefined,
-            })),
-          };
-        });
-        setMessages(hydrated);
+      setMessages([]);
+    } catch (e: any) {
+      if (e.message === "NO_SESSION") {
+        setMessages([{
+          id: "no-session-err",
+          role: "model",
+          text: "Please log in again.",
+          timestamp: new Date(),
+        }]);
       } else {
+        console.warn("[DI] Unable to load conversation", e);
         setMessages([]);
       }
-    } catch (e) {
-      console.warn("[DI] Unable to load conversation", e);
-      setMessages([]);
     }
   };
 
   const handleDeleteSession = async (sessionId: string) => {
     try {
-      const res = await fetch(
-        `${API_URL}/decision-intelligence/conversations/${sessionId}?userId=${encodeURIComponent(userId)}`,
-        { method: 'DELETE' }
-      ).catch(() => null);
-
-      if (!res || !res.ok) {
-        await supabase.from("di_conversations").delete().eq("id", sessionId).eq("user_id", userId);
-      }
-
-      // Remove from local state
+      await diFetch(`/dynamic-rag/conversations/${sessionId}`, { method: 'DELETE' });
       setPreviousSessions(prev => prev.filter(s => s.id !== sessionId));
-
-      // If the currently open chat is being deleted, clear it
       if (activeSessionId === sessionId || currentConversationId === sessionId) {
         setMessages([]);
         setActiveSessionId(null);
         setCurrentConversationId(null);
       }
-    } catch (err) {
-      console.warn('[DI] delete session fallback:', err);
+    } catch (err: any) {
+      if (err.message === "NO_SESSION") {
+        setMessages([{
+          id: "no-session-err",
+          role: "model",
+          text: "Please log in again.",
+          timestamp: new Date(),
+        }]);
+      } else {
+        console.warn('[DI] delete session failed:', err);
+      }
     }
   };
 
@@ -2685,97 +1277,49 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                             ol: ({ children }) => (
                               <ol className="list-decimal pl-5 my-2 space-y-1 text-[13px] leading-relaxed text-slate-700 font-normal tracking-normal">{children}</ol>
                             ),
-                            li: ({ children }) => {
-                              const childrenArray = React.Children.toArray(children);
-                              const hasLink = childrenArray.some(
-                                (child) =>
-                                  React.isValidElement(child) &&
-                                  (child.type === "a" || ((child.props as any) && (child.props as any).href !== undefined))
-                              );
-
-                              if (hasLink) {
-                                let linkText = "";
-                                React.Children.forEach(children, (child) => {
-                                  if (React.isValidElement(child)) {
-                                    const props = child.props as any;
-                                    if (props && props.children) {
-                                      linkText = String(props.children);
-                                    } else {
-                                      const nested = props?.children;
-                                      if (typeof nested === "string") {
-                                        linkText = nested;
-                                      } else if (Array.isArray(nested)) {
-                                        linkText = nested.join("");
-                                      }
-                                    }
-                                  }
-                                });
-
-                                if (!linkText) {
-                                  linkText = childrenArray.map(c => typeof c === "string" ? c : "").join("").trim();
-                                }
-
-                                const isExpanded = !!expandedItems[linkText];
-                                const signalDetails = getSignalDetails(linkText);
-
+                            li: ({ children }) => (
+                              <li className="leading-relaxed text-[13px] py-0.5 text-slate-700 font-normal tracking-normal">{children}</li>
+                            ),
+                            a: ({ href, children }) => {
+                              if (href && href.startsWith("#source-")) {
+                                const numStr = href.slice("#source-".length);
+                                const num = Number(numStr);
+                                const matchedSource = msg.details?.sources?.find(
+                                  (s) => Number(s.n) === num || String(s.n) === numStr
+                                );
                                 return (
-                                  <li className="flex flex-col py-0.5 -ml-5 list-none font-sans">
-                                    <div
-                                      onClick={() => {
-                                        setExpandedItems((prev) => ({
-                                          ...prev,
-                                          [linkText]: !isExpanded,
-                                        }));
-                                      }}
-                                      className="flex items-center gap-2 py-0.5 cursor-pointer group select-none"
-                                    >
-                                      <FileText className={`w-3.5 h-3.5 shrink-0 transition-colors ${isExpanded ? "text-[#2d39d2]" : "text-[#8a8d98] group-hover:text-[#2d39d2]"}`} />
-                                      <span className={`text-[11.5px] font-sans font-medium transition-colors ${isExpanded ? "text-[#2d39d2]" : "text-[#2d2f36] group-hover:text-[#2d39d2]"}`}>
-                                        {linkText}
-                                      </span>
-                                    </div>
-                                    {isExpanded && (
-                                      <div className="pl-5.5 mt-1 pb-1 flex flex-col gap-1.5 border-l border-zinc-200 ml-[6px]">
-                                        <p className="text-[11px] text-zinc-500 font-sans leading-relaxed font-normal">
-                                          {signalDetails.text}
-                                        </p>
-                                        <div className="flex justify-start">
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              if (onTabChange) {
-                                                onTabChange(signalDetails.tabId);
-                                              }
-                                            }}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 hover:bg-purple-100 text-[#2d39d2] border border-purple-200/50 rounded-[3px] text-[10px] font-medium font-sans transition-colors cursor-pointer"
-                                          >
-                                            <span>Read more in {signalDetails.tabLabel}</span>
-                                            <ArrowUp className="w-2.5 h-2.5 rotate-45" />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </li>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (matchedSource) {
+                                        handleSourceOpen(matchedSource);
+                                      }
+                                    }}
+                                    title={matchedSource ? `${matchedSource.title}${matchedSource.module_name ? ` — ${matchedSource.module_name}` : ""}` : undefined}
+                                    className="inline-flex items-center justify-center px-1 py-0 mx-0.5 bg-[#eef1fe] hover:bg-[#dce2fd] text-[#2d39d2] border border-[#2d39d2]/25 rounded-[3px] text-[10.5px] font-semibold leading-tight align-baseline cursor-pointer transition-colors font-mono"
+                                  >
+                                    [{Number.isFinite(num) ? num : numStr}]
+                                  </button>
                                 );
                               }
-
-                              return <li className="leading-relaxed text-[13px] py-0.5 text-slate-700 font-normal tracking-normal">{children}</li>;
+                              return (
+                                <a
+                                  href={href || "#"}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => {
+                                    if (!href || href === "#") {
+                                      e.preventDefault();
+                                    }
+                                  }}
+                                  className="text-[#2d2f36] hover:text-[#2d39d2] font-medium transition-colors hover:underline decoration-zinc-300"
+                                >
+                                  {children}
+                                </a>
+                              );
                             },
-                            a: ({ href, children }) => (
-                              <a
-                                href={href || "#"}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => {
-                                  if (!href || href === "#") {
-                                    e.preventDefault();
-                                  }
-                                }}
-                                className="text-[#2d2f36] hover:text-[#2d39d2] font-medium transition-colors hover:underline decoration-zinc-300"
-                              >
-                                {children}
-                              </a>
-                            ),
                             strong: ({ children }) => <strong className="font-semibold text-zinc-900">{children}</strong>,
                             em: ({ children }) => <em className="italic text-zinc-600">{children}</em>,
                             table: ({ children }) => (
@@ -2867,8 +1411,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                           return (
                             <div
                               key={itemKey}
-                              onClick={() => handleListItemClick(item)}
-                              className="flex items-center justify-between gap-4 py-2 px-3.5 hover:bg-zinc-50/70 transition-colors cursor-pointer group/row"
+                              className="flex items-center justify-between gap-4 py-2 px-3.5 hover:bg-zinc-50/70 transition-colors group/row"
                             >
                               <span className="text-[13px] text-slate-700 font-normal leading-relaxed tracking-normal group-hover/row:text-zinc-950">
                                 {item.title}
@@ -2926,6 +1469,50 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                     {msg.role === "model" && !msg.report && msg.sources && msg.sources.length > 0 && (
                       <div className="mt-3 pt-2.5 border-t border-zinc-200/60">
                         <ChatSources sources={msg.sources} />
+                      </div>
+                    )}
+
+                    {msg.role === "model" && !msg.isStreaming && msg.details?.sources && msg.details.sources.length > 0 && (
+                      <div className="mt-3 pt-2.5 border-t border-zinc-200/60">
+                        <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                          <Search className="w-3 h-3" />
+                          Sources
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {msg.details.sources.map((src, sIdx) => {
+                            const metaText = [src.module_name, src.date].filter(Boolean).join(", ");
+                            const mod = src.module || "";
+                            const tab = MODULE_TO_TAB[mod] || MODULE_TO_TAB[mod.toLowerCase()];
+                            const canOpen = Boolean(tab && onTabChange && src.signal_id);
+                            return (
+                              <button
+                                key={src.signal_id || src.n || sIdx}
+                                type="button"
+                                onClick={() => handleSourceOpen(src)}
+                                disabled={!canOpen}
+                                className={`w-full text-left flex items-start gap-1.5 px-1.5 py-1 rounded-[4px] text-[11.5px] leading-snug transition-colors ${
+                                  canOpen
+                                    ? "hover:bg-zinc-50 text-zinc-700 hover:text-[#2d39d2] cursor-pointer group"
+                                    : "text-zinc-600 cursor-default"
+                                }`}
+                              >
+                                <span className="font-mono text-[10.5px] font-semibold text-[#2d39d2] shrink-0">
+                                  [{src.n}]
+                                </span>
+                                <span className="flex-1 min-w-0">
+                                  <span className="font-medium text-zinc-800 group-hover:text-[#2d39d2] transition-colors">
+                                    {src.title}
+                                  </span>
+                                  {metaText && (
+                                    <span className="text-zinc-500 font-normal">
+                                      {" "}— {metaText}
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
 
@@ -3295,7 +1882,7 @@ The overall risk-adjusted return supports proactive execution, provided risk thr
                         key={item.id}
                         onClick={() => {
                           setShowQuestionLibraryModal(false);
-                          handleSend(item.question, item.category);
+                          handleSend(item.question);
                         }}
                         className="p-2.5 border border-zinc-200/90 hover:border-[#2d39d2] rounded-[4px] bg-white hover:bg-purple-50/20 transition-all cursor-pointer group flex flex-col justify-center"
                       >
