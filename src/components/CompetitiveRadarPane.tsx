@@ -732,57 +732,105 @@ export default function CompetitiveRadarPane({ onReturn, onSwitchToDecisionIntel
   // Accordion state: by default, all categories are expanded
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
+  // A link from the Decision Intelligence chat can be ONE article (signal)
+  // inside a card. Its card is looked up, then kept as pendingNav (state,
+  // so it does not depend on the link id staying set) until the card list
+  // has it: the card opens with that article selected.
+  const [pendingNav, setPendingNav] = useState<{ cardId: string; signalId: string | null } | null>(null);
+  const lookedUpRef = React.useRef<string | null>(null);
+
+  const openCardFromLink = (card: any, focusSignalId: string | null) => {
+    if (activeTab !== "Overview" && card.organization.toLowerCase() !== activeTab.toLowerCase()) {
+      setActiveTab("Overview");
+    }
+    if (selectedCategoryFilter !== "All" && card.category !== selectedCategoryFilter) {
+      setSelectedCategoryFilter("All");
+    }
+    if (searchQuery.trim() !== "") {
+      setSearchQuery("");
+    }
+    const cat = card.category || "General Updates";
+    setExpandedCategories((prev) => ({ ...prev, [cat]: true }));
+    setSelectedLiveCard(card);
+    setSelectedSignalId(focusSignalId);
+    setSelectedItem(null);
+    setExpandedQuotesSignalIds({});
+
+    setTimeout(() => {
+      const el = document.getElementById(`change-card-${card.id}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+
+    if (focusSignalId) {
+      // the card's articles load after it opens: wait for this one, then show it
+      let tries = 0;
+      const showSignal = () => {
+        const el = document.getElementById(`signal-card-${focusSignalId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("ring-2", "ring-[#2d39d2]", "ring-offset-2");
+          setTimeout(() => el.classList.remove("ring-2", "ring-[#2d39d2]", "ring-offset-2"), 2500);
+        } else if (tries < 20) {
+          tries += 1;
+          setTimeout(showSignal, 150);
+        }
+      };
+      setTimeout(showSignal, 200);
+    }
+  };
+
+  // 1. a link arrives: a card id opens at once; any other id is looked up
+  //    as an article, and its card becomes pendingNav
   useEffect(() => {
     if (!navigatedItemId) return;
     if (!effectiveClientId) {
       onClearNavigatedItem?.();
       return;
     }
-
-    const card = liveChanges.find((c) => c.id === navigatedItemId);
+    const id = navigatedItemId;
+    const card = liveChanges.find((c) => c.id === id);
+    console.log("[CR nav] link:", id, "| is a card on screen:", Boolean(card), "| cards loaded:", liveChanges.length);
     if (card) {
-      if (activeTab !== "Overview" && card.organization.toLowerCase() !== activeTab.toLowerCase()) {
-        setActiveTab("Overview");
-      }
-      if (selectedCategoryFilter !== "All" && card.category !== selectedCategoryFilter) {
-        setSelectedCategoryFilter("All");
-      }
-      if (searchQuery.trim() !== "") {
-        setSearchQuery("");
-      }
-
-      const cat = card.category || "General Updates";
-      setExpandedCategories((prev) => ({
-        ...prev,
-        [cat]: true,
-      }));
-      setSelectedLiveCard(card);
-      setSelectedSignalId(null);
-      setSelectedItem(null);
-      setExpandedQuotesSignalIds({});
-
-      setTimeout(() => {
-        const el = document.getElementById(`change-card-${card.id}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 80);
-
+      openCardFromLink(card, null);
       onClearNavigatedItem?.();
       return;
     }
+    if (lookedUpRef.current === id) return;   // already being looked up
+    lookedUpRef.current = id;
+    supabase
+      .from("competitor_signals_live")
+      .select("change_id")
+      .eq("id", id)
+      .limit(1)
+      .maybeSingle()
+      .then((res) => {
+        const cardId = res.data?.change_id || null;
+        console.log("[CR nav] article lookup:", id, "-> card:", cardId, res.error ? `error: ${res.error.message}` : "");
+        // an article -> open its card with the article; else the id is a card not loaded yet
+        setPendingNav(cardId ? { cardId, signalId: id } : { cardId: id, signalId: null });
+        lookedUpRef.current = null;
+        onClearNavigatedItem?.();
+      });
+  }, [navigatedItemId, effectiveClientId, liveChanges]);
 
-    if (isActivityLoading || !hasChangesFetched) {
+  // 2. open the pending card once the card list has it (all time if needed)
+  useEffect(() => {
+    if (!pendingNav) return;
+    const card = liveChanges.find((c) => c.id === pendingNav.cardId);
+    console.log("[CR nav] pending card:", pendingNav.cardId, "| article:", pendingNav.signalId, "| found:", Boolean(card), "| loading:", isActivityLoading, "| timeframe:", selectedTimeframe);
+    if (card) {
+      openCardFromLink(card, pendingNav.signalId);
+      setPendingNav(null);
       return;
     }
-
+    if (isActivityLoading || !hasChangesFetched) return;
     if (selectedTimeframe !== "All time") {
       setSelectedTimeframe("All time");
       return;
     }
-
-    onClearNavigatedItem?.();
-  }, [navigatedItemId, effectiveClientId, liveChanges, isActivityLoading, hasChangesFetched, selectedTimeframe]);
+    console.log("[CR nav] gave up: card not found in any timeframe", pendingNav.cardId);
+    setPendingNav(null);
+  }, [pendingNav, liveChanges, isActivityLoading, hasChangesFetched, selectedTimeframe]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => ({

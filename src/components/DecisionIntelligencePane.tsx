@@ -55,6 +55,7 @@ import {
   Trash2,
   ShieldAlert,
   ExternalLink,
+  ArrowUpRight,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { ChatMessage } from "../types";
@@ -70,11 +71,17 @@ export interface AnswerSource {
   module_name: string;
   date?: string;
   signal_id?: string;
+  // the one news a click opens (a Competitive Radar card: its article closest to the question)
+  open_id?: string;
+  // the card the news sits on (Forward Outlook trend or Market Dynamics card)
+  card?: { kind: "trend" | "market_card"; id: string; name?: string | null } | null;
 }
 
 export interface AnswerDetails {
   body?: string;
   sources?: AnswerSource[];
+  // news found but not used in the answer (shown as one closed line)
+  other_sources?: AnswerSource[];
 }
 
 export type DIChatMessage = ChatMessage & {
@@ -742,11 +749,11 @@ export default function DecisionIntelligencePane({
   }
 
   const handleSourceOpen = (source: any) => {
-    console.log("[DI open]", source.module, "|", source.title, "| signal_id:", source.signal_id);
+    console.log("[DI open]", source.module, "|", source.title, "| signal_id:", source.signal_id, "| open_id:", source.open_id);
     const mod = source.module || "";
     const tab = MODULE_TO_TAB[mod] || MODULE_TO_TAB[mod.toLowerCase()];
     if (!tab || !onTabChange) return;
-    onTabChange(tab.tabId, source.signal_id || undefined);
+    onTabChange(tab.tabId, source.open_id || source.signal_id || undefined);
   };
 
 const DecisionChart: React.FC<{
@@ -965,9 +972,18 @@ const DecisionChart: React.FC<{
         return;
       }
 
-      const intervalTime = tokens.length > 400 ? 12 : tokens.length > 200 ? 16 : 18;
+      // The whole answer is already here: the typing is only for the look.
+      // It always ends within about TYPING_MAX_MS (several words per step),
+      // and when this page is not on screen (another app or browser tab)
+      // the browser slows timers down, so the full answer is put at once.
+      const TYPING_STEP_MS = 16;
+      const TYPING_MAX_MS = 2000;
+      const wordsPerStep = Math.max(1, Math.ceil(tokens.length / (TYPING_MAX_MS / TYPING_STEP_MS)));
+      const intervalTime = TYPING_STEP_MS;
+      if (typeof document !== "undefined" && document.hidden) currentIndex = tokens.length;
 
       const timer = setInterval(() => {
+        if (typeof document !== "undefined" && document.hidden) currentIndex = tokens.length;
         if (currentIndex >= tokens.length) {
           clearInterval(timer);
           setLoading(false);
@@ -986,9 +1002,9 @@ const DecisionChart: React.FC<{
           return;
         }
 
-        const nextWord = tokens[currentIndex];
-        currentIndex += 1;
-        streamedText += nextWord;
+        const nextWords = tokens.slice(currentIndex, currentIndex + wordsPerStep).join("");
+        currentIndex += wordsPerStep;
+        streamedText += nextWords;
 
         setMessages((prev) =>
           prev.map((msg) =>
@@ -1473,46 +1489,101 @@ const DecisionChart: React.FC<{
                     )}
 
                     {msg.role === "model" && !msg.isStreaming && msg.details?.sources && msg.details.sources.length > 0 && (
-                      <div className="mt-3 pt-2.5 border-t border-zinc-200/60">
-                        <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <Search className="w-3 h-3" />
-                          Sources
+                      <div className="mt-4 pt-3 border-t border-zinc-200/60">
+                        <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                          Key Signals Leading to This Intelligence
                         </div>
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col divide-y divide-zinc-100 border border-zinc-200/70 rounded-[6px] bg-white">
                           {msg.details.sources.map((src, sIdx) => {
-                            const metaText = [src.module_name, src.date].filter(Boolean).join(", ");
                             const mod = src.module || "";
                             const tab = MODULE_TO_TAB[mod] || MODULE_TO_TAB[mod.toLowerCase()];
                             const canOpen = Boolean(tab && onTabChange && src.signal_id);
+                            const badge = (src.module_name || (tab ? tab.tabLabel : mod)).toUpperCase();
                             return (
                               <button
                                 key={src.signal_id || src.n || sIdx}
                                 type="button"
                                 onClick={() => handleSourceOpen(src)}
                                 disabled={!canOpen}
-                                className={`w-full text-left flex items-start gap-1.5 px-1.5 py-1 rounded-[4px] text-[11.5px] leading-snug transition-colors ${
-                                  canOpen
-                                    ? "hover:bg-zinc-50 text-zinc-700 hover:text-[#2d39d2] cursor-pointer group"
-                                    : "text-zinc-600 cursor-default"
+                                title={canOpen && tab ? `Open in ${tab.tabLabel}` : undefined}
+                                className={`w-full text-left flex items-center gap-2.5 px-2.5 py-2 text-[12px] leading-snug transition-colors ${
+                                  canOpen ? "hover:bg-zinc-50 cursor-pointer group" : "cursor-default"
                                 }`}
                               >
-                                <span className="font-mono text-[10.5px] font-semibold text-[#2d39d2] shrink-0">
+                                <span className="font-mono text-[10.5px] font-semibold text-[#2d39d2] shrink-0 w-[22px]">
                                   [{src.n}]
                                 </span>
+                                <span className="shrink-0 w-[132px] truncate rounded-[3px] bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-zinc-500 text-center">
+                                  {badge}
+                                </span>
                                 <span className="flex-1 min-w-0">
-                                  <span className="font-medium text-zinc-800 group-hover:text-[#2d39d2] transition-colors">
+                                  <span className={`font-medium text-zinc-800 transition-colors ${canOpen ? "group-hover:text-[#2d39d2]" : ""}`}>
                                     {src.title}
                                   </span>
-                                  {metaText && (
-                                    <span className="text-zinc-500 font-normal">
-                                      {" "}— {metaText}
+                                  {src.date && (
+                                    <span className="text-zinc-400 font-normal text-[11px]">
+                                      {" "}· {src.date}
                                     </span>
                                   )}
                                 </span>
+                                {canOpen && (
+                                  <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-zinc-400 group-hover:text-[#2d39d2] transition-colors" />
+                                )}
                               </button>
                             );
                           })}
                         </div>
+                        {msg.details.other_sources && msg.details.other_sources.length > 0 && (
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedItems((prev) => ({ ...prev, [`other-${msg.id}`]: !prev[`other-${msg.id}`] }))}
+                              className="flex items-center gap-1 text-[11px] font-medium text-zinc-500 hover:text-[#2d39d2] cursor-pointer transition-colors"
+                            >
+                              {expandedItems[`other-${msg.id}`] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                              Other related news ({msg.details.other_sources.length})
+                            </button>
+                            {expandedItems[`other-${msg.id}`] && (
+                              <div className="mt-1.5 flex flex-col divide-y divide-zinc-100 border border-zinc-200/70 rounded-[6px] bg-white">
+                                {msg.details.other_sources.map((src, oIdx) => {
+                                  const mod = src.module || "";
+                                  const tab = MODULE_TO_TAB[mod] || MODULE_TO_TAB[mod.toLowerCase()];
+                                  const canOpen = Boolean(tab && onTabChange && src.signal_id);
+                                  const badge = (src.module_name || (tab ? tab.tabLabel : mod)).toUpperCase();
+                                  return (
+                                    <button
+                                      key={src.signal_id || src.n || oIdx}
+                                      type="button"
+                                      onClick={() => handleSourceOpen(src)}
+                                      disabled={!canOpen}
+                                      title={canOpen && tab ? `Open in ${tab.tabLabel}` : undefined}
+                                      className={`w-full text-left flex items-center gap-2.5 px-2.5 py-1.5 text-[11.5px] leading-snug transition-colors ${
+                                        canOpen ? "hover:bg-zinc-50 cursor-pointer group" : "cursor-default"
+                                      }`}
+                                    >
+                                      <span className="shrink-0 w-[132px] truncate rounded-[3px] bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-zinc-500 text-center">
+                                        {badge}
+                                      </span>
+                                      <span className="flex-1 min-w-0">
+                                        <span className={`text-zinc-700 transition-colors ${canOpen ? "group-hover:text-[#2d39d2]" : ""}`}>
+                                          {src.title}
+                                        </span>
+                                        {src.date && (
+                                          <span className="text-zinc-400 font-normal text-[11px]">
+                                            {" "}· {src.date}
+                                          </span>
+                                        )}
+                                      </span>
+                                      {canOpen && (
+                                        <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-zinc-400 group-hover:text-[#2d39d2] transition-colors" />
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1907,4 +1978,3 @@ const DecisionChart: React.FC<{
     </div>
   );
 }
-

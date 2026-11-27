@@ -1056,15 +1056,16 @@ export default function ForewardOutlookPane({
 
     (async () => {
       try {
-        // First check if navigatedItemId is a signal id in trend_membership
-        const { data, error } = await supabase
+        // First check if navigatedItemId is a signal id in trend_membership.
+        // A signal can sit in more than one trend (also in candidate trends
+        // that are not shown here), so pick the trend that is on this screen.
+        const { data } = await supabase
           .from("trend_membership")
           .select("trend_id")
-          .eq("signal_id", navigatedItemId)
-          .limit(1)
-          .maybeSingle();
+          .eq("signal_id", navigatedItemId);
 
-        let targetTrendId = data?.trend_id;
+        const memberTrendIds = (data || []).map((m: any) => m.trend_id);
+        let targetTrendId = memberTrendIds.find((id: string) => trends.some(t => t.id === id));
         let isSignal = Boolean(targetTrendId);
 
         // If not found in membership, check if navigatedItemId is directly a trend id
@@ -1251,12 +1252,17 @@ const [sectorRanges, setSectorRanges] = useState<Record<string, { start: number,
             m => m.joined_at && new Date(m.joined_at) >= oneWeekAgo
           ).length;
 
-          const { data: signalsData, error: signalsError } = await supabase
-            .from("trend_signals")
-            .select("*")
-            .in("id", signalIds);
-
-          if (signalsError) throw signalsError;
+          // A trend with many signals made one very long web address
+          // ("id=in.(...)" with every id), which the database server refused
+          // (the browser showed it as a CORS error, and the trend opened
+          // with "Signals (0)"). The ids are read in small groups instead.
+          const SIGNAL_IDS_PER_READ = 80;
+          const groups: string[][] = [];
+          for (let k = 0; k < signalIds.length; k += SIGNAL_IDS_PER_READ) groups.push(signalIds.slice(k, k + SIGNAL_IDS_PER_READ));
+          const parts = await Promise.all(groups.map((ids) => supabase.from("trend_signals").select("*").in("id", ids)));
+          const failed = parts.find((r) => r.error);
+          if (failed && failed.error) throw failed.error;
+          const signalsData = parts.flatMap((r) => r.data || []);
 
           if (signalsData) {
             const mappedSignals: SourceItem[] = signalsData.map(s => ({
