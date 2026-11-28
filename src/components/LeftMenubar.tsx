@@ -10,7 +10,7 @@ interface LeftMenubarProps {
 }
 
 export default function LeftMenubar({ activeTab, onTabChange, onLogout, userInitials, userName }: LeftMenubarProps) {
-  // Compute initials: if provided explicitly use it, or derive from userName, or default to "HW" (Hannah Wells)
+  // Compute initials: if provided explicitly use it, or derive from userName, or default to ""
   const displayInitials = (() => {
     if (userInitials) return userInitials.toUpperCase();
     if (userName) {
@@ -18,12 +18,12 @@ export default function LeftMenubar({ activeTab, onTabChange, onLogout, userInit
       if (parts.length >= 2) {
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
       }
-      return parts[0]?.slice(0, 2).toUpperCase() || "HW";
+      return parts[0]?.slice(0, 2).toUpperCase() || "";
     }
-    return "HW";
+    return "";
   })();
 
-  const tooltipName = userName || (displayInitials === "HW" ? "Hannah Wells" : "User Profile");
+  const tooltipName = userName || "User Profile";
   // Map string icon names to actual Lucide component instances
   const renderIcon = (iconName: string, isActive: boolean, itemId?: string) => {
     let iconColor = isActive ? "text-[#2d39d2]" : "text-zinc-500 hover:text-zinc-800";
@@ -69,7 +69,7 @@ export default function LeftMenubar({ activeTab, onTabChange, onLogout, userInit
       id="left-menubar-rail" 
       className="w-[56px] h-full bg-[#fbfbfb] border-r border-zinc-200 flex flex-col justify-between py-2 items-center select-none"
     >
-      {/* Top Section with User Avatar: User Initials Badge (e.g. HW) */}
+      {/* Top Section with User Avatar: User Initials Badge */}
       <div className="flex flex-col items-center gap-1.5 w-full">
         <div id="user-avatar-container" onClick={() => onTabChange("landing_page")} className="relative group cursor-pointer mb-1.5 flex items-center justify-center">
           <div className="w-7 h-7 bg-zinc-900 text-white rounded-full flex items-center justify-center text-[10.5px] font-bold tracking-tight border border-zinc-800 hover:bg-black transition-colors">

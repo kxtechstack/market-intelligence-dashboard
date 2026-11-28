@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { supabase } from "./lib/supabase";
+import { useAccessGuard } from "./lib/useAccessGuard";
 import LeftMenubar from "./components/LeftMenubar";
 import IntelligencePane from "./components/IntelligencePane";
 import LatestPane from "./components/LatestPane";
@@ -58,8 +59,8 @@ function TopMenuBar({
   activeTab,
   onTabChange,
   isLoggedIn,
-  userName = "Hannah Wells",
-  companyName = "Lumière Beauty Group",
+  userName = "",
+  companyName = "",
   clientId,
   userId,
   creditUsage: propCreditUsage,
@@ -513,9 +514,11 @@ function TopMenuBar({
                 >
                   {userName}
                 </span>
-                <span className="text-[10.5px] text-zinc-500 font-normal leading-snug">
-                  {companyName}
-                </span>
+                {companyName && (
+                  <span className="text-[10.5px] text-zinc-500 font-normal leading-snug">
+                    {companyName}
+                  </span>
+                )}
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-150 ${openDropdown === "user" ? "rotate-180" : ""}`} />
             </div>
@@ -825,9 +828,9 @@ export default function App() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [industry, setIndustry] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>("Hannah Wells");
-  const [companyName, setCompanyName] = useState<string>("Lumière Beauty Group");
-  const [userInitials, setUserInitials] = useState<string>("HW");
+  const [userName, setUserName] = useState<string>("");
+  const [companyName, setCompanyName] = useState<string>("");
+  const [userInitials, setUserInitials] = useState<string>("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isRecoveryFlow, setIsRecoveryFlow] = useState(() => window.location.hash.includes('access_token'));
   const [creditUsage, setCreditUsage] = useState<{ used: number; total: number; remaining: number } | null>(null);
@@ -932,7 +935,9 @@ export default function App() {
     if (isRecoveryFlow) pageName = "Set Password";
     if (!isLoggedIn && activeTab !== "support") pageName = "Login";
 
-    document.title = `InsideMarkets AI | ${pageName} | ${companyName}`;
+    document.title = companyName
+      ? `InsideMarkets AI | ${pageName} | ${companyName}`
+      : `InsideMarkets AI | ${pageName}`;
   }, [activeTab, companyName, isLoggedIn, isRecoveryFlow]);
 
   const [navigatedItemId, setNavigatedItemId] = useState<string | null>(null);
@@ -954,6 +959,56 @@ export default function App() {
     setNavigatedItemId(id);
   };
 
+  const clearLoggedInStorage = () => {
+    try {
+      sessionStorage.removeItem("policy_risk_start_date");
+      sessionStorage.removeItem("policy_risk_end_date");
+      sessionStorage.removeItem("market_dynamics_start_date");
+      sessionStorage.removeItem("market_dynamics_end_date");
+      sessionStorage.removeItem("foreward_outlook_start_date");
+      sessionStorage.removeItem("foreward_outlook_end_date");
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith("market_dynamics_cache_") || key.startsWith("competitive_intelligence_"))) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+    try {
+      localStorage.removeItem("app_active_tab");
+      localStorage.removeItem("dr_current_conversation_id");
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const resetSessionState = () => {
+    clearLoggedInStorage();
+    setIsLoggedIn(false);
+    setActiveTab("landing_page");
+    setUserId(null);
+    setClientId(null);
+    setIndustry(null);
+    setUserName("");
+    setCompanyName("");
+    setUserInitials("");
+    setCreditUsage(null);
+    setSelectedAlert(null);
+    setChatHistory([]);
+    setEmail("");
+    setPassword("");
+  };
+
+  useAccessGuard({
+    enabled: isLoggedIn && !isRecoveryFlow,
+    onRevoked: (message) => {
+      resetSessionState();
+      setLoginError(message);
+    },
+  });
+
   useEffect(() => {
     const initializeAuth = async () => {
       setAuthLoading(true);
@@ -961,6 +1016,34 @@ export default function App() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session && !isRecoveryFlow) {
+          if (session.access_token) {
+            try {
+              const statusRes = await fetch(`${API_URL}/auth/access-status`, {
+                method: "GET",
+                headers: {
+                  Authorization: `Bearer ${session.access_token}`,
+                },
+              });
+              if (statusRes.status === 401) {
+                await supabase.auth.signOut().catch(() => {});
+                resetSessionState();
+                setLoginError("Your access has been turned off. Please contact your administrator.");
+                return;
+              }
+              if (statusRes.ok) {
+                const statusData = await statusRes.json().catch(() => null);
+                if (statusData && statusData.active === false) {
+                  await supabase.auth.signOut().catch(() => {});
+                  resetSessionState();
+                  setLoginError("Your access has been turned off. Please contact your administrator.");
+                  return;
+                }
+              }
+            } catch {
+              // Network or server error: ignore and let useAccessGuard retry later
+            }
+          }
+
           const userEmail = session.user.email;
           if (userEmail) {
             // Look up client_id, id, and user name in admin.client_users
@@ -986,19 +1069,20 @@ export default function App() {
               setUserId(userData.id);
               setClientId(userData.client_id);
               setIndustry(clientData?.industry || "Retail");
-              if (clientData?.company_name) {
-                setCompanyName(clientData.company_name);
-              }
-              
+              setCompanyName(clientData?.company_name || "");
+
+              const emailName = userEmail.split("@")[0] || "";
+              const emailInitial = emailName ? emailName[0].toUpperCase() : "";
+
               if (userData.first_name || userData.last_name) {
                 const fullName = `${userData.first_name || ""} ${userData.last_name || ""}`.trim();
-                setUserName(fullName || "Hannah Wells");
-                const firstInitial = userData.first_name ? userData.first_name[0] : "";
-                const lastInitial = userData.last_name ? userData.last_name[0] : "";
-                setUserInitials((firstInitial + lastInitial).toUpperCase() || "HW");
+                setUserName(fullName || emailName);
+                const firstInitial = userData.first_name?.trim() ? userData.first_name.trim()[0] : "";
+                const lastInitial = userData.last_name?.trim() ? userData.last_name.trim()[0] : "";
+                setUserInitials((firstInitial + lastInitial).toUpperCase() || emailInitial);
               } else {
-                setUserName("Hannah Wells");
-                setUserInitials("HW");
+                setUserName(emailName);
+                setUserInitials(emailInitial);
               }
               setIsLoggedIn(true);
             }
@@ -1013,14 +1097,11 @@ export default function App() {
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY" || event === "USER_UPDATED") {
         setIsRecoveryFlow(true);
-      } else if (event === "SIGNED_OUT") {
-        setIsLoggedIn(false);
-        setUserId(null);
-        setClientId(null);
-        setIndustry(null);
+      } else if (event === "SIGNED_OUT" || (event === "TOKEN_REFRESHED" && !session)) {
+        resetSessionState();
       }
     });
 
@@ -1050,7 +1131,44 @@ export default function App() {
         password,
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        const msg = (authError.message || "").toLowerCase();
+        if (msg.includes("banned") || authError.code === "user_banned") {
+          throw new Error("Unable to log in? Please contact the administrator for assistance.");
+        }
+        throw authError;
+      }
+
+      // Check backend access status once after successful login
+      const accessToken =
+        authData.session?.access_token ||
+        (await supabase.auth.getSession()).data.session?.access_token;
+
+      if (accessToken) {
+        try {
+          const statusRes = await fetch(`${API_URL}/auth/access-status`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+          if (statusRes.ok) {
+            const statusData = await statusRes.json().catch(() => null);
+            if (statusData && statusData.active === false) {
+              await supabase.auth.signOut().catch(() => {});
+              throw new Error("Unable to log in? Please contact the administrator for assistance.");
+            }
+          } else if (statusRes.status === 401) {
+            await supabase.auth.signOut().catch(() => {});
+            throw new Error("Unable to log in? Please contact the administrator for assistance.");
+          }
+        } catch (statusErr: any) {
+          if (statusErr?.message === "Unable to log in? Please contact the administrator for assistance.") {
+            throw statusErr;
+          }
+          // Network or 500 error: do not block login
+        }
+      }
 
       // 2. Look up client_id and id in admin.client_users
       const { data: userData, error: userError } = await supabase
@@ -1084,19 +1202,21 @@ export default function App() {
       setUserId(userData.id);
       setClientId(userData.client_id);
       setIndustry(clientData?.industry || "Retail");
-      if (clientData?.company_name) {
-        setCompanyName(clientData.company_name);
-      }
-      
+      setCompanyName(clientData?.company_name || "");
+
+      const emailSource = authData.user?.email || email;
+      const emailName = emailSource.split("@")[0] || "";
+      const emailInitial = emailName ? emailName[0].toUpperCase() : "";
+
       if (userData.first_name || userData.last_name) {
         const fullName = `${userData.first_name || ""} ${userData.last_name || ""}`.trim();
-        setUserName(fullName || "Hannah Wells");
-        const firstInitial = userData.first_name ? userData.first_name[0] : "";
-        const lastInitial = userData.last_name ? userData.last_name[0] : "";
-        setUserInitials((firstInitial + lastInitial).toUpperCase() || "HW");
+        setUserName(fullName || emailName);
+        const firstInitial = userData.first_name?.trim() ? userData.first_name.trim()[0] : "";
+        const lastInitial = userData.last_name?.trim() ? userData.last_name.trim()[0] : "";
+        setUserInitials((firstInitial + lastInitial).toUpperCase() || emailInitial);
       } else {
-        setUserName("Hannah Wells");
-        setUserInitials("HW");
+        setUserName(emailName);
+        setUserInitials(emailInitial);
       }
 
       setActiveTab("landing_page");
@@ -1186,25 +1306,13 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    setLoginError(null);
     try {
       await supabase.auth.signOut();
     } catch (err) {
       console.error("Logout error:", err);
     }
-    sessionStorage.removeItem("policy_risk_start_date");
-    sessionStorage.removeItem("policy_risk_end_date");
-    sessionStorage.removeItem("market_dynamics_start_date");
-    sessionStorage.removeItem("market_dynamics_end_date");
-    sessionStorage.removeItem("foreward_outlook_start_date");
-    sessionStorage.removeItem("foreward_outlook_end_date");
-    localStorage.removeItem("app_active_tab");
-    setIsLoggedIn(false);
-    setActiveTab("landing_page");
-    setUserId(null);
-    setClientId(null);
-    setIndustry(null);
-    setEmail("");
-    setPassword("");
+    resetSessionState();
   };
 
   // Switch between workspaces based on active tab
